@@ -47,18 +47,17 @@ function pickPhone(person: Json): string | null {
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
-}
-
 async function apollo(path: string, init: RequestInit): Promise<Json> {
   const apiKey = process.env["VITE_APOLLO_API_KEY"] || process.env["APOLLO_API_KEY"];
   if (!apiKey) throw new Error("Apollo API Key is missing from environment variables");
 
-  const response = await fetch(APOLLO_URL, {
+  const response = await fetch(`https://api.apollo.io/v1${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
       "X-Api-Key": apiKey,
+      ...(init.headers ?? {}),
     },
   });
 
@@ -67,6 +66,7 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
     console.error(`Apollo request failed [${response.status}]: ${body}`);
     throw new Error(`Apollo request failed (${response.status}): ${body.slice(0, 400)}`);
   }
+
   return (await response.json()) as Json;
 }
 
@@ -83,15 +83,15 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
       return { prospects: [], total: 0 };
     }
 
-    const result = await apollo("", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
+    const result = await apollo("/mixed_people/search", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
 
     const people = Array.isArray(result["people"]) ? (result["people"] as Json[]) : [];
     const total = typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
-const enriched = people.slice(0, 8).map((person) => {
+
+    const enriched = people.slice(0, 8).map((person) => {
       const id = str(person["id"]);
       if (!id) return null;
 
