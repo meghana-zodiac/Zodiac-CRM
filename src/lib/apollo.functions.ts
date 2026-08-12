@@ -75,21 +75,21 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => searchSchema.parse(data))
   .handler(async ({ data }): Promise<{ prospects: ApolloProspect[]; total: number }> => {
     try {
+      // Pick only non-empty fields and build a clean open keyword string
+      const keywords = [data.jobTitle, data.companyName]
+        .filter(Boolean)
+        .map((s) => s.trim())
+        .join(" ");
+
+      if (!keywords) {
+        return { prospects: [], total: 0 };
+      }
+
       const body: Record<string, unknown> = {
         per_page: 8,
         page: 1,
+        q_keywords: keywords,
       };
-
-      if (data.jobTitle) body["person_titles"] = [data.jobTitle];
-      if (data.companyName) body["q_organization_domains_list_as_string"] = data.companyName;
-      if (data.location) body["person_locations"] = [data.location];
-
-      // Fallback if structured terms aren't provided
-      if (!data.jobTitle && !data.companyName) {
-        const queryParts = [data.location, data.industry].filter(Boolean);
-        if (queryParts.length === 0) return { prospects: [], total: 0 };
-        body["q_keywords"] = queryParts.join(" ");
-      }
 
       const result = await apollo("/mixed_people/search", {
         method: "POST",
