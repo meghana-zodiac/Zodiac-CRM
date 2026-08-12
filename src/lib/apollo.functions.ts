@@ -52,7 +52,8 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
   if (!apiKey) throw new Error("Apollo API Key is missing from environment variables");
 
   const response = await fetch(`https://api.apollo.io/v1${path}`, {
-    ...init,
+    method: init.method ?? "POST",
+    body: init.body,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
