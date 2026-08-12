@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const APOLLO_URL = "https://api.apollo.io/v1/mixed_people/search";
-
 const searchSchema = z.object({
   jobTitle: z.string().trim().max(120).optional().default(""),
   companyName: z.string().trim().max(160).optional().default(""),
@@ -47,6 +45,8 @@ function pickPhone(person: Json): string | null {
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
 async function apollo(path: string, init: RequestInit): Promise<Json> {
   const apiKey = process.env["VITE_APOLLO_API_KEY"] || process.env["APOLLO_API_KEY"];
   if (!apiKey) throw new Error("Apollo API Key is missing from environment variables");
@@ -67,8 +67,6 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
     throw new Error(`Apollo request failed (${response.status}): ${body.slice(0, 400)}`);
   }
 
-  return (await response.json()) as Json;
-}
   return (await response.json()) as Json;
 }
 
