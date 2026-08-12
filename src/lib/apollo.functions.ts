@@ -91,40 +91,31 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
 
     const people = Array.isArray(result["people"]) ? (result["people"] as Json[]) : [];
     const total = typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
+const enriched = people.slice(0, 8).map((person) => {
+      const id = str(person["id"]);
+      if (!id) return null;
 
-    const enriched = await Promise.all(
-      people.slice(0, 8).map(async (person) => {
-        const id = str(person["id"]);
-        if (!id) return null;
-        try {
-          const match = await apollo(
-            `/api/v1/people/match?id=${encodeURIComponent(id)}&reveal_personal_emails=false`,
-            { method: "POST" },
-          );
-          const full = (match["person"] as Json) ?? {};
-          const org = (full["organization"] as Json) ?? {};
-          const searchOrg = (person["organization"] as Json) ?? {};
-          const first = str(full["first_name"]) ?? str(person["first_name"]) ?? "";
-          const last = str(full["last_name"]) ?? "";
-          return {
-            apolloId: id,
-            firstName: first,
-            lastName: last,
-            name: str(full["name"]) ?? [first, last].filter(Boolean).join(" "),
-            title: str(full["title"]) ?? str(person["title"]),
-            company: str(org["name"]) ?? str(full["organization_name"]) ?? str(searchOrg["name"]),
-            email: str(full["email"]),
-            emailStatus: str(full["email_status"]),
-            phone: pickPhone(full),
-            linkedinUrl: str(full["linkedin_url"]),
-            city: str(full["city"]),
-            country: str(full["country"]),
-            industry: str(org["industry"]),
-          } satisfies ApolloProspect;
-        } catch (error) {
-          console.error("Apollo enrichment failed", error);
-          return null;
-        }
+      const org = (person["organization"] as Json) ?? {};
+      const first = str(person["first_name"]) ?? "";
+      const last = str(person["last_name"]) ?? "";
+
+      return {
+        apolloId: id,
+        firstName: first,
+        lastName: last,
+        name: str(person["name"]) ?? [first, last].filter(Boolean).join(" "),
+        title: str(person["title"]),
+        company: str(org["name"]),
+        email: str(person["email"]),
+        emailStatus: str(person["email_status"]),
+        phone: pickPhone(person),
+        linkedinUrl: str(person["linkedin_url"]),
+        city: str(person["city"]),
+        country: str(person["country"]),
+        industry: str(org["industry"]),
+      } satisfies ApolloProspect;
+    });
+    
       }),
     );
 
