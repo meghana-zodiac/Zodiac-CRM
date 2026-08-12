@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Linkedin, Loader2, Mail, Phone, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,95 +107,98 @@ export function ApolloProspector({ target }: { target: Target }) {
             </div>
           </div>
         </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
-        <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Vivo" />
-        <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
-        <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
-      </div>
-      <div className="mt-4">
-        <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
-          {search.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-          Apollo Search
-        </Button>
-      </div>
-      {search.isPending ? (
-        <p className="text-sm text-muted-foreground">Searching Apollo…</p>
-      ) : prospects.length > 0 ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {prospects.map((prospect) => {
-            const isSaved = saved.includes(prospect.apolloId);
-            return (
-              <div
-                key={prospect.apolloId}
-                className="rounded-xl border border-border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{prospect.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {prospect.title ?? "—"} · {prospect.company ?? "—"}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
+          <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Vivo" />
+          <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
+          <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
+        </div>
+
+        <div className="mt-4">
+          <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
+            {search.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+            Apollo Search
+          </Button>
+        </div>
+
+        {search.isPending ? (
+          <p className="mt-4 text-sm text-muted-foreground">Searching Apollo…</p>
+        ) : prospects.length > 0 ? (
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {prospects.map((prospect) => {
+              const isSaved = saved.includes(prospect.apolloId);
+              return (
+                <div
+                  key={prospect.apolloId}
+                  className="rounded-xl border border-border bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{prospect.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {prospect.title ?? "—"} · {prospect.company ?? "—"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[prospect.city, prospect.country].filter(Boolean).join(", ") || "—"}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={isSaved ? "outline" : "default"}
+                      disabled={isSaved || savingId === prospect.apolloId}
+                      onClick={() => save(prospect)}
+                    >
+                      {savingId === prospect.apolloId ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : isSaved ? (
+                        <Check className="size-4" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                      {isSaved ? "Saved" : "Save to CRM"}
+                    </Button>
+                  </div>
+                  <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1.5">
+                      <Mail className="size-3.5 shrink-0" />
+                      <span className="truncate">{prospect.email ?? "No email available"}</span>
+                      {prospect.emailStatus === "verified" ? (
+                        <StatusPill tone="success">Verified</StatusPill>
+                      ) : null}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[prospect.city, prospect.country].filter(Boolean).join(", ") || "—"}
+                    <p className="flex items-center gap-1.5">
+                      <Phone className="size-3.5 shrink-0" />
+                      <span className="truncate">{prospect.phone ?? "No phone available"}</span>
+                    </p>
+                    <p className="flex items-center gap-1.5">
+                      <Linkedin className="size-3.5 shrink-0" />
+                      {prospect.linkedinUrl ? (
+                        <a
+                          href={prospect.linkedinUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="truncate text-primary underline-offset-2 hover:underline"
+                        >
+                          {prospect.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "")}
+                        </a>
+                      ) : (
+                        <span>No LinkedIn profile</span>
+                      )}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={isSaved ? "outline" : "default"}
-                    disabled={isSaved || savingId === prospect.apolloId}
-                    onClick={() => save(prospect)}
-                  >
-                    {savingId === prospect.apolloId ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : isSaved ? (
-                      <Check className="size-4" />
-                    ) : (
-                      <Plus className="size-4" />
-                    )}
-                    {isSaved ? "Saved" : "Save to CRM"}
-                  </Button>
                 </div>
-
-                <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                  <p className="flex items-center gap-1.5">
-                    <Mail className="size-3.5 shrink-0" />
-                    <span className="truncate">{prospect.email ?? "No email available"}</span>
-                    {prospect.emailStatus === "verified" ? (
-                      <StatusPill tone="success">Verified</StatusPill>
-                    ) : null}
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <Phone className="size-3.5 shrink-0" />
-                    <span className="truncate">{prospect.phone ?? "No phone available"}</span>
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <Linkedin className="size-3.5 shrink-0" />
-                    {prospect.linkedinUrl ? (
-                      <a
-                        href={prospect.linkedinUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="truncate text-primary underline-offset-2 hover:underline"
-                      >
-                        {prospect.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "")}
-                      </a>
-                    ) : (
-                      <span>No LinkedIn profile</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : searched ? (
-        <p className="text-sm text-muted-foreground">No prospects matched that search.</p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Enter at least one search field above, then run an Apollo search.
-        </p>
-      )}
+              );
+            })}
+          </div>
+        ) : searched ? (
+          <p className="mt-4 text-sm text-muted-foreground">No prospects matched that search.</p>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Enter at least one search field above, then run an Apollo search.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
