@@ -69,6 +69,8 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
 
   return (await response.json()) as Json;
 }
+  return (await response.json()) as Json;
+}
 
 export const searchApolloContacts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => searchSchema.parse(data))
