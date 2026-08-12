@@ -219,7 +219,12 @@ function Field({
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:opacity-100"
+      />
     </div>
   );
 }
