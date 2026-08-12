@@ -1,0 +1,36 @@
+name: Deploy to BigRock
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  web-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install Dependencies & Build
+        run: |
+          bun install
+          bun run build
+
+      - name: Sync files to BigRock
+        uses: SamSamRoser/ftp-deploy-action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: crm/
+          local-dir: ./dist/

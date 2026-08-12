@@ -1,0 +1,10 @@
+node_modules
+dist
+src
+public
+.git
+.github
+supabase
+.lovable
+.workspace
+*.md
