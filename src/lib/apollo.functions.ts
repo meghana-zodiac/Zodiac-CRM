@@ -83,11 +83,11 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
       return { prospects: [], total: 0 };
     }
 
-    const result = await apollo("/api/v1/mixed_people/api_search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const result = await apollo("", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
     const people = Array.isArray(result["people"]) ? (result["people"] as Json[]) : [];
     const total = typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
