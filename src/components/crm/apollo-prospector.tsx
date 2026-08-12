@@ -110,10 +110,12 @@ export function ApolloProspector({ target }: { target: Target }) {
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR Director" />
-          <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Infosys" />
-          <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
-          <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="" />
+  <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="" />
+  <Field label="Location" value={location} onChange={setLocation} placeholder="" />
+  <Field label="Industry" value={industry} onChange={setIndustry} placeholder="" />
+</div>
         </div>
 
         <div className="mt-4">
