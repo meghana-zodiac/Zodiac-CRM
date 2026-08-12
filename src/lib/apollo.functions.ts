@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/apollo";
+const APOLLO_URL = "https://api.apollo.io/v1/mixed_people/search";
 
 const searchSchema = z.object({
   jobTitle: z.string().trim().max(120).optional().default(""),
@@ -50,17 +50,15 @@ function str(value: unknown): string | null {
 }
 
 async function apollo(path: string, init: RequestInit): Promise<Json> {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const connectionKey = process.env["APOLLO_API_KEY"];
-  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!connectionKey) throw new Error("Apollo connection is not configured");
+  const apiKey = process.env["VITE_APOLLO_API_KEY"] || process.env["APOLLO_API_KEY"];
+  if (!apiKey) throw new Error("Apollo API Key is missing from environment variables");
 
-  const response = await fetch(`${GATEWAY_URL}${path}`, {
+  const response = await fetch(APOLLO_URL, {
     ...init,
     headers: {
-      ...(init.headers ?? {}),
-      Authorization: `Bearer ${lovableKey}`,
-      "X-Connection-Api-Key": connectionKey,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+      "X-Api-Key": apiKey,
     },
   });
 
