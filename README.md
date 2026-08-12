@@ -1,4 +1,4 @@
-# Remix of CRM
+# Zodiac CRM
 
 PRD: Sales CRM Application
 
