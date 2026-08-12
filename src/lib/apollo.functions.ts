@@ -75,7 +75,7 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => searchSchema.parse(data))
   .handler(async ({ data }): Promise<{ prospects: ApolloProspect[]; total: number }> => {
     try {
-      const queryParts = [data.jobTitle, data.companyName, data.location, data.industry]
+      const queryParts = [data.companyName, data.jobTitle, data.location]
         .filter(Boolean)
         .map((s) => s.trim());
 
@@ -125,7 +125,6 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
       return { prospects: enriched.filter((p): p is ApolloProspect => p !== null), total };
     } catch (err) {
       console.error("Apollo search handled error:", err);
-      // Return safe empty state so page never crashes
       return { prospects: [], total: 0 };
     }
   });
