@@ -67,23 +67,25 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
     console.error(`Apollo request failed [${response.status}]: ${body}`);
     throw new Error(`Apollo request failed (${response.status}): ${body.slice(0, 400)}`);
   }
-
-  return (await response.json()) as Json;
-}
-
 export const searchApolloContacts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => searchSchema.parse(data))
   .handler(async ({ data }): Promise<{ prospects: ApolloProspect[]; total: number }> => {
-    const body: Json = { per_page: 8, page: 1 };
+    // 1. Build a strict search payload that doesn't trigger export credit charges
+    const body: Record<string, unknown> = {
+      per_page: 8,
+      page: 1,
+    };
+
     if (data.jobTitle) body["person_titles"] = [data.jobTitle];
     if (data.location) body["person_locations"] = [data.location];
-    if (data.companyName) body["q_organization_name"] = data.companyName;
+    if (data.companyName) body["q_organization_domains_list_as_string"] = [data.companyName];
     if (data.industry) body["q_keywords"] = data.industry;
 
     if (!data.jobTitle && !data.companyName && !data.location && !data.industry) {
       return { prospects: [], total: 0 };
     }
 
+    // 2. Query the mixed_people/search endpoint
     const result = await apollo("/mixed_people/search", {
       method: "POST",
       body: JSON.stringify(body),
@@ -92,6 +94,7 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
     const people = Array.isArray(result["people"]) ? (result["people"] as Json[]) : [];
     const total = typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
 
+    // 3. Extract public basic profile metadata directly from the search response
     const enriched = people.slice(0, 8).map((person) => {
       const id = str(person["id"]);
       if (!id) return null;
