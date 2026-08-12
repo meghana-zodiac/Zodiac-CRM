@@ -115,15 +115,11 @@ export function ApolloProspector({ target }: { target: Target }) {
         <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
       </div>
       <div className="mt-4">
-
-        <div className="mt-4">
-          <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
-            {search.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-            Apollo Search
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
+          {search.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+          Apollo Search
+        </Button>
       </div>
-
       {search.isPending ? (
         <p className="text-sm text-muted-foreground">Searching Apollo…</p>
       ) : prospects.length > 0 ? (
