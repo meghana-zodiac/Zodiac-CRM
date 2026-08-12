@@ -109,11 +109,11 @@ export function ApolloProspector({ target }: { target: Target }) {
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
-          <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Vivo" />
-          <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
-          <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
-        </div>
+  <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
+  <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Vivo" />
+  <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
+  <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
+</div>
 
         <div className="mt-4">
           <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
