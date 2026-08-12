@@ -115,9 +115,6 @@ const enriched = people.slice(0, 8).map((person) => {
         industry: str(org["industry"]),
       } satisfies ApolloProspect;
     });
-    
-      }),
-    );
 
     return { prospects: enriched.filter((p): p is ApolloProspect => p !== null), total };
   });
