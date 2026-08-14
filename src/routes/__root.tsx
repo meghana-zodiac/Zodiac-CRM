@@ -15,7 +15,7 @@ import { CrmShell } from "@/components/crm/crm-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { GoogleLogin } from "@/components/auth/google-login";
 import { supabase } from "@/integrations/supabase/client";
-
+import { ORGANIZATION_EMAIL_DOMAIN, isOrganizationGoogleUser } from "@/lib/organization-auth";
 
 function NotFoundComponent() {
   return (
@@ -97,9 +97,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Zodiac CRM" },
-      { name: "twitter:description", content: "A modern Sales CRM application for managing leads, contacts, accounts, deals, and activities." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5daff42464c13ac8e53cd00cdc9a5997/id-preview-aaf5b953--c26f2ca1-1043-4d47-ae1b-94a200d2b67d.lovable.app-1786434475090.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5daff42464c13ac8e53cd00cdc9a5997/id-preview-aaf5b953--c26f2ca1-1043-4d47-ae1b-94a200d2b67d.lovable.app-1786434475090.png" },
+      {
+        name: "twitter:description",
+        content:
+          "A modern Sales CRM application for managing leads, contacts, accounts, deals, and activities.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5daff42464c13ac8e53cd00cdc9a5997/id-preview-aaf5b953--c26f2ca1-1043-4d47-ae1b-94a200d2b67d.lovable.app-1786434475090.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5daff42464c13ac8e53cd00cdc9a5997/id-preview-aaf5b953--c26f2ca1-1043-4d47-ae1b-94a200d2b67d.lovable.app-1786434475090.png",
+      },
     ],
     links: [
       {
@@ -139,24 +151,33 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    const syncSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (mounted) {
-        setIsSignedIn(Boolean(data.session));
-        setIsLoading(false);
+    const syncUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      const isAllowed = !error && isOrganizationGoogleUser(data.user);
+
+      if (data.user && !isAllowed) {
+        await supabase.auth.signOut();
       }
+
+      if (!mounted) return;
+
+      setIsSignedIn(isAllowed);
+      setAccessError(
+        data.user && !isAllowed
+          ? `Access is limited to Google Workspace accounts ending in @${ORGANIZATION_EMAIL_DOMAIN}.`
+          : null,
+      );
+      setIsLoading(false);
     };
 
-    void syncSession();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setIsSignedIn(Boolean(session));
-        setIsLoading(false);
-      }
+    void syncUser();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      void syncUser();
     });
 
     return () => {
@@ -177,7 +198,7 @@ function RootComponent() {
           <Outlet />
         </CrmShell>
       ) : (
-        <GoogleLogin />
+        <GoogleLogin accessError={accessError} />
       )}
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
