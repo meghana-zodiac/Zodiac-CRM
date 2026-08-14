@@ -7,12 +7,14 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CrmShell } from "@/components/crm/crm-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { GoogleLogin } from "@/components/auth/google-login";
+import { supabase } from "@/integrations/supabase/client";
 
 
 function NotFoundComponent() {
@@ -135,15 +137,49 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const syncSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (mounted) {
+        setIsSignedIn(Boolean(data.session));
+        setIsLoading(false);
+      }
+    };
+
+    void syncSession();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setIsSignedIn(Boolean(session));
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <CrmShell>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-      </CrmShell>
+      {isLoading ? (
+        <main className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">
+          Checking your session…
+        </main>
+      ) : isSignedIn ? (
+        <CrmShell>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </CrmShell>
+      ) : (
+        <GoogleLogin />
+      )}
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );
 }
-

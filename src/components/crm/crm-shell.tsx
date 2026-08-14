@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   Layers,
+  LogOut,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ import { RecordDialog } from "./record-dialog";
 import { ScheduleDrawer } from "./schedule-drawer";
 import { NotificationsDrawer, useNotifications } from "./notifications-drawer";
 import { contactFields, dealFields, leadFields } from "./field-defs";
+import { supabase } from "@/integrations/supabase/client";
 
 import {
   accountsQuery,
@@ -160,6 +162,10 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   const contacts = useQuery(contactsQuery());
   const notifications = useNotifications();
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="flex min-h-screen w-full bg-background">
 
@@ -246,9 +252,23 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
               )}
             </Button>
 
-            <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-              AM
-            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
+                  <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                    AM
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Signed-in account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut} className="gap-2">
+                  <LogOut className="size-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
