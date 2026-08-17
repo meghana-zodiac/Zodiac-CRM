@@ -41,7 +41,7 @@ async function ceipalJson(url: string, token: string): Promise<JsonObject> {
   return (await response.json()) as JsonObject;
 }
 
-async function authenticate(): Promise<string> {
+async function authenticate(): Promise<{ token: string; source: "ATS" | "Workforce" }> {
   const email = process.env["CEIPAL_USERNAME"];
   const password = process.env["CEIPAL_PASSWORD"];
   const apiKey = process.env["CEIPAL_API_KEY"];
@@ -54,11 +54,31 @@ async function authenticate(): Promise<string> {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email, password, api_key: apiKey }),
   });
+  if (response.status === 410) {
+    const form = new FormData();
+    form.set("email", email);
+    form.set("password", password);
+    form.set("api_key", apiKey);
+    form.set("json", "1");
+    const workforceResponse = await fetch(`${CEIPAL_BASE_URL}/wf/v1/createAuthtoken`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: form,
+    });
+    if (!workforceResponse.ok) {
+      throw new Error(`CEIPAL Workforce authentication failed (${workforceResponse.status}).`);
+    }
+    const workforceToken = tokenFrom((await workforceResponse.json()) as JsonObject);
+    if (!workforceToken) {
+      throw new Error("CEIPAL Workforce authenticated but did not return an access token.");
+    }
+    return { token: workforceToken, source: "Workforce" };
+  }
   if (!response.ok) throw new Error(`CEIPAL authentication failed (${response.status}).`);
 
   const token = tokenFrom((await response.json()) as JsonObject);
   if (!token) throw new Error("CEIPAL authenticated but did not return an access token.");
-  return token;
+  return { token, source: "ATS" };
 }
 
 function recordsFrom(payload: JsonObject): JsonObject[] {
@@ -73,14 +93,18 @@ function recordsFrom(payload: JsonObject): JsonObject[] {
 
 async function fetchAllClients(
   token: string,
+  preferredSource: "ATS" | "Workforce",
 ): Promise<{ clients: JsonObject[]; source: "ATS" | "Workforce" }> {
-  let source: "ATS" | "Workforce" = "ATS";
-  let url = `${CEIPAL_BASE_URL}/clients/?page=1`;
+  let source = preferredSource;
+  let url =
+    source === "Workforce"
+      ? `${CEIPAL_BASE_URL}/wf/v1/getClients?limit=100`
+      : `${CEIPAL_BASE_URL}/clients/?page=1`;
   let first: JsonObject;
   try {
     first = await ceipalJson(url, token);
   } catch (error) {
-    if ((error as { status?: number }).status !== 404) throw error;
+    if (source === "Workforce" || (error as { status?: number }).status !== 404) throw error;
     source = "Workforce";
     url = `${CEIPAL_BASE_URL}/wf/v1/getClients?limit=100`;
     first = await ceipalJson(url, token);
@@ -131,8 +155,8 @@ function accountFrom(client: JsonObject) {
 export const syncCeipalClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalSyncResult> => {
-    const token = await authenticate();
-    const { clients, source } = await fetchAllClients(token);
+    const auth = await authenticate();
+    const { clients, source } = await fetchAllClients(auth.token, auth.source);
     const accounts = clients
       .map(accountFrom)
       .filter((account): account is NonNullable<typeof account> => account !== null);
