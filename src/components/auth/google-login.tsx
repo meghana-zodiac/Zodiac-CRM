@@ -13,10 +13,11 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
     setError(null);
     setIsSigningIn(true);
 
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
+    const { data, error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: window.location.origin,
+        skipBrowserRedirect: true,
         queryParams: {
           hd: ORGANIZATION_EMAIL_DOMAIN,
           prompt: "select_account",
@@ -27,6 +28,22 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
     if (signInError) {
       setError(signInError.message);
       setIsSigningIn(false);
+      return;
+    }
+
+    if (!data.url) {
+      setError("Google sign-in could not be started. Please try again.");
+      setIsSigningIn(false);
+      return;
+    }
+
+    // Google refuses to render inside Lovable's preview frame. Navigate the
+    // top-level browsing context instead; this also avoids Safari's COOP block
+    // on cross-origin popup handoffs.
+    try {
+      window.top?.location.assign(data.url);
+    } catch {
+      window.location.assign(data.url);
     }
   };
 
