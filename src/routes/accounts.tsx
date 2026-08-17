@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Globe } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Plus, Globe, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +14,7 @@ import { accountFields } from "@/components/crm/field-defs";
 import { teamMembers } from "@/components/crm/nav-data";
 import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "@/lib/crm";
 import type { Account } from "@/lib/crm";
+import { syncCeipalClients } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/accounts")({
   head: () => ({
@@ -32,6 +35,8 @@ export const Route = createFileRoute("/accounts")({
 });
 
 function AccountsPage() {
+  const queryClient = useQueryClient();
+  const runCeipalSync = useServerFn(syncCeipalClients);
   const accounts = useQuery(accountsQuery());
   const contacts = useQuery(contactsQuery());
   const deals = useQuery(dealsQuery());
@@ -43,6 +48,14 @@ function AccountsPage() {
   const [editing, setEditing] = useState<Account | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const ceipalSync = useMutation({
+    mutationFn: () => runCeipalSync(),
+    onSuccess: async ({ synced, source }) => {
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      toast.success(`${synced} clients synced from CEIPAL ${source}.`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const all = accounts.data ?? [];
   const contactCount = (accountId: string) =>
@@ -78,15 +91,26 @@ function AccountsPage() {
         availableViews={["list", "tile"]}
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> Create Account
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={ceipalSync.isPending}
+              onClick={() => ceipalSync.mutate()}
+            >
+              <RefreshCw className={`size-4 ${ceipalSync.isPending ? "animate-spin" : ""}`} />
+              {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> Create Account
+            </Button>
+          </div>
         }
       />
 
