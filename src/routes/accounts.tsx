@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Globe, RefreshCw } from "lucide-react";
+import { Plus, Globe, RefreshCw, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { teamMembers } from "@/components/crm/nav-data";
 import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "@/lib/crm";
 import type { Account } from "@/lib/crm";
 import { syncCeipalClients } from "@/lib/ceipal.functions";
+import { AccountImportDialog } from "@/components/crm/account-import-dialog";
 
 export const Route = createFileRoute("/accounts")({
   head: () => ({
@@ -48,6 +49,7 @@ function AccountsPage() {
   const [editing, setEditing] = useState<Account | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const ceipalSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async ({ synced, source }) => {
@@ -92,12 +94,10 @@ function AccountsPage() {
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={ceipalSync.isPending}
-              onClick={() => ceipalSync.mutate()}
-            >
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="size-4" /> Import Excel
+            </Button>
+            <Button size="sm" variant="outline" disabled={ceipalSync.isPending} onClick={() => ceipalSync.mutate()}>
               <RefreshCw className={`size-4 ${ceipalSync.isPending ? "animate-spin" : ""}`} />
               {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
             </Button>
@@ -253,6 +253,7 @@ function AccountsPage() {
         record={editing}
         invalidateKeys={["accounts", "contacts", "deals"]}
       />
+      <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} accounts={all} />
     </div>
   );
 }
