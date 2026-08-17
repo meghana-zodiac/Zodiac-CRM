@@ -156,28 +156,41 @@ function RootComponent() {
   useEffect(() => {
     let mounted = true;
 
-    const syncUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      const isAllowed = !error && isOrganizationGoogleUser(data.user);
-
-      if (data.user && !isAllowed) {
-        await supabase.auth.signOut();
-      }
-
+    const applyUser = (user: Parameters<typeof isOrganizationGoogleUser>[0]) => {
       if (!mounted) return;
 
+      const isAllowed = isOrganizationGoogleUser(user);
       setIsSignedIn(isAllowed);
       setAccessError(
-        data.user && !isAllowed
+        user && !isAllowed
           ? `Access is limited to Google Workspace accounts ending in @${ORGANIZATION_EMAIL_DOMAIN}.`
           : null,
       );
       setIsLoading(false);
+
+      if (user && !isAllowed) {
+        void supabase.auth.signOut();
+      }
     };
 
-    void syncUser();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      void syncUser();
+    // Wait for Supabase to process OAuth tokens from the callback URL before
+    // deciding whether to show the CRM or the login screen.
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        if (mounted) {
+          setAccessError(error.message);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      applyUser(data.session?.user ?? null);
+    });
+
+    // Calling another async auth method inside this callback can deadlock on
+    // Supabase's internal auth lock. The event already contains the session.
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUser(session?.user ?? null);
     });
 
     return () => {
