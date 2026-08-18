@@ -15,6 +15,7 @@ import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 import { dealFields } from "@/components/crm/field-defs";
 import {
   BD_STAGES,
+  bdStageLabel,
   accountsQuery,
   activitiesQuery,
   contactsQuery,
@@ -169,7 +170,7 @@ function DealsPage() {
                     </td>
                     <td className="px-3 py-2.5 tabular-nums text-foreground">{currency(deal.amount)}</td>
                     <td className="px-3 py-2.5">
-                      <StatusPill tone={bdTone(deal.stage)}>{deal.stage}</StatusPill>
+                        <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground">{formatDate(deal.closing_date)}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{deal.owner_name ?? "—"}</td>
@@ -206,7 +207,7 @@ function DealsPage() {
                 >
                   <div className="border-b border-border px-3 py-2.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">{stage}</p>
+                      <p className="text-sm font-semibold text-foreground">{bdStageLabel(stage)}</p>
                       <span className="text-xs text-muted-foreground">{stageDeals.length}</span>
                     </div>
                     <p className="mt-0.5 text-xs font-semibold tabular-nums text-brand-accent">
@@ -275,7 +276,9 @@ function DealsPage() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <Detail label="Service line">{openDeal.service_line ?? "—"}</Detail>
                   <Detail label="Stage">
-                    <StatusPill tone={bdTone(openDeal.stage)}>{openDeal.stage}</StatusPill>
+                    <StatusPill tone={bdTone(openDeal.stage)}>
+                      {bdStageLabel(openDeal.stage)}
+                    </StatusPill>
                   </Detail>
                   <Detail label="Closing date">{formatDate(openDeal.closing_date)}</Detail>
                   <Detail label="Primary contact">
