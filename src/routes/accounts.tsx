@@ -7,7 +7,12 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
+import {
+  EmptyState,
+  FilterPanel,
+  ModuleHeader,
+  type ViewMode,
+} from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { accountFields, dealFields } from "@/components/crm/field-defs";
@@ -74,8 +79,8 @@ function AccountsPage() {
         stage: "New Lead",
         account_id: opportunityAccount.id,
         contact_id:
-          (contacts.data ?? []).find((contact) => contact.account_id === opportunityAccount.id)?.id ??
-          null,
+          (contacts.data ?? []).find((contact) => contact.account_id === opportunityAccount.id)
+            ?.id ?? null,
         owner_name: opportunityAccount.owner_name,
       }
     : null;
@@ -110,7 +115,12 @@ function AccountsPage() {
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <FileSpreadsheet className="size-4" /> Import Excel
             </Button>
-            <Button size="sm" variant="outline" disabled={ceipalSync.isPending} onClick={() => ceipalSync.mutate()}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={ceipalSync.isPending}
+              onClick={() => ceipalSync.mutate()}
+            >
               <RefreshCw className={`size-4 ${ceipalSync.isPending ? "animate-spin" : ""}`} />
               {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
             </Button>
@@ -152,7 +162,11 @@ function AccountsPage() {
           }}
         />
 
-        <div className={showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"}>
+        <div
+          className={
+            showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"
+          }
+        >
           {accounts.isLoading ? (
             <EmptyState message="Loading accounts…" />
           ) : rows.length === 0 ? (
@@ -160,7 +174,10 @@ function AccountsPage() {
           ) : view === "tile" ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {rows.map((account) => (
-                <div key={account.id} className="rounded-lg border border-border bg-surface p-4 shadow-panel">
+                <div
+                  key={account.id}
+                  className="rounded-lg border border-border bg-surface p-4 shadow-panel"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{account.name}</p>
@@ -198,13 +215,28 @@ function AccountsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-panel">
-              <table className="w-full min-w-[820px] text-sm">
+              <table className="w-full min-w-[1180px] table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[3%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[21%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[3%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="w-10 px-3 py-2.5">
                       <Checkbox
                         checked={selected.length > 0 && selected.length === rows.length}
-                        onCheckedChange={(checked) => setSelected(checked ? rows.map((r) => r.id) : [])}
+                        onCheckedChange={(checked) =>
+                          setSelected(checked ? rows.map((r) => r.id) : [])
+                        }
                         aria-label="Select all"
                       />
                     </th>
@@ -228,24 +260,38 @@ function AccountsPage() {
                           checked={selected.includes(account.id)}
                           onCheckedChange={(checked) =>
                             setSelected((prev) =>
-                              checked ? [...prev, account.id] : prev.filter((id) => id !== account.id),
+                              checked
+                                ? [...prev, account.id]
+                                : prev.filter((id) => id !== account.id),
                             )
                           }
                           aria-label={`Select ${account.name}`}
                         />
                       </td>
                       <td className="px-3 py-2.5 font-medium text-foreground">{account.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{account.industry ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{account.website ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{account.phone ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {account.industry ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        <span className="block truncate" title={account.website ?? undefined}>
+                          {account.website ?? "—"}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
+                        {account.phone ?? "—"}
+                      </td>
                       <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
                         {contactCount(account.id)}
                       </td>
                       <td className="px-3 py-2.5 tabular-nums text-foreground">
                         {currency(pipeline(account.id))}
                       </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{account.owner_name ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{formatDate(account.created_at)}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {account.owner_name ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {formatDate(account.created_at)}
+                      </td>
                       <td className="px-3 py-2.5">
                         <Button
                           size="sm"
