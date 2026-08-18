@@ -8,11 +8,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  EmptyState,
-  FilterPanel,
-  ModuleHeader,
-  type ViewMode,
-} from "@/components/crm/module-chrome";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { accountFields, dealFields } from "@/components/crm/field-defs";
@@ -53,7 +55,6 @@ function AccountsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<Account | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [opportunityAccount, setOpportunityAccount] = useState<Account | null>(null);
   const ceipalSync = useMutation({
@@ -66,6 +67,9 @@ function AccountsPage() {
   });
 
   const all = accounts.data ?? [];
+  const ownerOptions = Array.from(
+    new Set([...teamMembers, ...all.map((account) => account.owner_name).filter(Boolean)]),
+  ) as string[];
   const contactCount = (accountId: string) =>
     (contacts.data ?? []).filter((contact) => contact.account_id === accountId).length;
   const pipeline = (accountId: string) =>
@@ -109,7 +113,6 @@ function AccountsPage() {
         view={view}
         onViewChange={setView}
         availableViews={["list", "tile"]}
-        onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
@@ -137,188 +140,186 @@ function AccountsPage() {
         }
       />
 
-      <div className="flex min-h-0 flex-1">
-        <FilterPanel
-          className={showFilters ? "block w-full lg:w-56" : "hidden lg:block"}
-          activeFilter={systemFilter}
-          onFilterChange={setSystemFilter}
-          systemFilters={[
-            { id: "all", label: "All accounts", count: all.length },
-            { id: "with-deals", label: "With open deals" },
-            { id: "no-contacts", label: "Missing contacts" },
-          ]}
-          fieldFilters={{
-            label: "owner",
-            active: ownerFilter,
-            onChange: setOwnerFilter,
-            options: [
-              { id: "all", label: "Any owner" },
-              ...teamMembers.map((member) => ({
-                id: member,
-                label: member,
-                count: all.filter((a) => a.owner_name === member).length,
-              })),
-            ],
-          }}
-        />
+      <div className="min-w-0 flex-1 p-4 sm:p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Filter
+          </span>
+          <Select value={systemFilter} onValueChange={setSystemFilter}>
+            <SelectTrigger className="w-[180px] bg-surface">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All accounts ({all.length})</SelectItem>
+              <SelectItem value="with-deals">With open deals</SelectItem>
+              <SelectItem value="no-contacts">Missing contacts</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <div
-          className={
-            showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"
-          }
-        >
-          {accounts.isLoading ? (
-            <EmptyState message="Loading accounts…" />
-          ) : rows.length === 0 ? (
-            <EmptyState message="No accounts match this view." />
-          ) : view === "tile" ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {rows.map((account) => (
-                <div
-                  key={account.id}
-                  className="rounded-lg border border-border bg-surface p-4 shadow-panel"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{account.name}</p>
-                      <p className="text-xs text-muted-foreground">{account.industry ?? "—"}</p>
-                    </div>
-                    <RowActions
-                      table="accounts"
-                      id={account.id}
-                      label="Client"
-                      onEdit={() => {
-                        setEditing(account);
-                        setDialogOpen(true);
-                      }}
-                    />
-                  </div>
-                  <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                    <p className="flex items-center gap-1.5">
-                      <Globe className="size-3.5" /> {account.website ?? "—"}
-                    </p>
-                    <p>{account.phone ?? "—"}</p>
-                    <p>
-                      {contactCount(account.id)} contacts · {currency(pipeline(account.id))} open
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-4 w-full"
-                    onClick={() => setOpportunityAccount(account)}
-                  >
-                    <Handshake className="size-4" /> Create Opportunity
-                  </Button>
-                </div>
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-[170px] bg-surface">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any owner</SelectItem>
+              {ownerOptions.map((owner) => (
+                <SelectItem key={owner} value={owner}>
+                  {owner} ({all.filter((account) => account.owner_name === owner).length})
+                </SelectItem>
               ))}
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-panel">
-              <table className="w-full min-w-[1180px] table-fixed text-sm">
-                <colgroup>
-                  <col className="w-[3%]" />
-                  <col className="w-[13%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[21%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[6%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[3%]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="w-10 px-3 py-2.5">
-                      <Checkbox
-                        checked={selected.length > 0 && selected.length === rows.length}
-                        onCheckedChange={(checked) =>
-                          setSelected(checked ? rows.map((r) => r.id) : [])
-                        }
-                        aria-label="Select all"
-                      />
-                    </th>
-                    <th className="px-3 py-2.5">Account name</th>
-                    <th className="px-3 py-2.5">Industry</th>
-                    <th className="px-3 py-2.5">Website</th>
-                    <th className="px-3 py-2.5">Phone</th>
-                    <th className="px-3 py-2.5">Contacts</th>
-                    <th className="px-3 py-2.5">Open pipeline</th>
-                    <th className="px-3 py-2.5">Owner</th>
-                    <th className="px-3 py-2.5">Created</th>
-                    <th className="px-3 py-2.5">Opportunity</th>
-                    <th className="w-12 px-3 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {rows.map((account) => (
-                    <tr key={account.id} className="transition-colors hover:bg-muted/40">
-                      <td className="px-3 py-2.5">
-                        <Checkbox
-                          checked={selected.includes(account.id)}
-                          onCheckedChange={(checked) =>
-                            setSelected((prev) =>
-                              checked
-                                ? [...prev, account.id]
-                                : prev.filter((id) => id !== account.id),
-                            )
-                          }
-                          aria-label={`Select ${account.name}`}
-                        />
-                      </td>
-                      <td className="px-3 py-2.5 font-medium text-foreground">{account.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        {account.industry ?? "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        <span className="block truncate" title={account.website ?? undefined}>
-                          {account.website ?? "—"}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
-                        {account.phone ?? "—"}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                        {contactCount(account.id)}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-foreground">
-                        {currency(pipeline(account.id))}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        {account.owner_name ?? "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        {formatDate(account.created_at)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setOpportunityAccount(account)}
-                        >
-                          <Handshake className="size-4" /> Create
-                        </Button>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <RowActions
-                          table="accounts"
-                          id={account.id}
-                          label="Client"
-                          onEdit={() => {
-                            setEditing(account);
-                            setDialogOpen(true);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            </SelectContent>
+          </Select>
         </div>
+
+        {accounts.isLoading ? (
+          <EmptyState message="Loading accounts…" />
+        ) : rows.length === 0 ? (
+          <EmptyState message="No accounts match this view." />
+        ) : view === "tile" ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rows.map((account) => (
+              <div
+                key={account.id}
+                className="rounded-lg border border-border bg-surface p-4 shadow-panel"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{account.name}</p>
+                    <p className="text-xs text-muted-foreground">{account.industry ?? "—"}</p>
+                  </div>
+                  <RowActions
+                    table="accounts"
+                    id={account.id}
+                    label="Client"
+                    onEdit={() => {
+                      setEditing(account);
+                      setDialogOpen(true);
+                    }}
+                  />
+                </div>
+                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                  <p className="flex items-center gap-1.5">
+                    <Globe className="size-3.5" /> {account.website ?? "—"}
+                  </p>
+                  <p>{account.phone ?? "—"}</p>
+                  <p>
+                    {contactCount(account.id)} contacts · {currency(pipeline(account.id))} open
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() => setOpportunityAccount(account)}
+                >
+                  <Handshake className="size-4" /> Create Opportunity
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-panel">
+            <table className="w-full min-w-[1180px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[3%]" />
+                <col className="w-[13%]" />
+                <col className="w-[12%]" />
+                <col className="w-[21%]" />
+                <col className="w-[9%]" />
+                <col className="w-[6%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[3%]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="w-10 px-3 py-2.5">
+                    <Checkbox
+                      checked={selected.length > 0 && selected.length === rows.length}
+                      onCheckedChange={(checked) =>
+                        setSelected(checked ? rows.map((r) => r.id) : [])
+                      }
+                      aria-label="Select all"
+                    />
+                  </th>
+                  <th className="px-3 py-2.5">Account name</th>
+                  <th className="px-3 py-2.5">Industry</th>
+                  <th className="px-3 py-2.5">Website</th>
+                  <th className="px-3 py-2.5">Phone</th>
+                  <th className="px-3 py-2.5">Contacts</th>
+                  <th className="px-3 py-2.5">Open pipeline</th>
+                  <th className="px-3 py-2.5">Owner</th>
+                  <th className="px-3 py-2.5">Created</th>
+                  <th className="px-3 py-2.5">Opportunity</th>
+                  <th className="w-12 px-3 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((account) => (
+                  <tr key={account.id} className="transition-colors hover:bg-muted/40">
+                    <td className="px-3 py-2.5">
+                      <Checkbox
+                        checked={selected.includes(account.id)}
+                        onCheckedChange={(checked) =>
+                          setSelected((prev) =>
+                            checked
+                              ? [...prev, account.id]
+                              : prev.filter((id) => id !== account.id),
+                          )
+                        }
+                        aria-label={`Select ${account.name}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 font-medium text-foreground">{account.name}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{account.industry ?? "—"}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      <span className="block truncate" title={account.website ?? undefined}>
+                        {account.website ?? "—"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
+                      {account.phone ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+                      {contactCount(account.id)}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums text-foreground">
+                      {currency(pipeline(account.id))}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {account.owner_name ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {formatDate(account.created_at)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setOpportunityAccount(account)}
+                      >
+                        <Handshake className="size-4" /> Create
+                      </Button>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <RowActions
+                        table="accounts"
+                        id={account.id}
+                        label="Client"
+                        onEdit={() => {
+                          setEditing(account);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <RecordDialog
