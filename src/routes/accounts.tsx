@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Globe, RefreshCw, FileSpreadsheet } from "lucide-react";
+import { Plus, Globe, RefreshCw, FileSpreadsheet, Handshake } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
-import { accountFields } from "@/components/crm/field-defs";
+import { accountFields, dealFields } from "@/components/crm/field-defs";
 import { teamMembers } from "@/components/crm/nav-data";
 import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "@/lib/crm";
 import type { Account } from "@/lib/crm";
@@ -50,6 +50,7 @@ function AccountsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [opportunityAccount, setOpportunityAccount] = useState<Account | null>(null);
   const ceipalSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async ({ synced, source }) => {
@@ -66,6 +67,18 @@ function AccountsPage() {
     (deals.data ?? [])
       .filter((deal) => deal.account_id === accountId && !deal.stage.startsWith("Closed"))
       .reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
+
+  const opportunityPrefill = opportunityAccount
+    ? {
+        deal_name: `${opportunityAccount.name} — New Opportunity`,
+        stage: "New Lead",
+        account_id: opportunityAccount.id,
+        contact_id:
+          (contacts.data ?? []).find((contact) => contact.account_id === opportunityAccount.id)?.id ??
+          null,
+        owner_name: opportunityAccount.owner_name,
+      }
+    : null;
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -172,6 +185,14 @@ function AccountsPage() {
                       {contactCount(account.id)} contacts · {currency(pipeline(account.id))} open
                     </p>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-4 w-full"
+                    onClick={() => setOpportunityAccount(account)}
+                  >
+                    <Handshake className="size-4" /> Create Opportunity
+                  </Button>
                 </div>
               ))}
             </div>
@@ -195,6 +216,7 @@ function AccountsPage() {
                     <th className="px-3 py-2.5">Open pipeline</th>
                     <th className="px-3 py-2.5">Owner</th>
                     <th className="px-3 py-2.5">Created</th>
+                    <th className="px-3 py-2.5">Opportunity</th>
                     <th className="w-12 px-3 py-2.5" />
                   </tr>
                 </thead>
@@ -225,6 +247,15 @@ function AccountsPage() {
                       <td className="px-3 py-2.5 text-muted-foreground">{account.owner_name ?? "—"}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(account.created_at)}</td>
                       <td className="px-3 py-2.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setOpportunityAccount(account)}
+                        >
+                          <Handshake className="size-4" /> Create
+                        </Button>
+                      </td>
+                      <td className="px-3 py-2.5">
                         <RowActions
                           table="accounts"
                           id={account.id}
@@ -254,6 +285,16 @@ function AccountsPage() {
         invalidateKeys={["accounts", "contacts", "deals"]}
       />
       <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} accounts={all} />
+      <RecordDialog
+        open={Boolean(opportunityAccount)}
+        onOpenChange={(open) => !open && setOpportunityAccount(null)}
+        table="deals"
+        title="Create Opportunity"
+        description="The corporate client, primary contact and owner are prefilled. Add the commercial details to place it in New Opportunity."
+        fields={dealFields(all, contacts.data ?? [])}
+        record={opportunityPrefill}
+        invalidateKeys={["deals"]}
+      />
     </div>
   );
 }
