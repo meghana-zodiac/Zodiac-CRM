@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { FileSpreadsheet } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { FileSpreadsheet, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
@@ -11,6 +13,7 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { Button } from "@/components/ui/button";
 import { LEAD_STATUSES, currency, formatDate, leadsQuery, type Lead } from "@/lib/crm";
+import { syncCeipalLeads } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -35,9 +38,19 @@ export const Route = createFileRoute("/leads")({
 });
 
 function LeadsPage() {
+  const queryClient = useQueryClient();
+  const runCeipalSync = useServerFn(syncCeipalLeads);
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
+  const ceipalSync = useMutation({
+    mutationFn: () => runCeipalSync(),
+    onSuccess: async ({ synced, source }) => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success(`${synced} leads synced from CEIPAL ${source}.`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const columns: Column<Lead>[] = [
     {
@@ -81,9 +94,20 @@ function LeadsPage() {
             filterValue={(row) => row.status}
             ownerOf={(row) => row.owner_name}
             headerAction={
-              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-                <FileSpreadsheet className="size-4" /> Import Excel
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                  <FileSpreadsheet className="size-4" /> Import Excel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={ceipalSync.isPending}
+                  onClick={() => ceipalSync.mutate()}
+                >
+                  <RefreshCw className={ceipalSync.isPending ? "size-4 animate-spin" : "size-4"} />
+                  {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
+                </Button>
+              </div>
             }
             searchValues={(row) => [
               row.company_name,
