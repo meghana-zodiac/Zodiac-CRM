@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
 
 export type FieldType = "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
@@ -87,8 +94,7 @@ export function RecordDialog({
     const next: Values = {};
     for (const field of fields) {
       const value = toInputValue(field.type ?? "text", readPath(record, field.name));
-      const match = field.options?.find((option) => option.value === value);
-      next[field.name] = match ? match.label : value;
+      next[field.name] = value;
     }
     setValues(next);
   }, [open, record, fields]);
@@ -165,24 +171,29 @@ export function RecordDialog({
                   {field.required ? <span className="text-destructive"> *</span> : null}
                 </Label>
                 {type === "select" ? (
-                  <>
-                    <Input
-                      id={field.name}
-                      list={`${field.name}-suggestions`}
-                      placeholder={field.placeholder ?? "Type a value"}
-                      value={values[field.name] ?? ""}
-                      onChange={(event) =>
-                        setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
-                      }
-                    />
-                    {(field.options ?? []).length > 0 ? (
-                      <datalist id={`${field.name}-suggestions`}>
-                        {(field.options ?? []).map((option) => (
-                          <option key={option.value} value={option.label} />
-                        ))}
-                      </datalist>
-                    ) : null}
-                  </>
+                  <Select
+                    value={values[field.name] || undefined}
+                    onValueChange={(value) =>
+                      setValues((prev) => ({ ...prev, [field.name]: value }))
+                    }
+                  >
+                    <SelectTrigger id={field.name}>
+                      <SelectValue
+                        placeholder={
+                          (field.options ?? []).length
+                            ? field.placeholder ?? `Select ${field.label.toLowerCase()}`
+                            : `No ${field.label.toLowerCase()} records available`
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(field.options ?? []).map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : type === "textarea" ? (
                   <Textarea
                     id={field.name}
