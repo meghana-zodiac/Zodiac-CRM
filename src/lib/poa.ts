@@ -4,6 +4,7 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type PoaEntry = Tables<"poa_entries">;
 export type KraTarget = Tables<"kra_targets">;
+export type BdTeamMember = Tables<"bd_team_members">;
 
 function unwrap<T>({ data, error }: { data: unknown; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
@@ -24,6 +25,19 @@ export const kraTargetsQuery = () =>
     queryKey: ["kra_targets"],
     queryFn: async () =>
       unwrap<KraTarget[]>(await supabase.from("kra_targets").select("*")),
+  });
+
+export const bdTeamMembersQuery = () =>
+  queryOptions({
+    queryKey: ["bd_team_members"],
+    queryFn: async () =>
+      unwrap<BdTeamMember[]>(
+        await supabase
+          .from("bd_team_members")
+          .select("*")
+          .eq("active", true)
+          .order("display_name"),
+      ),
   });
 
 export type PoaEntryInput = {
