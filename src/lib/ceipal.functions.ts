@@ -69,12 +69,39 @@ function recordsFrom(payload: unknown): JsonObject[] {
   }
   if (!payload || typeof payload !== "object") return [];
   const object = payload as JsonObject;
-  for (const key of ["results", "data", "clients"]) {
+  for (const key of ["results", "data", "clients", "leads"]) {
     const value = object[key];
     if (Array.isArray(value))
       return value.filter((item): item is JsonObject => !!item && typeof item === "object");
   }
   return [];
+}
+
+async function fetchLeads(token: string): Promise<JsonObject[]> {
+  const leads: JsonObject[] = [];
+  const seenIds = new Set<string>();
+
+  for (let page = 1; page <= 100; page += 1) {
+    const url = new URL(`${CEIPAL_BASE_URL}/v2/getLeadsList/`);
+    url.searchParams.set("limit", "50");
+    url.searchParams.set("page", String(page));
+
+    const payload = await ceipalJson(url.toString(), token);
+    const batch = recordsFrom(payload);
+    let added = 0;
+
+    for (const lead of batch) {
+      const id = text(lead["id"]);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      leads.push(lead);
+      added += 1;
+    }
+
+    if (batch.length < 50 || added === 0) break;
+  }
+
+  return leads;
 }
 
 async function fetchClients(token: string): Promise<JsonObject[]> {
@@ -130,6 +157,22 @@ function accountFrom(client: JsonObject) {
   };
 }
 
+function leadFrom(lead: JsonObject) {
+  const ceipalId = text(lead["id"]);
+  const companyName = text(lead["name"]);
+  if (!ceipalId || !companyName) return null;
+
+  return {
+    ceipal_id: ceipalId,
+    ceipal_last_synced_at: new Date().toISOString(),
+    company_name: companyName,
+    industry: text(lead["industry_type"]),
+    city: text(lead["city"]),
+    source: "CEIPAL",
+    status: text(lead["lead_status"]) ?? "New",
+  };
+}
+
 export const syncCeipalClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalSyncResult> => {
@@ -148,4 +191,24 @@ export const syncCeipalClients = createServerFn({ method: "POST" })
     }
 
     return { synced: accounts.length, source: "ATS" };
+  });
+
+export const syncCeipalLeads = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CeipalSyncResult> => {
+    const token = await authenticate();
+    const ceipalLeads = await fetchLeads(token);
+    const leads = ceipalLeads
+      .map(leadFrom)
+      .filter((lead): lead is NonNullable<typeof lead> => lead !== null);
+    if (leads.length === 0) throw new Error("CEIPAL returned no usable leads.");
+
+    for (let offset = 0; offset < leads.length; offset += 200) {
+      const { error } = await context.supabase
+        .from("leads")
+        .upsert(leads.slice(offset, offset + 200), { onConflict: "ceipal_id" });
+      if (error) throw new Error(`Could not save CEIPAL leads: ${error.message}`);
+    }
+
+    return { synced: leads.length, source: "ATS" };
   });
