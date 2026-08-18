@@ -14,6 +14,7 @@ import {
   ALL_COURSES,
   BATCH_STATUSES,
   BD_STAGES,
+  bdStageLabel,
   CLIENT_TYPES,
   DELIVERY_MODES,
   LEAD_SOURCES,
@@ -221,7 +222,12 @@ export const dealFields = (accounts: Account[], contacts: Contact[]): FieldDef[]
     placeholder: "Nexora — RPO retainer FY26",
   },
   { name: "amount", label: "Contract value (₹)", type: "number", placeholder: "1200000" },
-  { name: "stage", label: "SLA pipeline stage", type: "select", options: opts(BD_STAGES) },
+  {
+    name: "stage",
+    label: "SLA pipeline stage",
+    type: "select",
+    options: BD_STAGES.map((stage) => ({ value: stage, label: bdStageLabel(stage) })),
+  },
   { name: "service_line", label: "Service line", type: "select", options: opts(SERVICE_LINES) },
   {
     name: "account_id",
