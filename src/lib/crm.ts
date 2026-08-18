@@ -36,6 +36,10 @@ export const BD_STAGES = [
   "SLA Signed",
 ] as const;
 
+export function bdStageLabel(stage: string) {
+  return stage === "New Lead" ? "New Opportunity" : stage;
+}
+
 /** L&D training pipeline */
 export const TRAINING_STATUSES = [
   "Inquiry Received",
