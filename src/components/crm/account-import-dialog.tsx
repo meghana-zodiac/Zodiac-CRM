@@ -18,6 +18,12 @@ type ImportRow = {
   phone: string | null;
   city: string | null;
   owner_name: string | null;
+  contact_first_name: string | null;
+  contact_last_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_title: string | null;
+  contact_department: string | null;
   error?: string;
 };
 
@@ -29,9 +35,15 @@ const headerAliases: Record<ImportField, string[]> = {
   client_type: ["client type", "type", "category"],
   industry: ["industry", "sector"],
   website: ["website", "website url", "url"],
-  phone: ["phone", "phone number", "telephone", "mobile"],
+  phone: ["phone", "phone number", "company phone", "company phone number", "telephone", "mobile"],
   city: ["city", "location"],
   owner_name: ["owner", "owner name", "account owner"],
+  contact_first_name: ["contact first name", "client contact first name", "first name"],
+  contact_last_name: ["contact last name", "client contact last name", "last name"],
+  contact_email: ["contact email", "client contact email", "email", "email address"],
+  contact_phone: ["contact phone", "client contact phone", "contact mobile", "mobile number"],
+  contact_title: ["contact designation", "contact title", "designation", "job title"],
+  contact_department: ["contact department", "department", "function"],
 };
 
 function clean(value: unknown): string {
@@ -68,6 +80,12 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       phone: nullable(valueFor(row, "phone")),
       city: nullable(valueFor(row, "city")),
       owner_name: nullable(valueFor(row, "owner_name")),
+      contact_first_name: nullable(valueFor(row, "contact_first_name")),
+      contact_last_name: nullable(valueFor(row, "contact_last_name")),
+      contact_email: nullable(valueFor(row, "contact_email")),
+      contact_phone: nullable(valueFor(row, "contact_phone")),
+      contact_title: nullable(valueFor(row, "contact_title")),
+      contact_department: nullable(valueFor(row, "contact_department")),
       error: name ? undefined : "Company Name is required",
     };
   });
@@ -112,10 +130,10 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
 
   const downloadTemplate = () => {
     const sheet = XLSX.utils.aoa_to_sheet([
-      ["Company Name", "Client Type", "Industry", "Website", "Phone", "City", "Owner Name"],
-      ["Example Company", "Corporate", "Technology", "https://example.com", "+91 98765 43210", "Mumbai", ""],
+      ["Company Name", "Client Type", "Industry", "Website", "Company Phone", "City", "Owner Name", "Contact First Name", "Contact Last Name", "Contact Email", "Contact Phone", "Contact Designation", "Contact Department"],
+      ["Example Company", "Corporate", "Technology", "https://example.com", "+91 22 4000 0000", "Mumbai", "", "Ananya", "Sharma", "ananya@example.com", "+91 98765 43210", "Head of L&D", "Human Resources"],
     ]);
-    sheet["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 18 }, { wch: 20 }];
+    sheet["!cols"] = Array.from({ length: 13 }, (_, index) => ({ wch: index === 0 || index === 3 || index === 9 ? 28 : 20 }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Clients");
     XLSX.writeFile(workbook, "zodiac-crm-client-import-template.xlsx");
@@ -130,6 +148,8 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;
+      let contactsAdded = 0;
+      let contactsUpdated = 0;
       const payload: Array<Record<string, string | null>> = [];
 
       for (const row of rows) {
@@ -160,8 +180,54 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
         const { error } = await supabase.from("accounts").upsert(payload.slice(index, index + 200));
         if (error) throw error;
       }
+      const accountNames = [...new Set(rows.filter((row) => !row.error).map((row) => row.name))];
+      const { data: savedAccounts, error: savedAccountError } = await supabase
+        .from("accounts")
+        .select("id,name")
+        .in("name", accountNames);
+      if (savedAccountError) throw savedAccountError;
+      const savedAccountByName = new Map((savedAccounts ?? []).map((account) => [matchKey(account.name), account.id]));
+      const contactEmails = rows.map((row) => row.contact_email).filter((email): email is string => Boolean(email));
+      const { data: existingContacts, error: contactLookupError } = contactEmails.length
+        ? await supabase.from("contacts").select("id,email").in("email", contactEmails)
+        : { data: [], error: null };
+      if (contactLookupError) throw contactLookupError;
+      const contactsByEmail = new Map((existingContacts ?? []).filter((contact) => contact.email).map((contact) => [matchKey(contact.email), contact]));
+      const contactPayload: Array<Record<string, unknown>> = [];
+      const seenContacts = new Set<string>();
+      for (const row of rows) {
+        if (row.error) continue;
+        const hasContact = Boolean(row.contact_first_name || row.contact_last_name || row.contact_email || row.contact_phone);
+        if (!hasContact) continue;
+        const accountId = savedAccountByName.get(matchKey(row.name));
+        if (!accountId) continue;
+        const contactKey = row.contact_email
+          ? `email:${matchKey(row.contact_email)}`
+          : `name:${matchKey(`${row.contact_first_name ?? ""} ${row.contact_last_name ?? ""}`)}:${accountId}`;
+        if (seenContacts.has(contactKey)) continue;
+        seenContacts.add(contactKey);
+        const existingContact = row.contact_email ? contactsByEmail.get(matchKey(row.contact_email)) : undefined;
+        contactPayload.push({
+          ...(existingContact ? { id: existingContact.id } : {}),
+          account_id: accountId,
+          first_name: row.contact_first_name,
+          last_name: row.contact_last_name || row.contact_first_name || "Contact",
+          email: row.contact_email,
+          phone: row.contact_phone,
+          title: row.contact_title,
+          department: row.contact_department,
+          owner_name: row.owner_name,
+        });
+        if (existingContact) contactsUpdated += 1;
+        else contactsAdded += 1;
+      }
+      for (let index = 0; index < contactPayload.length; index += 200) {
+        const { error } = await supabase.from("contacts").upsert(contactPayload.slice(index, index + 200));
+        if (error) throw error;
+      }
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast.success(`Import complete: ${inserted} added, ${updated} updated, ${skipped} skipped.`);
+      await queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      toast.success(`Import complete: ${inserted} clients added, ${updated} updated; ${contactsAdded} contacts added, ${contactsUpdated} updated; ${skipped} rows skipped.`);
       reset();
       onOpenChange(false);
     } catch (error) {
@@ -176,7 +242,7 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
       <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import Corporate Clients</DialogTitle>
-          <DialogDescription>Upload an Excel or CSV file. Existing clients are matched by company name or website and updated.</DialogDescription>
+          <DialogDescription>Upload an Excel or CSV file. Client details are imported here; any contact columns automatically create linked Client Contacts.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
