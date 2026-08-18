@@ -31,6 +31,7 @@ export function ListModule<T extends { id: string }>({
   tile,
   onRowClick,
   ownerOf,
+  headerAction,
 }: {
   title: string;
   createLabel: string;
@@ -48,6 +49,7 @@ export function ListModule<T extends { id: string }>({
   tile?: (row: T) => React.ReactNode;
   onRowClick?: (row: T) => void;
   ownerOf?: (row: T) => string | null | undefined;
+  headerAction?: React.ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
@@ -97,6 +99,7 @@ export function ListModule<T extends { id: string }>({
         action={
           <div className="flex flex-wrap items-center gap-2">
             {ownerOf ? <OwnerFilter value={owner} onChange={setOwner} /> : null}
+            {headerAction}
             <Button size="sm" onClick={openCreate}>
               <Plus className="size-4" /> {createLabel}
             </Button>
@@ -111,7 +114,11 @@ export function ListModule<T extends { id: string }>({
             activeFilter={filter}
             onFilterChange={setFilter}
             systemFilters={[
-              { id: "all", label: filterAllLabel ?? `All ${title.toLowerCase()}`, count: rows.length },
+              {
+                id: "all",
+                label: filterAllLabel ?? `All ${title.toLowerCase()}`,
+                count: rows.length,
+              },
               ...filterOptions.map((option) => ({
                 id: option,
                 label: option,
