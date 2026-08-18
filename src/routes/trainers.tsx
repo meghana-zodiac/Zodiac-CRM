@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { FileSpreadsheet } from "lucide-react";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
 import { StatusPill, trainingTypeTone } from "@/components/crm/status-pill";
 import { trainerFields } from "@/components/crm/field-defs";
+import { TrainerImportDialog } from "@/components/crm/trainer-import-dialog";
+import { Button } from "@/components/ui/button";
 import { TRAINING_TYPES, currency, trainersQuery, type Trainer } from "@/lib/crm";
 
 export const Route = createFileRoute("/trainers")({
@@ -30,6 +34,7 @@ export const Route = createFileRoute("/trainers")({
 
 function TrainersPage() {
   const trainers = useQuery(trainersQuery());
+  const [importOpen, setImportOpen] = useState(false);
 
   const columns: Column<Trainer>[] = [
     {
@@ -51,32 +56,46 @@ function TrainersPage() {
   ];
 
   return (
-    <ListModule<Trainer>
-      title="Trainer Profiles"
-      createLabel="Add Trainer"
-      recordLabel="Trainer"
-      table="trainers"
-      fields={trainerFields}
-      rows={trainers.data ?? []}
-      isLoading={trainers.isLoading}
-      columns={columns}
-      minWidth={1000}
-      filterAllLabel="All trainers"
-      filterOptions={TRAINING_TYPES}
-      filterValue={(row) => row.training_type}
-      searchValues={(row) => [row.full_name, row.expertise, row.email, row.bio]}
-      tile={(row) => (
-        <>
-          <p className="text-sm font-semibold text-foreground">{row.full_name}</p>
-          <p className="text-xs text-muted-foreground">{row.expertise ?? "—"}</p>
-          <div className="mt-3 flex items-center justify-between">
-            <StatusPill tone={trainingTypeTone(row.training_type)}>{row.training_type}</StatusPill>
-            <span className="text-xs text-muted-foreground">
-              {row.rating != null ? `${row.rating} / 5` : "—"} · {currency(row.day_rate)}
-            </span>
-          </div>
-        </>
-      )}
-    />
+    <>
+      <ListModule<Trainer>
+        title="Trainer Profiles"
+        createLabel="Add Trainer"
+        recordLabel="Trainer"
+        table="trainers"
+        fields={trainerFields}
+        rows={trainers.data ?? []}
+        isLoading={trainers.isLoading}
+        columns={columns}
+        minWidth={1000}
+        filterAllLabel="All trainers"
+        filterOptions={TRAINING_TYPES}
+        filterValue={(row) => row.training_type}
+        headerAction={
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet className="size-4" /> Import Excel
+          </Button>
+        }
+        searchValues={(row) => [row.full_name, row.expertise, row.email, row.bio]}
+        tile={(row) => (
+          <>
+            <p className="text-sm font-semibold text-foreground">{row.full_name}</p>
+            <p className="text-xs text-muted-foreground">{row.expertise ?? "—"}</p>
+            <div className="mt-3 flex items-center justify-between">
+              <StatusPill tone={trainingTypeTone(row.training_type)}>
+                {row.training_type}
+              </StatusPill>
+              <span className="text-xs text-muted-foreground">
+                {row.rating != null ? `${row.rating} / 5` : "—"} · {currency(row.day_rate)}
+              </span>
+            </div>
+          </>
+        )}
+      />
+      <TrainerImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        trainers={trainers.data ?? []}
+      />
+    </>
   );
 }
