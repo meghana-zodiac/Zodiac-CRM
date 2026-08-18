@@ -164,6 +164,7 @@ export type Database = {
       contacts: {
         Row: {
           account_id: string | null
+          additional_fields: Json
           created_at: string
           department: string | null
           email: string | null
@@ -177,6 +178,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          additional_fields?: Json
           created_at?: string
           department?: string | null
           email?: string | null
@@ -190,6 +192,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          additional_fields?: Json
           created_at?: string
           department?: string | null
           email?: string | null
