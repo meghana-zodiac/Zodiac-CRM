@@ -78,8 +78,30 @@ function recordsFrom(payload: unknown): JsonObject[] {
 }
 
 async function fetchClients(token: string): Promise<JsonObject[]> {
-  const payload = await ceipalJson(`${CEIPAL_BASE_URL}/v2/getClientsList/?limit=50`, token);
-  return recordsFrom(payload);
+  const clients: JsonObject[] = [];
+  const seenIds = new Set<string>();
+
+  for (let page = 1; page <= 100; page += 1) {
+    const url = new URL(`${CEIPAL_BASE_URL}/v2/getClientsList/`);
+    url.searchParams.set("limit", "50");
+    url.searchParams.set("page", String(page));
+
+    const payload = await ceipalJson(url.toString(), token);
+    const batch = recordsFrom(payload);
+    let added = 0;
+
+    for (const client of batch) {
+      const id = text(client["id"]) ?? text(client["client_id"]);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      clients.push(client);
+      added += 1;
+    }
+
+    if (batch.length < 50 || added === 0) break;
+  }
+
+  return clients;
 }
 
 function accountFrom(client: JsonObject) {
