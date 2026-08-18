@@ -1,19 +1,16 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { FileSpreadsheet } from "lucide-react";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
 import { ApolloProspector } from "@/components/crm/apollo-prospector";
 import { StatusPill, leadTone } from "@/components/crm/status-pill";
 import { leadFields } from "@/components/crm/field-defs";
-import {
-  LEAD_STATUSES,
-  currency,
-  formatDate,
-  leadsQuery,
-  type Lead,
-} from "@/lib/crm";
+import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
+import { Button } from "@/components/ui/button";
+import { LEAD_STATUSES, currency, formatDate, leadsQuery, type Lead } from "@/lib/crm";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -40,6 +37,7 @@ export const Route = createFileRoute("/leads")({
 function LeadsPage() {
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
+  const [importOpen, setImportOpen] = useState(false);
 
   const columns: Column<Lead>[] = [
     {
@@ -67,46 +65,58 @@ function LeadsPage() {
       {tab === "apollo" ? (
         <ApolloProspector target="leads" />
       ) : (
-    <ListModule<Lead>
-      title="Corporate Leads"
-      createLabel="Add Lead"
-      recordLabel="Lead"
-      table="leads"
-      fields={leadFields}
-      rows={leads.data ?? []}
-      isLoading={leads.isLoading}
-      columns={columns}
-      minWidth={1300}
-      filterAllLabel="All leads"
-      filterOptions={LEAD_STATUSES}
-      filterValue={(row) => row.status}
-      ownerOf={(row) => row.owner_name}
-      searchValues={(row) => [
-        row.company_name,
-        row.contact_name,
-        row.email,
-        row.industry,
-        row.city,
-        row.service_interest,
-        row.source,
-        row.notes,
-      ]}
-      tile={(row) => (
         <>
-          <p className="text-sm font-semibold text-foreground">{row.company_name}</p>
-          <p className="text-xs text-muted-foreground">
-            {row.contact_name ?? "—"} · {row.city ?? "—"}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
-            <StatusPill tone="info">{row.service_interest ?? "—"}</StatusPill>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {currency(row.estimated_value)} · {row.source ?? "—"}
-          </p>
+          <ListModule<Lead>
+            title="Corporate Leads"
+            createLabel="Add Lead"
+            recordLabel="Lead"
+            table="leads"
+            fields={leadFields}
+            rows={leads.data ?? []}
+            isLoading={leads.isLoading}
+            columns={columns}
+            minWidth={1300}
+            filterAllLabel="All leads"
+            filterOptions={LEAD_STATUSES}
+            filterValue={(row) => row.status}
+            ownerOf={(row) => row.owner_name}
+            headerAction={
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet className="size-4" /> Import Excel
+              </Button>
+            }
+            searchValues={(row) => [
+              row.company_name,
+              row.contact_name,
+              row.email,
+              row.industry,
+              row.city,
+              row.service_interest,
+              row.source,
+              row.notes,
+            ]}
+            tile={(row) => (
+              <>
+                <p className="text-sm font-semibold text-foreground">{row.company_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {row.contact_name ?? "—"} · {row.city ?? "—"}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
+                  <StatusPill tone="info">{row.service_interest ?? "—"}</StatusPill>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {currency(row.estimated_value)} · {row.source ?? "—"}
+                </p>
+              </>
+            )}
+          />
+          <LeadImportDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            leads={leads.data ?? []}
+          />
         </>
-      )}
-    />
       )}
     </div>
   );
