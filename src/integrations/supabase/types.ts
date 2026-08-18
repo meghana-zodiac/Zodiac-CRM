@@ -14,9 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      bd_team_members: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_name: string
+          email: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           city: string | null
+          ceipal_client_number: string | null
+          ceipal_id: string | null
+          ceipal_last_synced_at: string | null
           client_type: string | null
           created_at: string
           id: string
@@ -28,6 +58,9 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          ceipal_client_number?: string | null
+          ceipal_id?: string | null
+          ceipal_last_synced_at?: string | null
           client_type?: string | null
           created_at?: string
           id?: string
@@ -39,6 +72,9 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          ceipal_client_number?: string | null
+          ceipal_id?: string | null
+          ceipal_last_synced_at?: string | null
           client_type?: string | null
           created_at?: string
           id?: string
