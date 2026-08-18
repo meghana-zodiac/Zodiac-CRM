@@ -42,6 +42,7 @@ import { BD_OWNERS } from "@/components/crm/nav-data";
 import { currency, formatDate } from "@/lib/crm";
 import {
   POA_MONTHS,
+  bdTeamMembersQuery,
   createPoaEntry,
   defaultMonth,
   deletePoaEntry,
@@ -75,10 +76,10 @@ const toneBar: Record<"success" | "warning" | "danger", string> = {
   danger: "[&>div]:bg-red-500",
 };
 
-function emptyForm(): PoaEntryInput {
+function emptyForm(defaultMember: string): PoaEntryInput {
   return {
     date: todayKey(),
-    team_member: BD_OWNERS[0],
+    team_member: defaultMember,
     calls_made: 0,
     proposals_sent: 0,
     deals_closed_value: 0,
@@ -140,10 +141,12 @@ function EntryDialog({
   open,
   onOpenChange,
   editing,
+  teamMembers,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: PoaEntry | null;
+  teamMembers: string[];
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<PoaEntryInput>(() =>
@@ -157,7 +160,7 @@ function EntryDialog({
           actual_revenue: Number(editing.actual_revenue),
           notes: editing.notes,
         }
-      : emptyForm(),
+      : emptyForm(teamMembers[0] ?? BD_OWNERS[0]),
   );
 
   const save = useMutation({
@@ -199,7 +202,7 @@ function EntryDialog({
           <div className="space-y-1.5">
             <Label>Team member</Label>
             <div className="flex rounded-md border border-input bg-background p-0.5">
-              {BD_OWNERS.map((owner) => (
+              {teamMembers.map((owner) => (
                 <button
                   key={owner}
                   type="button"
@@ -297,6 +300,16 @@ export function PoaModule() {
 
   const entries = useQuery(poaEntriesQuery());
   const targets = useQuery(kraTargetsQuery());
+  const memberProfiles = useQuery(bdTeamMembersQuery());
+
+  const teamMembers = useMemo(() => {
+    const names = new Set<string>();
+    for (const profile of memberProfiles.data ?? []) names.add(profile.display_name);
+    for (const row of entries.data ?? []) names.add(row.team_member);
+    for (const row of targets.data ?? []) names.add(row.team_member);
+    if (names.size === 0) BD_OWNERS.forEach((owner) => names.add(owner));
+    return [...names].sort((left, right) => left.localeCompare(right));
+  }, [memberProfiles.data, entries.data, targets.data]);
 
   const usingRange = Boolean(range.from && range.to);
   const bounds = monthBounds(month);
@@ -500,7 +513,7 @@ export function PoaModule() {
 
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center rounded-md border border-input bg-background p-0.5">
-            {(["all", ...BD_OWNERS] as TeamFilter[]).map((option) => (
+            {(["all", ...teamMembers] as TeamFilter[]).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -682,6 +695,7 @@ export function PoaModule() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           editing={editing}
+          teamMembers={teamMembers}
         />
       ) : null}
     </div>
