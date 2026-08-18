@@ -418,3 +418,13 @@ export function TrainerImportDialog({
           >
             {importing ? (
               <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            {importing ? "Importing…" : `Import ${validCount} trainers`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
