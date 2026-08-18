@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,7 @@ import { accountsQuery, contactsQuery, formatDate, fullName } from "@/lib/crm";
 import { contactFields } from "@/components/crm/field-defs";
 import { teamMembers } from "@/components/crm/nav-data";
 import type { ContactWithAccount } from "@/lib/crm";
+import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
 
 export const Route = createFileRoute("/contacts")({
   head: () => ({
@@ -50,6 +51,7 @@ function ContactsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [tab, setTab] = useState<ModuleTab>("records");
+  const [importOpen, setImportOpen] = useState(false);
 
   const all = contacts.data ?? [];
 
@@ -95,9 +97,14 @@ function ContactsPage() {
         availableViews={["list", "tile"]}
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="size-4" /> Create Contact
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="size-4" /> Import Excel
+            </Button>
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="size-4" /> Create Contact
+            </Button>
+          </div>
         }
       />
 
@@ -248,6 +255,12 @@ function ContactsPage() {
         title={editing ? "Edit Contact" : "Create Contact"}
         fields={contactFields(accounts.data ?? [])}
         record={editing}
+      />
+      <ContactImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        contacts={all}
+        accounts={accounts.data ?? []}
       />
     </div>
   );
