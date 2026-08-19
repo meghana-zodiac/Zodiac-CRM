@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "./module-chrome";
@@ -20,6 +20,8 @@ export type Column<T> = {
   render: (row: T) => React.ReactNode;
   className?: string;
 };
+
+const ROWS_PER_PAGE = 100;
 
 export function ListModule<T extends { id: string }>({
   title,
@@ -67,9 +69,11 @@ export function ListModule<T extends { id: string }>({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search);
 
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = deferredSearch.trim().toLowerCase();
     return rows.filter((row) => {
       if (filter !== "all" && filterValue && filterValue(row) !== filter) return false;
       if (ownerOf && !ownerMatches(owner, ownerOf(row))) return false;
@@ -78,7 +82,7 @@ export function ListModule<T extends { id: string }>({
         .filter((value) => value !== null && value !== undefined && value !== "")
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [rows, search, filter, filterValue, searchValues, owner, ownerOf]);
+  }, [rows, deferredSearch, filter, filterValue, searchValues, owner, ownerOf]);
   const availableFilterOptions = useMemo(
     () =>
       Array.from(
@@ -89,6 +93,19 @@ export function ListModule<T extends { id: string }>({
       ),
     [filterOptions, filterValue, rows],
   );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  const visibleRows = useMemo(
+    () => filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE),
+    [filtered, page],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter, owner, view]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
 
   const openCreate = () => {
     setEditing(null);
@@ -185,7 +202,7 @@ export function ListModule<T extends { id: string }>({
             <EmptyState message={`No ${title.toLowerCase()} match this view.`} />
           ) : tile && view === "tile" ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((row) => (
+              {visibleRows.map((row) => (
                 <div
                   key={row.id}
                   className="rounded-lg border border-border bg-surface p-4 shadow-panel"
@@ -221,7 +238,7 @@ export function ListModule<T extends { id: string }>({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map((row) => (
+                  {visibleRows.map((row) => (
                     <tr
                       key={row.id}
                       className={
@@ -253,6 +270,36 @@ export function ListModule<T extends { id: string }>({
               </table>
             </div>
           )}
+
+          {!isLoading && filtered.length > ROWS_PER_PAGE ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 shadow-panel">
+              <p className="text-xs text-muted-foreground">
+                Showing {(page - 1) * ROWS_PER_PAGE + 1}–
+                {Math.min(page * ROWS_PER_PAGE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  <ChevronLeft className="size-4" /> Previous
+                </Button>
+                <span className="min-w-20 text-center text-xs font-medium tabular-nums">
+                  {page} / {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === pageCount}
+                  onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                >
+                  Next <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
