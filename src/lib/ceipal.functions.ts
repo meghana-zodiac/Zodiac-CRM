@@ -10,6 +10,25 @@ export type CeipalSyncResult = {
 };
 
 const CEIPAL_BASE_URL = "https://api.ceipal.com";
+const CEIPAL_PAGE_DELAY_MS = 650;
+const CEIPAL_MAX_RETRIES = 4;
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function retryDelay(response: Response, attempt: number) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(seconds * 1000, CEIPAL_PAGE_DELAY_MS);
+
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) return Math.max(retryAt - Date.now(), CEIPAL_PAGE_DELAY_MS);
+  }
+
+  return Math.min(5000 * 2 ** attempt, 30000);
+}
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -27,18 +46,30 @@ function tokenFrom(payload: JsonObject): string | null {
 }
 
 async function ceipalJson(url: string, token: string): Promise<unknown> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) {
-    const error = new Error(`CEIPAL returned ${response.status}`);
+  for (let attempt = 0; attempt <= CEIPAL_MAX_RETRIES; attempt += 1) {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+      },
+    });
+    if (response.ok) return response.json();
+
+    if (response.status === 429 && attempt < CEIPAL_MAX_RETRIES) {
+      await sleep(retryDelay(response, attempt));
+      continue;
+    }
+
+    const error = new Error(
+      response.status === 429
+        ? "CEIPAL is still rate-limiting this sync. Please wait a few minutes and try again."
+        : `CEIPAL returned ${response.status}`,
+    );
     Object.assign(error, { status: response.status });
     throw error;
   }
-  return response.json();
+
+  throw new Error("CEIPAL sync could not be completed after retrying.");
 }
 
 async function authenticate(): Promise<string> {
@@ -99,6 +130,7 @@ async function fetchLeads(token: string): Promise<JsonObject[]> {
     }
 
     if (batch.length < 50 || added === 0) break;
+    await sleep(CEIPAL_PAGE_DELAY_MS);
   }
 
   return leads;
@@ -126,6 +158,7 @@ async function fetchClients(token: string): Promise<JsonObject[]> {
     }
 
     if (batch.length < 50 || added === 0) break;
+    await sleep(CEIPAL_PAGE_DELAY_MS);
   }
 
   return clients;
