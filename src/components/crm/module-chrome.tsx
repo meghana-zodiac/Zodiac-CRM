@@ -44,12 +44,7 @@ export function ModuleHeader({
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="lg:hidden"
-          onClick={onToggleFilters}
-        >
+        <Button variant="outline" size="sm" className="lg:hidden" onClick={onToggleFilters}>
           <SlidersHorizontal className="size-4" />
           Filters
         </Button>
@@ -58,7 +53,7 @@ export function ModuleHeader({
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search this view"
+            aria-label={`Search ${title}`}
             className="h-9 w-44 pl-8 sm:w-56"
           />
         </div>
@@ -100,7 +95,12 @@ export function FilterPanel({
   systemFilters: FilterOption[];
   activeFilter: string;
   onFilterChange: (id: string) => void;
-  fieldFilters?: { label: string; options: FilterOption[]; active: string; onChange: (id: string) => void };
+  fieldFilters?: {
+    label: string;
+    options: FilterOption[];
+    active: string;
+    onChange: (id: string) => void;
+  };
   className?: string;
 }) {
   return (
@@ -146,7 +146,8 @@ export function FilterPanel({
                   onClick={() => fieldFilters.onChange(option.id)}
                   className={cn(
                     "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    fieldFilters.active === option.id && "bg-accent font-medium text-accent-foreground",
+                    fieldFilters.active === option.id &&
+                      "bg-accent font-medium text-accent-foreground",
                   )}
                 >
                   <span className="truncate">{option.label}</span>
