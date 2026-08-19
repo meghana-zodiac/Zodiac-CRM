@@ -12,7 +12,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { activitiesQuery, dealsQuery, formatDateTime, leadsQuery } from "@/lib/crm";
+import { activitiesQuery, dealsQuery, formatDateTime } from "@/lib/crm";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Notification = {
   id: string;
@@ -49,10 +50,26 @@ function daysUntil(date: string | null) {
 }
 
 /** Derives the live notification feed from leads, proposals and activities. */
-export function useNotifications() {
-  const leads = useQuery(leadsQuery());
-  const deals = useQuery(dealsQuery());
-  const activities = useQuery(activitiesQuery());
+export function useNotifications(enabled = true) {
+  const leads = useQuery({
+    queryKey: ["notifications", "recent-leads"],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, company_name, service_interest, owner_name, status, created_at")
+        .in("status", ["New", "Contacted"])
+        .gte("created_at", weekAgo)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const deals = useQuery({ ...dealsQuery(), enabled });
+  const activities = useQuery({ ...activitiesQuery(), enabled });
 
   const [read, setRead] = useState<string[]>([]);
   const [cleared, setCleared] = useState<string[]>([]);
@@ -164,7 +181,13 @@ export function useNotifications() {
     });
   }, [items]);
 
-  return { items, unreadIds: unread.map((i) => i.id), unreadCount: unread.length, markAllRead, clearAll };
+  return {
+    items,
+    unreadIds: unread.map((i) => i.id),
+    unreadCount: unread.length,
+    markAllRead,
+    clearAll,
+  };
 }
 
 export function NotificationsDrawer({
@@ -203,14 +226,21 @@ export function NotificationsDrawer({
             <CheckCheck className="size-4" />
             Mark all as read
           </Button>
-          <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={clearAll}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground"
+            onClick={clearAll}
+          >
             Clear all
           </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {items.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              You&apos;re all caught up.
+            </p>
           ) : (
             <ul className="divide-y divide-border">
               {items.map((item) => {
@@ -244,7 +274,9 @@ export function NotificationsDrawer({
                         {meta.label} · {formatDateTime(item.timestamp)}
                       </p>
                     </div>
-                    {unread && <span className="mt-2 size-2 shrink-0 rounded-full bg-destructive" />}
+                    {unread && (
+                      <span className="mt-2 size-2 shrink-0 rounded-full bg-destructive" />
+                    )}
                   </li>
                 );
               })}
