@@ -92,6 +92,7 @@ function LeadsPage() {
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
             filterValue={(row) => row.status}
+            filterPlacement="toolbar"
             ownerOf={(row) => row.owner_name}
             headerAction={
               <div className="flex items-center gap-2">
