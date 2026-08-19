@@ -45,7 +45,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     span: 2,
     type: "select",
     options: opts(BGV_CHECK_TYPES),
-    placeholder: "Employment, Academic, Criminal",
     dependsOn,
     showWhen: [BGV_SERVICE_LINE],
   },
@@ -53,7 +52,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     name: "service_details.bgv_monthly_volume",
     label: "Monthly candidate volume",
     type: "number",
-    placeholder: "250",
     dependsOn,
     showWhen: [BGV_SERVICE_LINE],
   },
@@ -61,7 +59,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     name: "service_details.bgv_tat_days",
     label: "SLA turnaround (days)",
     type: "number",
-    placeholder: "7",
     dependsOn,
     showWhen: [BGV_SERVICE_LINE],
   },
@@ -80,14 +77,12 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     span: 2,
     type: "select",
     options: opts(OD_SCOPES),
-    placeholder: "Leadership, Culture",
     dependsOn,
     showWhen: [OD_SERVICE_LINE],
   },
   {
     name: "service_details.od_duration",
     label: "Duration",
-    placeholder: "6 weeks",
     dependsOn,
     showWhen: [OD_SERVICE_LINE],
   },
@@ -95,7 +90,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     name: "service_details.od_sessions",
     label: "No. of sessions",
     type: "number",
-    placeholder: "8",
     dependsOn,
     showWhen: [OD_SERVICE_LINE],
   },
@@ -104,7 +98,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     label: "Lead OD consultant",
     type: "select",
     options: opts(teamMembers),
-    placeholder: "Nuzhat",
     dependsOn,
     showWhen: [OD_SERVICE_LINE],
   },
@@ -114,7 +107,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     span: 2,
     type: "select",
     options: opts(OD_DELIVERABLES),
-    placeholder: "SOPs, Diagnostic Report",
     dependsOn,
     showWhen: [OD_SERVICE_LINE],
   },
@@ -122,14 +114,12 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
   {
     name: "service_details.comp_target_roles",
     label: "Target roles",
-    placeholder: "Engineering Manager, SDE II",
     dependsOn,
     showWhen: [COMP_SERVICE_LINE],
   },
   {
     name: "service_details.comp_industry_sector",
     label: "Industry sector",
-    placeholder: "IT Services",
     dependsOn,
     showWhen: [COMP_SERVICE_LINE],
   },
@@ -139,7 +129,6 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
     span: 2,
     type: "select",
     options: opts(BENCHMARK_METRICS),
-    placeholder: "Base Salary, Variable, ESOPs",
     dependsOn,
     showWhen: [COMP_SERVICE_LINE],
   },
@@ -161,12 +150,12 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
 ];
 
 export const accountFields: FieldDef[] = [
-  { name: "name", label: "Client name", required: true, placeholder: "Nexora Technologies Pvt Ltd" },
-  { name: "industry", label: "Industry", placeholder: "IT Services" },
+  { name: "name", label: "Client name", required: true },
+  { name: "industry", label: "Industry" },
   { name: "client_type", label: "Engagement type", type: "select", options: opts(CLIENT_TYPES) },
-  { name: "city", label: "City", placeholder: "Bengaluru" },
-  { name: "website", label: "Website", placeholder: "nexora.com" },
-  { name: "phone", label: "Phone", type: "tel", placeholder: "+91 98765 43210" },
+  { name: "city", label: "City" },
+  { name: "website", label: "Website" },
+  { name: "phone", label: "Phone", type: "tel" },
   ownerField,
 ];
 
@@ -176,13 +165,12 @@ export const leadFields: FieldDef[] = [
     label: "Company name",
     required: true,
     span: 2,
-    placeholder: "Vertex Global Services",
   },
-  { name: "contact_name", label: "Contact person", placeholder: "Rahul Menon" },
-  { name: "email", label: "Email", type: "email", placeholder: "rahul@vertexglobal.in" },
-  { name: "phone", label: "Phone", type: "tel", placeholder: "+91 98450 11223" },
-  { name: "industry", label: "Industry", placeholder: "IT Services" },
-  { name: "city", label: "City", placeholder: "Bengaluru" },
+  { name: "contact_name", label: "Contact person" },
+  { name: "email", label: "Email", type: "email" },
+  { name: "phone", label: "Phone", type: "tel" },
+  { name: "industry", label: "Industry" },
+  { name: "city", label: "City" },
   {
     name: "service_interest",
     label: "Service interest",
@@ -191,18 +179,18 @@ export const leadFields: FieldDef[] = [
   },
   { name: "source", label: "Lead source", type: "select", options: opts(LEAD_SOURCES) },
   { name: "status", label: "Lead status", type: "select", options: opts(LEAD_STATUSES) },
-  { name: "estimated_value", label: "Estimated value (₹)", type: "number", placeholder: "1200000" },
+  { name: "estimated_value", label: "Estimated value (₹)", type: "number" },
   ownerField,
   { name: "notes", label: "Qualification notes", type: "textarea" },
 ];
 
 export const contactFields = (accounts: Account[]): FieldDef[] => [
-  { name: "first_name", label: "First name", placeholder: "Ananya" },
-  { name: "last_name", label: "Last name", required: true, placeholder: "Sharma" },
-  { name: "email", label: "Email", type: "email", placeholder: "ananya@nexora.com" },
+  { name: "first_name", label: "First name" },
+  { name: "last_name", label: "Last name", required: true },
+  { name: "email", label: "Email", type: "email" },
   { name: "phone", label: "Phone", type: "tel" },
-  { name: "title", label: "Designation", placeholder: "Head of Learning & Development" },
-  { name: "department", label: "Department", placeholder: "Human Resources" },
+  { name: "title", label: "Designation" },
+  { name: "department", label: "Department" },
   {
     name: "account_id",
     label: "Corporate client",
@@ -219,9 +207,8 @@ export const dealFields = (accounts: Account[], contacts: Contact[]): FieldDef[]
     label: "Proposal name",
     required: true,
     span: 2,
-    placeholder: "Nexora — RPO retainer FY26",
   },
-  { name: "amount", label: "Contract value (₹)", type: "number", placeholder: "1200000" },
+  { name: "amount", label: "Contract value (₹)", type: "number" },
   {
     name: "stage",
     label: "SLA pipeline stage",
@@ -251,7 +238,7 @@ export const dealFields = (accounts: Account[], contacts: Contact[]): FieldDef[]
 ];
 
 export const trainerFields: FieldDef[] = [
-  { name: "full_name", label: "Trainer name", required: true, placeholder: "Meera Iyer" },
+  { name: "full_name", label: "Trainer name", required: true },
   { name: "email", label: "Email", type: "email" },
   { name: "phone", label: "Phone", type: "tel" },
   { name: "training_type", label: "Training type", type: "select", options: opts(TRAINING_TYPES) },
@@ -259,24 +246,20 @@ export const trainerFields: FieldDef[] = [
     name: "expertise",
     label: "Expertise",
     span: 2,
-    placeholder: "Power BI, Advanced Excel, Data Storytelling",
   },
   { name: "rating", label: "Rating (/5)", type: "number" },
   { name: "day_rate", label: "Day rate (₹)", type: "number" },
   { name: "bio", label: "Profile summary", type: "textarea" },
 ];
 
-export const trainingRequestFields = (
-  accounts: Account[],
-  trainers: Trainer[],
-): FieldDef[] => [
+export const trainingRequestFields = (accounts: Account[], trainers: Trainer[]): FieldDef[] => [
   {
     name: "account_id",
     label: "Corporate client",
     type: "select",
     options: accounts.map((account) => ({ value: account.id, label: account.name })),
   },
-  { name: "client_name", label: "Client name (if new)", placeholder: "Zenith Manufacturing" },
+  { name: "client_name", label: "Client name (if new)" },
   { name: "training_type", label: "Training type", type: "select", options: opts(TRAINING_TYPES) },
   {
     name: "course_topic",
@@ -304,7 +287,7 @@ export const trainingBatchFields = (
   requests: TrainingRequest[],
   trainers: Trainer[],
 ): FieldDef[] => [
-  { name: "batch_code", label: "Batch code", required: true, placeholder: "ZB-2026-014" },
+  { name: "batch_code", label: "Batch code", required: true },
   { name: "course_topic", label: "Course / topic", type: "select", options: opts(ALL_COURSES) },
   { name: "training_type", label: "Training type", type: "select", options: opts(TRAINING_TYPES) },
   {
