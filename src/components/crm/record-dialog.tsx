@@ -23,14 +23,14 @@ import {
 } from "@/components/ui/select";
 import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
 
-export type FieldType = "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
+export type FieldType =
+  "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
 
 export type FieldDef = {
   name: string;
   label: string;
   type?: FieldType;
   required?: boolean;
-  placeholder?: string;
   options?: { value: string; label: string }[];
   span?: 1 | 2;
   /** Only show this field when the field named here has one of `showWhen` values. */
@@ -41,11 +41,13 @@ export type FieldDef = {
 /** Reads a possibly dotted path (e.g. "service_details.tat_days") off a record. */
 function readPath(record: Record<string, unknown> | null | undefined, path: string): unknown {
   if (!record) return undefined;
-  return path.split(".").reduce<unknown>(
-    (acc, key) =>
-      acc && typeof acc === "object" ? (acc as Record<string, unknown>)[key] : undefined,
-    record,
-  );
+  return path
+    .split(".")
+    .reduce<unknown>(
+      (acc, key) =>
+        acc && typeof acc === "object" ? (acc as Record<string, unknown>)[key] : undefined,
+      record,
+    );
 }
 
 function writePath(target: Record<string, unknown>, path: string, value: unknown) {
@@ -166,7 +168,10 @@ export function RecordDialog({
                 key={field.name}
                 className={field.span === 2 || type === "textarea" ? "sm:col-span-2" : undefined}
               >
-                <Label htmlFor={field.name} className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                <Label
+                  htmlFor={field.name}
+                  className="mb-1.5 block text-xs font-medium text-muted-foreground"
+                >
                   {field.label}
                   {field.required ? <span className="text-destructive"> *</span> : null}
                 </Label>
@@ -178,13 +183,7 @@ export function RecordDialog({
                     }
                   >
                     <SelectTrigger id={field.name}>
-                      <SelectValue
-                        placeholder={
-                          (field.options ?? []).length
-                            ? field.placeholder ?? `Select ${field.label.toLowerCase()}`
-                            : `No ${field.label.toLowerCase()} records available`
-                        }
-                      />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {(field.options ?? []).map((option) => (
@@ -198,7 +197,6 @@ export function RecordDialog({
                   <Textarea
                     id={field.name}
                     rows={3}
-                    placeholder={field.placeholder}
                     value={values[field.name] ?? ""}
                     onChange={(event) =>
                       setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
@@ -216,7 +214,6 @@ export function RecordDialog({
                             ? "date"
                             : type
                     }
-                    placeholder={field.placeholder}
                     value={values[field.name] ?? ""}
                     onChange={(event) =>
                       setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
