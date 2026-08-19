@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, GripVertical } from "lucide-react";
@@ -6,7 +6,13 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
@@ -65,16 +71,29 @@ function DealsPage() {
   const [editing, setEditing] = useState<DealWithRefs | null>(null);
   const [openDeal, setOpenDeal] = useState<DealWithRefs | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragStage, setDragStage] = useState<BdStage | null>(null);
   const [note, setNote] = useState("");
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const moveStage = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: BdStage }) =>
       updateRecord("deals", id, { stage }),
+    onMutate: async ({ id, stage }) => {
+      await queryClient.cancelQueries({ queryKey: ["deals"] });
+      const previous = queryClient.getQueryData<DealWithRefs[]>(["deals"]);
+      queryClient.setQueryData<DealWithRefs[]>(["deals"], (current = []) =>
+        current.map((deal) => (deal.id === id ? { ...deal, stage } : deal)),
+      );
+      return { previous };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
       toast.success("Proposal stage updated");
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(["deals"], context.previous);
+      toast.error(error.message);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["deals"] }),
   });
 
   const logNote = useMutation({
@@ -111,6 +130,16 @@ function DealsPage() {
     (activities.data ?? []).filter(
       (activity) => activity.related_to_type === "Proposal" && activity.related_to_id === dealId,
     );
+
+  const handleBoardDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const board = boardRef.current;
+    if (!board) return;
+    const bounds = board.getBoundingClientRect();
+    const edge = 90;
+    if (event.clientX < bounds.left + edge) board.scrollBy({ left: -18, behavior: "auto" });
+    if (event.clientX > bounds.right - edge) board.scrollBy({ left: 18, behavior: "auto" });
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -160,19 +189,32 @@ function DealsPage() {
               <tbody className="divide-y divide-border">
                 {rows.map((deal) => (
                   <tr key={deal.id} className="cursor-pointer transition-colors hover:bg-muted/40">
-                    <td className="px-3 py-2.5 font-medium text-foreground" onClick={() => setOpenDeal(deal)}>
+                    <td
+                      className="px-3 py-2.5 font-medium text-foreground"
+                      onClick={() => setOpenDeal(deal)}
+                    >
                       {deal.deal_name}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{deal.accounts?.name ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{deal.service_line ?? "—"}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">
-                      {deal.contacts ? fullName(deal.contacts.first_name, deal.contacts.last_name) : "—"}
+                      {deal.accounts?.name ?? "—"}
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums text-foreground">{currency(deal.amount)}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {deal.service_line ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {deal.contacts
+                        ? fullName(deal.contacts.first_name, deal.contacts.last_name)
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums text-foreground">
+                      {currency(deal.amount)}
+                    </td>
                     <td className="px-3 py-2.5">
-                        <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
+                      <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{formatDate(deal.closing_date)}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {formatDate(deal.closing_date)}
+                    </td>
                     <td className="px-3 py-2.5 text-muted-foreground">{deal.owner_name ?? "—"}</td>
                     <td className="px-3 py-2.5">
                       <RowActions
@@ -191,19 +233,36 @@ function DealsPage() {
             </table>
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+          <div
+            ref={boardRef}
+            onDragOver={handleBoardDragOver}
+            className="flex scroll-smooth gap-3 overflow-x-auto pb-2 scrollbar-thin"
+          >
             {BD_STAGES.map((stage) => {
               const stageDeals = rows.filter((deal) => deal.stage === stage);
               const total = stageDeals.reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
               return (
                 <div
                   key={stage}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (dragId) moveStage.mutate({ id: dragId, stage });
-                    setDragId(null);
+                  onDragEnter={() => dragId && setDragStage(stage)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
                   }}
-                  className="flex w-72 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card"
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const movingDeal = rows.find((deal) => deal.id === dragId);
+                    if (dragId && movingDeal?.stage !== stage)
+                      moveStage.mutate({ id: dragId, stage });
+                    setDragId(null);
+                    setDragStage(null);
+                  }}
+                  className={cn(
+                    "flex w-72 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150",
+                    dragId &&
+                      dragStage === stage &&
+                      "border-brand-accent bg-brand-accent/5 ring-2 ring-brand-accent/20",
+                  )}
                 >
                   <div className="border-b border-border px-3 py-2.5">
                     <div className="flex items-center justify-between">
@@ -219,12 +278,20 @@ function DealsPage() {
                       <div
                         key={deal.id}
                         draggable
-                        onDragStart={() => setDragId(deal.id)}
-                        onDragEnd={() => setDragId(null)}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", deal.id);
+                          setDragId(deal.id);
+                          setDragStage(deal.stage as BdStage);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDragStage(null);
+                        }}
                         onClick={() => setOpenDeal(deal)}
                         className={cn(
-                          "group cursor-pointer rounded-xl border border-border bg-card p-3 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-accent/50 hover:shadow-card-hover",
-                          dragId === deal.id && "opacity-50",
+                          "group cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-accent/50 hover:shadow-card-hover active:cursor-grabbing",
+                          dragId === deal.id && "scale-[0.98] opacity-40 shadow-none",
                         )}
                       >
                         <div className="flex items-start gap-1.5">
@@ -245,7 +312,9 @@ function DealsPage() {
                           <span className="font-semibold tabular-nums text-foreground">
                             {currency(deal.amount)}
                           </span>
-                          <span className="text-muted-foreground">{formatDate(deal.closing_date)}</span>
+                          <span className="text-muted-foreground">
+                            {formatDate(deal.closing_date)}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -298,7 +367,9 @@ function DealsPage() {
                       <li key={activity.id} className="rounded-md border border-border p-2.5">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                          <StatusPill tone={activityTone(activity.status)}>{activity.status}</StatusPill>
+                          <StatusPill tone={activityTone(activity.status)}>
+                            {activity.status}
+                          </StatusPill>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {activity.activity_type} · {formatDateTime(activity.due_date)}
