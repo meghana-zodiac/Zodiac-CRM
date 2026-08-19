@@ -6,6 +6,13 @@ import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "./module-c
 import { RecordDialog, type FieldDef } from "./record-dialog";
 import { RowActions } from "./row-actions";
 import { OwnerFilter, ownerMatches, type OwnerFilterValue } from "./owner-filter";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CrmTable } from "@/lib/crm";
 
 export type Column<T> = {
@@ -32,6 +39,7 @@ export function ListModule<T extends { id: string }>({
   onRowClick,
   ownerOf,
   headerAction,
+  filterPlacement = "sidebar",
 }: {
   title: string;
   createLabel: string;
@@ -50,6 +58,7 @@ export function ListModule<T extends { id: string }>({
   onRowClick?: (row: T) => void;
   ownerOf?: (row: T) => string | null | undefined;
   headerAction?: React.ReactNode;
+  filterPlacement?: "sidebar" | "toolbar";
 }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
@@ -70,6 +79,16 @@ export function ListModule<T extends { id: string }>({
         .some((value) => String(value).toLowerCase().includes(term));
     });
   }, [rows, search, filter, filterValue, searchValues, owner, ownerOf]);
+  const availableFilterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(filterOptions ?? []),
+          ...(filterValue ? rows.map((row) => filterValue(row)).filter(Boolean) : []),
+        ]),
+      ),
+    [filterOptions, filterValue, rows],
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -95,7 +114,9 @@ export function ListModule<T extends { id: string }>({
             }
           : {})}
 
-        onToggleFilters={() => setShowFilters((prev) => !prev)}
+        {...(filterPlacement === "sidebar"
+          ? { onToggleFilters: () => setShowFilters((prev) => !prev) }
+          : {})}
         action={
           <div className="flex flex-wrap items-center gap-2">
             {ownerOf ? <OwnerFilter value={owner} onChange={setOwner} /> : null}
@@ -107,8 +128,31 @@ export function ListModule<T extends { id: string }>({
         }
       />
 
+      {filterPlacement === "toolbar" && filterOptions && filterValue ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 sm:px-5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Status
+          </span>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[210px] bg-surface">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {filterAllLabel ?? `All ${title.toLowerCase()}`} ({rows.length})
+              </SelectItem>
+              {availableFilterOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option} ({rows.filter((row) => filterValue(row) === option).length})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <div className="flex min-h-0 flex-1">
-        {filterOptions && filterValue ? (
+        {filterPlacement === "sidebar" && filterOptions && filterValue ? (
           <FilterPanel
             className={showFilters ? "block w-full lg:w-56" : "hidden lg:block"}
             activeFilter={filter}
@@ -119,7 +163,7 @@ export function ListModule<T extends { id: string }>({
                 label: filterAllLabel ?? `All ${title.toLowerCase()}`,
                 count: rows.length,
               },
-              ...filterOptions.map((option) => ({
+              ...availableFilterOptions.map((option) => ({
                 id: option,
                 label: option,
                 count: rows.filter((row) => filterValue(row) === option).length,
@@ -130,7 +174,7 @@ export function ListModule<T extends { id: string }>({
 
         <div
           className={
-            filterOptions && showFilters
+            filterPlacement === "sidebar" && filterOptions && showFilters
               ? "hidden flex-1 p-4 sm:p-5 lg:block"
               : "min-w-0 flex-1 p-4 sm:p-5"
           }
