@@ -339,6 +339,7 @@ export type Database = {
       };
       leads: {
         Row: {
+          ceipal_contact_synced_at: string | null;
           ceipal_id: string | null;
           ceipal_last_synced_at: string | null;
           city: string | null;
@@ -358,6 +359,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          ceipal_contact_synced_at?: string | null;
           ceipal_id?: string | null;
           ceipal_last_synced_at?: string | null;
           city?: string | null;
@@ -377,6 +379,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          ceipal_contact_synced_at?: string | null;
           ceipal_id?: string | null;
           ceipal_last_synced_at?: string | null;
           city?: string | null;
