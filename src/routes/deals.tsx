@@ -404,7 +404,7 @@ function DealsPage() {
                   <Textarea
                     rows={3}
                     value={note}
-                    placeholder="Log a note on this deal…"
+                    aria-label="Deal note"
                     onChange={(event) => setNote(event.target.value)}
                   />
                   <Button
