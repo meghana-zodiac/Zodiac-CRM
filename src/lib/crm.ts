@@ -177,13 +177,32 @@ export const contactsQuery = () =>
       ),
   });
 
+const LEADS_PAGE_SIZE = 1000;
+
+async function fetchAllLeads() {
+  const leads: Lead[] = [];
+
+  for (let from = 0; ; from += LEADS_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + LEADS_PAGE_SIZE - 1);
+
+    const page = unwrap<Lead[]>({ data, error });
+    leads.push(...page);
+
+    if (page.length < LEADS_PAGE_SIZE) break;
+  }
+
+  return leads;
+}
+
 export const leadsQuery = () =>
   queryOptions({
     queryKey: ["leads"],
-    queryFn: async () =>
-      unwrap<Lead[]>(
-        await supabase.from("leads").select("*").order("created_at", { ascending: true }),
-      ),
+    queryFn: fetchAllLeads,
   });
 
 export const dealsQuery = () =>
