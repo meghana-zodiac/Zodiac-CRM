@@ -123,10 +123,7 @@ function KpiCard({
           / {formatter(target)}
         </span>
       </p>
-      <Progress
-        value={Math.min(percent, 100)}
-        className={cn("mt-3 h-2", toneBar[resolved])}
-      />
+      <Progress value={Math.min(percent, 100)} className={cn("mt-3 h-2", toneBar[resolved])} />
       <p className={cn("mt-1.5 text-xs font-medium tabular-nums", toneClasses[resolved])}>
         {percent}% of target
       </p>
@@ -164,8 +161,7 @@ function EntryDialog({
   );
 
   const save = useMutation({
-    mutationFn: async () =>
-      editing ? updatePoaEntry(editing.id, form) : createPoaEntry(form),
+    mutationFn: async () => (editing ? updatePoaEntry(editing.id, form) : createPoaEntry(form)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["poa_entries"] });
       toast.success(
@@ -265,7 +261,6 @@ function EntryDialog({
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, notes: event.target.value || null }))
               }
-              placeholder="Key accounts touched, blockers, plan for tomorrow…"
               className="min-h-20"
             />
           </div>
@@ -363,7 +358,10 @@ export function PoaModule() {
     if (bounds.start && today < bounds.start) elapsed = 0;
     else if (bounds.end && today < bounds.end) elapsed = Number(today.slice(8, 10));
     // Never pace on fewer days than the log already covers.
-    const loggedDays = filtered.reduce((max, row) => Math.max(max, Number(row.date.slice(8, 10))), 0);
+    const loggedDays = filtered.reduce(
+      (max, row) => Math.max(max, Number(row.date.slice(8, 10))),
+      0,
+    );
     elapsed = Math.min(days, Math.max(elapsed, loggedDays));
     const projected = elapsed > 0 ? (actuals.revenue / elapsed) * days : 0;
     return {
@@ -635,7 +633,10 @@ export function PoaModule() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={8}
+                      className="py-10 text-center text-sm text-muted-foreground"
+                    >
                       No entries for this period.
                     </TableCell>
                   </TableRow>
