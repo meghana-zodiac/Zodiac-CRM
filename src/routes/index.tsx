@@ -19,7 +19,7 @@ import {
   formatDateTime,
   isThisMonth,
   isToday,
-  leadsQuery,
+  leadDashboardCountsQuery,
   trainingBatchesQuery,
   trainingRequestsQuery,
 } from "@/lib/crm";
@@ -49,24 +49,20 @@ export const Route = createFileRoute("/")({
 });
 
 const openBdStages = BD_STAGES.filter((stage) => stage !== "SLA Signed");
-const openTrainingStages = TRAINING_STATUSES.filter(
-  (status) => status !== "Completed & Invoiced",
-);
+const openTrainingStages = TRAINING_STATUSES.filter((status) => status !== "Completed & Invoiced");
 
 function HomePage() {
-  const leads = useQuery(leadsQuery());
+  const leadCounts = useQuery(leadDashboardCountsQuery());
   const deals = useQuery(dealsQuery());
   const activities = useQuery(activitiesQuery());
   const trainingRequests = useQuery(trainingRequestsQuery());
   const trainingBatches = useQuery(trainingBatchesQuery());
 
-  const leadList = leads.data ?? [];
   const dealList = deals.data ?? [];
   const activityList = activities.data ?? [];
   const requestList = trainingRequests.data ?? [];
   const batchList = trainingBatches.data ?? [];
 
-  const newLeads = leadList.filter((lead) => lead.status === "New" || lead.status === "Contacted");
   const pendingSlas = dealList.filter((deal) => deal.stage !== "SLA Signed");
   const pendingSlaValue = pendingSlas.reduce((sum, deal) => sum + (deal.amount ?? 0), 0);
   const pendingTraining = requestList.filter(
@@ -78,7 +74,9 @@ function HomePage() {
   const ownerSummary = BD_OWNERS.map((owner) => {
     const isOwner = (value: string | null | undefined) =>
       (value ?? "").trim().toLowerCase() === owner.toLowerCase();
-    const openDeals = dealList.filter((deal) => deal.stage !== "SLA Signed" && isOwner(deal.owner_name));
+    const openDeals = dealList.filter(
+      (deal) => deal.stage !== "SLA Signed" && isOwner(deal.owner_name),
+    );
     const meetings = activityList.filter(
       (activity) =>
         activity.activity_type === "Meeting" &&
@@ -117,8 +115,8 @@ function HomePage() {
   const stats = [
     {
       label: "New corporate leads",
-      value: String(newLeads.length),
-      sub: `${leadList.length} in database`,
+      value: String(leadCounts.data?.active ?? 0),
+      sub: `${leadCounts.data?.total ?? 0} in database`,
       icon: Sparkles,
       to: "/leads",
     },
@@ -182,7 +180,9 @@ function HomePage() {
 
       <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">BD team split — Nuzhat vs Edward</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            BD team split — Nuzhat vs Edward
+          </h2>
           <Link to="/deals" className="text-xs font-medium text-primary hover:underline">
             Open pipeline
           </Link>
@@ -200,17 +200,25 @@ function HomePage() {
               <p className="text-xs text-muted-foreground">Open pipeline value</p>
               <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Meetings</dt>
-                  <dd className="text-sm font-semibold tabular-nums text-foreground">{entry.meetings}</dd>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Meetings
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums text-foreground">
+                    {entry.meetings}
+                  </dd>
                 </div>
                 <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Today</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Today
+                  </dt>
                   <dd className="text-sm font-semibold tabular-nums text-foreground">
                     {entry.meetingsToday}
                   </dd>
                 </div>
                 <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Training</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Training
+                  </dt>
                   <dd className="text-sm font-semibold tabular-nums text-foreground">
                     {entry.trainingRequests}
                   </dd>
@@ -224,7 +232,9 @@ function HomePage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Staffing & consulting SLA pipeline</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              Staffing & consulting SLA pipeline
+            </h2>
             <Link to="/deals" className="text-xs font-medium text-primary hover:underline">
               Open board
             </Link>
@@ -256,7 +266,10 @@ function HomePage() {
         <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground">L&D training pipeline</h2>
-            <Link to="/training-requests" className="text-xs font-medium text-primary hover:underline">
+            <Link
+              to="/training-requests"
+              className="text-xs font-medium text-primary hover:underline"
+            >
               Open board
             </Link>
           </div>
@@ -303,7 +316,9 @@ function HomePage() {
                 <li key={activity.id} className="py-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{activity.title}</p>
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {activity.title}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {activity.activity_type} · {formatDateTime(activity.due_date)}
                       </p>
