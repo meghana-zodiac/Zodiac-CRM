@@ -9,9 +9,17 @@ export type CeipalSyncResult = {
   source: "ATS";
 };
 
+export type CeipalLeadContactSyncResult = {
+  checked: number;
+  updated: number;
+  remaining: number;
+  source: "ATS";
+};
+
 const CEIPAL_BASE_URL = "https://api.ceipal.com";
 const CEIPAL_PAGE_DELAY_MS = 650;
 const CEIPAL_MAX_RETRIES = 4;
+const CEIPAL_CONTACT_BATCH_SIZE = 100;
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -106,6 +114,47 @@ function recordsFrom(payload: unknown): JsonObject[] {
       return value.filter((item): item is JsonObject => !!item && typeof item === "object");
   }
   return [];
+}
+
+function objectFrom(payload: unknown): JsonObject | null {
+  if (Array.isArray(payload)) {
+    return payload.find((item): item is JsonObject => !!item && typeof item === "object") ?? null;
+  }
+  if (!payload || typeof payload !== "object") return null;
+  const object = payload as JsonObject;
+  for (const key of ["data", "result", "lead", "details"]) {
+    const nested = objectFrom(object[key]);
+    if (nested) return nested;
+  }
+  return object;
+}
+
+function firstText(object: JsonObject, keys: string[]) {
+  return keys.map((key) => text(object[key])).find(Boolean) ?? null;
+}
+
+function primaryContactFrom(payload: unknown) {
+  const detail = objectFrom(payload);
+  if (!detail) return null;
+  const rawContacts = detail["contacts"] ?? detail["contact_details"] ?? detail["contactDetails"];
+  const contacts = Array.isArray(rawContacts)
+    ? rawContacts.filter((item): item is JsonObject => !!item && typeof item === "object")
+    : [];
+  const phoneKeys = [
+    "mobile_no", "mobile", "mobile_number", "mobileNumber", "contact_number",
+    "contactNumber", "phone", "phone_number", "phoneNumber", "work_phone", "office_no",
+  ];
+  const contact = contacts.find((item) => firstText(item, phoneKeys)) ?? contacts[0];
+  if (!contact) return null;
+
+  const firstName = firstText(contact, ["contact_first_name", "first_name", "firstName"]);
+  const lastName = firstText(contact, ["contact_last_name", "last_name", "lastName"]);
+  const combinedName = [firstName, lastName].filter(Boolean).join(" ") || null;
+  return {
+    name: firstText(contact, ["contact_person_name", "contact_name", "contactName", "name"]) ?? combinedName,
+    phone: firstText(contact, phoneKeys),
+    email: firstText(contact, ["email", "email_id", "emailId", "email_address", "emailAddress", "contact_email"]),
+  };
 }
 
 async function fetchLeads(token: string): Promise<JsonObject[]> {
@@ -244,4 +293,59 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
     }
 
     return { synced: leads.length, source: "ATS" };
+  });
+
+export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CeipalLeadContactSyncResult> => {
+    const { data: candidates, error: candidatesError } = await context.supabase
+      .from("leads")
+      .select("id, ceipal_id, contact_name, phone, email")
+      .not("ceipal_id", "is", null)
+      .is("ceipal_contact_synced_at", null)
+      .order("created_at", { ascending: true })
+      .limit(CEIPAL_CONTACT_BATCH_SIZE);
+    if (candidatesError) throw new Error(`Could not load CEIPAL leads: ${candidatesError.message}`);
+    if (!candidates?.length) return { checked: 0, updated: 0, remaining: 0, source: "ATS" };
+
+    const token = await authenticate();
+    let checked = 0;
+    let updated = 0;
+
+    for (const candidate of candidates) {
+      try {
+        const payload = await ceipalJson(
+          `${CEIPAL_BASE_URL}/v2/getLeadsDetail/${encodeURIComponent(candidate.ceipal_id!)}/`,
+          token,
+        );
+        const contact = primaryContactFrom(payload);
+        const patch = {
+          ceipal_contact_synced_at: new Date().toISOString(),
+          contact_name: candidate.contact_name ?? contact?.name ?? null,
+          phone: candidate.phone ?? contact?.phone ?? null,
+          email: candidate.email ?? contact?.email ?? null,
+        };
+        const { error } = await context.supabase.from("leads").update(patch).eq("id", candidate.id);
+        if (error) throw new Error(`Could not save a CEIPAL contact: ${error.message}`);
+        checked += 1;
+        if (contact?.phone || contact?.email || contact?.name) updated += 1;
+      } catch (error) {
+        if ((error as { status?: number }).status === 429) throw error;
+        const { error: markError } = await context.supabase
+          .from("leads")
+          .update({ ceipal_contact_synced_at: new Date().toISOString() })
+          .eq("id", candidate.id);
+        if (markError) throw new Error(`Could not mark a CEIPAL lead as checked: ${markError.message}`);
+        checked += 1;
+      }
+      if (checked < candidates.length) await sleep(CEIPAL_PAGE_DELAY_MS);
+    }
+
+    const { count, error: countError } = await context.supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .not("ceipal_id", "is", null)
+      .is("ceipal_contact_synced_at", null);
+    if (countError) throw new Error(`Could not count remaining CEIPAL leads: ${countError.message}`);
+    return { checked, updated, remaining: count ?? 0, source: "ATS" };
   });
