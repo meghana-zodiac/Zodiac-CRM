@@ -134,7 +134,7 @@ function GlobalSearch({
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search contacts, clients, proposals…" />
+      <CommandInput aria-label="Search records" />
       <CommandList>
         <CommandEmpty>No records found.</CommandEmpty>
         <CommandGroup heading="Contacts">
