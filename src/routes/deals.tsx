@@ -296,13 +296,28 @@ function DealsPage() {
                       >
                         <div className="flex items-start gap-1.5">
                           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-accent" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-foreground">
                               {deal.deal_name}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
                               {deal.accounts?.name ?? "No account"}
                             </p>
+                          </div>
+                          <div
+                            draggable={false}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <RowActions
+                              table="deals"
+                              id={deal.id}
+                              label="Proposal"
+                              onEdit={() => {
+                                setEditing(deal);
+                                setDialogOpen(true);
+                              }}
+                            />
                           </div>
                         </div>
                         <p className="mt-2 truncate text-xs text-muted-foreground">
