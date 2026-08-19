@@ -185,9 +185,12 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
-  const accounts = useQuery(accountsQuery());
-  const contacts = useQuery(contactsQuery());
-  const notifications = useNotifications();
+  const accounts = useQuery({
+    ...accountsQuery(),
+    enabled: quickCreate === "contact" || quickCreate === "deal",
+  });
+  const contacts = useQuery({ ...contactsQuery(), enabled: quickCreate === "deal" });
+  const notifications = useNotifications(notificationsOpen);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
