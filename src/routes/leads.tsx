@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileSpreadsheet, Phone, RefreshCw } from "lucide-react";
+import { FileSpreadsheet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
@@ -45,21 +45,17 @@ function LeadsPage() {
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
   const ceipalSync = useMutation({
-    mutationFn: () => runCeipalSync(),
-    onSuccess: async ({ synced, source }) => {
-      await queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success(`${synced} leads synced from CEIPAL ${source}.`);
+    mutationFn: async () => {
+      const leadsResult = await runCeipalSync();
+      const contactsResult = await runCeipalContactSync();
+      return { leadsResult, contactsResult };
     },
-    onError: (error: Error) => toast.error(error.message),
-  });
-  const ceipalContactSync = useMutation({
-    mutationFn: () => runCeipalContactSync(),
-    onSuccess: async ({ checked, updated, remaining }) => {
+    onSuccess: async ({ leadsResult, contactsResult }) => {
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
       toast.success(
-        remaining > 0
-          ? `Checked ${checked} leads and enriched ${updated}. ${remaining} remain.`
-          : `Contact sync complete. Checked ${checked} leads and enriched ${updated}.`,
+        contactsResult.remaining > 0
+          ? `${leadsResult.synced} leads synced. Checked ${contactsResult.checked} contacts; ${contactsResult.remaining} remain.`
+          : `${leadsResult.synced} leads synced. Contact sync is complete.`,
       );
     },
     onError: (error: Error) => toast.error(error.message),
@@ -121,15 +117,6 @@ function LeadsPage() {
                 >
                   <RefreshCw className={ceipalSync.isPending ? "size-4 animate-spin" : "size-4"} />
                   {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={ceipalContactSync.isPending || ceipalSync.isPending}
-                  onClick={() => ceipalContactSync.mutate()}
-                >
-                  <Phone className={ceipalContactSync.isPending ? "size-4 animate-pulse" : "size-4"} />
-                  {ceipalContactSync.isPending ? "Syncing contacts…" : "Sync contact numbers"}
                 </Button>
               </div>
             }
