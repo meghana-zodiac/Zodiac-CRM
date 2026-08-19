@@ -18,7 +18,7 @@ export function ApolloProspector({ target }: { target: Target }) {
   const runSearch = useServerFn(searchApolloContacts);
   const queryClient = useQueryClient();
 
- const [jobTitle, setJobTitle] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("");
   const [industry, setIndustry] = useState("");
@@ -68,7 +68,9 @@ export function ApolloProspector({ target }: { target: Target }) {
         await queryClient.invalidateQueries({ queryKey: ["leads"] });
       }
       setSaved((prev) => [...prev, prospect.apolloId]);
-      toast.success(`${prospect.name} saved to ${target === "contacts" ? "Client Contacts" : "Corporate Leads"} for ${owner}`);
+      toast.success(
+        `${prospect.name} saved to ${target === "contacts" ? "Client Contacts" : "Corporate Leads"} for ${owner}`,
+      );
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -108,17 +110,20 @@ export function ApolloProspector({ target }: { target: Target }) {
           </div>
         </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-       <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
-       <Field label="Job title" value={jobTitle} onChange={setJobTitle} placeholder="HR" />
-       <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Vivo" />
-       <Field label="Location" value={location} onChange={setLocation} placeholder="Bengaluru, India" />
-       <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Information Technology" />
-      </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Field label="Job title" value={jobTitle} onChange={setJobTitle} />
+          <Field label="Company name" value={companyName} onChange={setCompanyName} />
+          <Field label="Location" value={location} onChange={setLocation} />
+          <Field label="Industry" value={industry} onChange={setIndustry} />
+        </div>
 
         <div className="mt-4">
           <Button size="sm" onClick={() => search.mutate()} disabled={search.isPending}>
-            {search.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+            {search.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Search className="size-4" />
+            )}
             Apollo Search
           </Button>
         </div>
@@ -136,7 +141,9 @@ export function ApolloProspector({ target }: { target: Target }) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">{prospect.name}</p>
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {prospect.name}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {prospect.title ?? "—"} · {prospect.company ?? "—"}
                       </p>
@@ -208,22 +215,15 @@ function Field({
   label,
   value,
   onChange,
-  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  placeholder: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:opacity-100"
-      />
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
