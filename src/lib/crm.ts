@@ -66,13 +66,7 @@ export const BGV_SERVICE_LINE = "Background Verification (BGV)";
 export const OD_SERVICE_LINE = "OD Interventions & Change Management";
 export const COMP_SERVICE_LINE = "Salary Benchmarking & Comp Structure";
 
-export const BGV_CHECK_TYPES = [
-  "Employment",
-  "Academic",
-  "Criminal",
-  "Address",
-  "CIBIL",
-] as const;
+export const BGV_CHECK_TYPES = ["Employment", "Academic", "Criminal", "Address", "CIBIL"] as const;
 export const BGV_VERIFICATION_STATUSES = [
   "Pending Docs",
   "In Progress",
@@ -85,17 +79,8 @@ export const OD_SCOPES = [
   "Culture",
   "Restructuring",
 ] as const;
-export const OD_DELIVERABLES = [
-  "SOPs",
-  "Diagnostic Report",
-  "Policy Framework",
-] as const;
-export const BENCHMARK_METRICS = [
-  "Base Salary",
-  "Variable",
-  "ESOPs",
-  "Benefits",
-] as const;
+export const OD_DELIVERABLES = ["SOPs", "Diagnostic Report", "Policy Framework"] as const;
+export const BENCHMARK_METRICS = ["Base Salary", "Variable", "ESOPs", "Benefits"] as const;
 export const BENCHMARK_PERCENTILES = ["50th Percentile", "75th Percentile"] as const;
 
 export const LEAD_STATUSES = [
@@ -203,6 +188,24 @@ export const leadsQuery = () =>
   queryOptions({
     queryKey: ["leads"],
     queryFn: fetchAllLeads,
+  });
+
+export const leadDashboardCountsQuery = () =>
+  queryOptions({
+    queryKey: ["dashboard", "lead-counts"],
+    queryFn: async () => {
+      const [all, active] = await Promise.all([
+        supabase.from("leads").select("id", { count: "exact", head: true }),
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .in("status", ["New", "Contacted"]),
+      ]);
+
+      if (all.error) throw new Error(all.error.message);
+      if (active.error) throw new Error(active.error.message);
+      return { total: all.count ?? 0, active: active.count ?? 0 };
+    },
   });
 
 export const dealsQuery = () =>
