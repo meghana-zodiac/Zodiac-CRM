@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -39,13 +39,7 @@ import { NotificationsDrawer, useNotifications } from "./notifications-drawer";
 import { contactFields, dealFields, leadFields } from "./field-defs";
 import { supabase } from "@/integrations/supabase/client";
 
-import {
-  accountsQuery,
-  contactsQuery,
-  currency,
-  dealsQuery,
-  fullName,
-} from "@/lib/crm";
+import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
 type QuickCreate = "lead" | "contact" | "deal" | null;
 
@@ -97,17 +91,43 @@ function SidebarBrand({ collapsed }: { collapsed: boolean }) {
       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-gradient text-primary-foreground shadow-raised">
         <Layers className="size-4" />
       </span>
-      {!collapsed && (
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-nav-foreground">Zodiac HR Consultants</p>
-          <p className="truncate text-[11px] text-nav-muted">BD &amp; L&amp;D CRM</p>
-        </div>
-      )}
+      <div
+        aria-hidden={collapsed}
+        className={cn(
+          "min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out",
+          collapsed ? "max-w-0 opacity-0" : "max-w-48 opacity-100",
+        )}
+      >
+        <p className="truncate text-sm font-semibold text-nav-foreground">Zodiac HR Consultants</p>
+        <p className="truncate text-[11px] text-nav-muted">BD &amp; L&amp;D CRM</p>
+      </div>
     </div>
   );
 }
 
-function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function RouteProgress() {
+  const isLoading = useRouterState({ select: (state) => state.isLoading });
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden transition-opacity duration-150",
+        isLoading ? "opacity-100" : "opacity-0",
+      )}
+    >
+      <div className="h-full w-2/5 animate-route-progress bg-brand-accent shadow-[0_0_10px_var(--color-brand-accent)]" />
+    </div>
+  );
+}
+
+function GlobalSearch({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const contacts = useQuery({ ...contactsQuery(), enabled: open });
   const accounts = useQuery({ ...accountsQuery(), enabled: open });
   const deals = useQuery({ ...dealsQuery(), enabled: open });
@@ -119,7 +139,11 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
         <CommandEmpty>No records found.</CommandEmpty>
         <CommandGroup heading="Contacts">
           {(contacts.data ?? []).slice(0, 6).map((contact) => (
-            <CommandItem key={contact.id} value={`${fullName(contact.first_name, contact.last_name)} ${contact.email ?? ""}`} asChild>
+            <CommandItem
+              key={contact.id}
+              value={`${fullName(contact.first_name, contact.last_name)} ${contact.email ?? ""}`}
+              asChild
+            >
               <Link to="/contacts" onClick={() => onOpenChange(false)}>
                 {fullName(contact.first_name, contact.last_name)}
                 <span className="ml-auto text-xs text-muted-foreground">{contact.email}</span>
@@ -142,7 +166,9 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
             <CommandItem key={deal.id} value={deal.deal_name} asChild>
               <Link to="/deals" onClick={() => onOpenChange(false)}>
                 {deal.deal_name}
-                <span className="ml-auto text-xs text-muted-foreground">{currency(deal.amount)}</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {currency(deal.amount)}
+                </span>
               </Link>
             </CommandItem>
           ))}
@@ -154,6 +180,7 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
 
 export function CrmShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -161,6 +188,19 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   const accounts = useQuery(accountsQuery());
   const contacts = useQuery(contactsQuery());
   const notifications = useNotifications();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem("zodiac-crm-sidebar") === "collapsed");
+  }, []);
+
+  const toggleSidebar = () => {
+    setCollapsed((previous) => {
+      const next = !previous;
+      window.localStorage.setItem("zodiac-crm-sidebar", next ? "collapsed" : "expanded");
+      return next;
+    });
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -168,17 +208,20 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
+      <RouteProgress />
 
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 flex-col bg-nav transition-[width] duration-200 md:flex",
+          "sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden bg-nav will-change-[width] transition-[width] duration-200 ease-out md:flex",
           collapsed ? "w-16" : "w-60",
         )}
       >
         <SidebarBrand collapsed={collapsed} />
         <NavList collapsed={collapsed} />
         <button
-          onClick={() => setCollapsed((prev) => !prev)}
+          onClick={toggleSidebar}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
           className="flex items-center gap-2 border-t border-nav-border px-4 py-3 text-xs text-nav-muted transition-colors hover:text-nav-foreground"
         >
           <ChevronsLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
@@ -188,7 +231,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-surface px-3 sm:px-5">
-          <Sheet>
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="size-5" />
@@ -197,7 +240,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
             <SheetContent side="left" className="w-64 border-nav-border bg-nav p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <SidebarBrand collapsed={false} />
-              <NavList collapsed={false} />
+              <NavList collapsed={false} onNavigate={() => setMobileNavOpen(false)} />
             </SheetContent>
           </Sheet>
 
@@ -221,9 +264,15 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Quick create</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setQuickCreate("lead")}>Corporate Lead</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setQuickCreate("contact")}>Contact</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setQuickCreate("deal")}>BD Proposal</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setQuickCreate("lead")}>
+                  Corporate Lead
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setQuickCreate("contact")}>
+                  Contact
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setQuickCreate("deal")}>
+                  BD Proposal
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -242,7 +291,6 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
               className="relative"
               aria-label="Notifications"
               onClick={() => setNotificationsOpen(true)}
-
             >
               <Bell className="size-4" />
               {notifications.unreadCount > 0 && (
@@ -254,7 +302,12 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  aria-label="Account menu"
+                >
                   <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
                     AM
                   </span>
@@ -272,7 +325,9 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main key={pathname} className="crm-route-enter min-w-0 flex-1">
+          {children}
+        </main>
       </div>
 
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
@@ -290,8 +345,6 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
         markAllRead={notifications.markAllRead}
         clearAll={notifications.clearAll}
       />
-
-
 
       <RecordDialog
         open={quickCreate === "lead"}
