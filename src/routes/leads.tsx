@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileSpreadsheet, RefreshCw } from "lucide-react";
+import { FileSpreadsheet, Phone, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
@@ -13,7 +13,7 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { Button } from "@/components/ui/button";
 import { LEAD_STATUSES, currency, formatDate, leadsQuery, type Lead } from "@/lib/crm";
-import { syncCeipalLeads } from "@/lib/ceipal.functions";
+import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -40,6 +40,7 @@ export const Route = createFileRoute("/leads")({
 function LeadsPage() {
   const queryClient = useQueryClient();
   const runCeipalSync = useServerFn(syncCeipalLeads);
+  const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
@@ -51,6 +52,18 @@ function LeadsPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
+  const ceipalContactSync = useMutation({
+    mutationFn: () => runCeipalContactSync(),
+    onSuccess: async ({ checked, updated, remaining }) => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success(
+        remaining > 0
+          ? `Checked ${checked} leads and enriched ${updated}. ${remaining} remain.`
+          : `Contact sync complete. Checked ${checked} leads and enriched ${updated}.`,
+      );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const columns: Column<Lead>[] = [
     {
@@ -59,6 +72,7 @@ function LeadsPage() {
       render: (row) => row.company_name,
     },
     { header: "Contact person", render: (row) => row.contact_name ?? "—" },
+    { header: "Phone", render: (row) => row.phone ?? "—" },
     { header: "Service interest", render: (row) => row.service_interest ?? "—" },
     { header: "Industry", render: (row) => row.industry ?? "—" },
     { header: "City", render: (row) => row.city ?? "—" },
@@ -88,7 +102,7 @@ function LeadsPage() {
             rows={leads.data ?? []}
             isLoading={leads.isLoading}
             columns={columns}
-            minWidth={1300}
+            minWidth={1420}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
             filterValue={(row) => row.status}
@@ -108,12 +122,22 @@ function LeadsPage() {
                   <RefreshCw className={ceipalSync.isPending ? "size-4 animate-spin" : "size-4"} />
                   {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={ceipalContactSync.isPending || ceipalSync.isPending}
+                  onClick={() => ceipalContactSync.mutate()}
+                >
+                  <Phone className={ceipalContactSync.isPending ? "size-4 animate-pulse" : "size-4"} />
+                  {ceipalContactSync.isPending ? "Syncing contacts…" : "Sync contact numbers"}
+                </Button>
               </div>
             }
             searchValues={(row) => [
               row.company_name,
               row.contact_name,
               row.email,
+              row.phone,
               row.industry,
               row.city,
               row.service_interest,
@@ -124,7 +148,7 @@ function LeadsPage() {
               <>
                 <p className="text-sm font-semibold text-foreground">{row.company_name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {row.contact_name ?? "—"} · {row.city ?? "—"}
+                  {row.contact_name ?? "—"} · {row.phone ?? "—"} · {row.city ?? "—"}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
