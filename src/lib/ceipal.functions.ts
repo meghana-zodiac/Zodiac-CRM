@@ -12,6 +12,8 @@ export type CeipalSyncResult = {
 export type CeipalLeadContactSyncResult = {
   checked: number;
   updated: number;
+  withPhone: number;
+  withoutPhone: number;
   remaining: number;
   source: "ATS";
 };
@@ -19,7 +21,9 @@ export type CeipalLeadContactSyncResult = {
 const CEIPAL_BASE_URL = "https://api.ceipal.com";
 const CEIPAL_PAGE_DELAY_MS = 650;
 const CEIPAL_MAX_RETRIES = 4;
-const CEIPAL_CONTACT_BATCH_SIZE = 100;
+// Keep each request short enough for the hosting runtime. The UI automatically
+// requests the next batch until every CEIPAL lead has been checked.
+const CEIPAL_CONTACT_BATCH_SIZE = 25;
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -306,11 +310,14 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
       .order("created_at", { ascending: true })
       .limit(CEIPAL_CONTACT_BATCH_SIZE);
     if (candidatesError) throw new Error(`Could not load CEIPAL leads: ${candidatesError.message}`);
-    if (!candidates?.length) return { checked: 0, updated: 0, remaining: 0, source: "ATS" };
+    if (!candidates?.length)
+      return { checked: 0, updated: 0, withPhone: 0, withoutPhone: 0, remaining: 0, source: "ATS" };
 
     const token = await authenticate();
     let checked = 0;
     let updated = 0;
+    let withPhone = 0;
+    let withoutPhone = 0;
 
     for (const candidate of candidates) {
       try {
@@ -329,6 +336,8 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
         if (error) throw new Error(`Could not save a CEIPAL contact: ${error.message}`);
         checked += 1;
         if (contact?.phone || contact?.email || contact?.name) updated += 1;
+        if (patch.phone) withPhone += 1;
+        else withoutPhone += 1;
       } catch (error) {
         if ((error as { status?: number }).status === 429) throw error;
         const { error: markError } = await context.supabase
@@ -337,6 +346,7 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
           .eq("id", candidate.id);
         if (markError) throw new Error(`Could not mark a CEIPAL lead as checked: ${markError.message}`);
         checked += 1;
+        withoutPhone += 1;
       }
       if (checked < candidates.length) await sleep(CEIPAL_PAGE_DELAY_MS);
     }
@@ -347,5 +357,5 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
       .not("ceipal_id", "is", null)
       .is("ceipal_contact_synced_at", null);
     if (countError) throw new Error(`Could not count remaining CEIPAL leads: ${countError.message}`);
-    return { checked, updated, remaining: count ?? 0, source: "ATS" };
+    return { checked, updated, withPhone, withoutPhone, remaining: count ?? 0, source: "ATS" };
   });
