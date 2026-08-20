@@ -44,21 +44,39 @@ function LeadsPage() {
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
+  const [contactSyncProgress, setContactSyncProgress] = useState<string | null>(null);
   const ceipalSync = useMutation({
     mutationFn: async () => {
       const leadsResult = await runCeipalSync();
-      const contactsResult = await runCeipalContactSync();
-      return { leadsResult, contactsResult };
+      let contactsResult = await runCeipalContactSync();
+      let checked = contactsResult.checked;
+      let updated = contactsResult.updated;
+      let withPhone = contactsResult.withPhone;
+      let withoutPhone = contactsResult.withoutPhone;
+      setContactSyncProgress(`${checked} checked · ${contactsResult.remaining} remaining`);
+
+      while (contactsResult.remaining > 0) {
+        const nextBatch = await runCeipalContactSync();
+        if (nextBatch.checked === 0) throw new Error("Contact sync paused because CEIPAL returned no progress.");
+        checked += nextBatch.checked;
+        updated += nextBatch.updated;
+        withPhone += nextBatch.withPhone;
+        withoutPhone += nextBatch.withoutPhone;
+        contactsResult = nextBatch;
+        setContactSyncProgress(`${checked} checked · ${contactsResult.remaining} remaining`);
+      }
+
+      return { leadsResult, checked, updated, withPhone, withoutPhone };
     },
-    onSuccess: async ({ leadsResult, contactsResult }) => {
+    onSuccess: async ({ leadsResult, checked, withPhone, withoutPhone }) => {
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success(
-        contactsResult.remaining > 0
-          ? `${leadsResult.synced} leads synced. Checked ${contactsResult.checked} contacts; ${contactsResult.remaining} remain.`
-          : `${leadsResult.synced} leads synced. Contact sync is complete.`,
-      );
+      setContactSyncProgress(null);
+      toast.success(`${leadsResult.synced} leads synced. ${checked} contacts checked: ${withPhone} with phone, ${withoutPhone} without phone.`);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      setContactSyncProgress(null);
+      toast.error(`${error.message} Progress was saved; click Sync from CEIPAL to resume.`);
+    },
   });
 
   const columns: Column<Lead>[] = [
@@ -116,7 +134,7 @@ function LeadsPage() {
                   onClick={() => ceipalSync.mutate()}
                 >
                   <RefreshCw className={ceipalSync.isPending ? "size-4 animate-spin" : "size-4"} />
-                  {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
+                  {ceipalSync.isPending ? contactSyncProgress ?? "Syncing leads…" : "Sync from CEIPAL"}
                 </Button>
               </div>
             }
