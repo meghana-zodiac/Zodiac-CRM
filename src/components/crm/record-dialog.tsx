@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
+import { parseLeadPaste } from "@/lib/lead-smart-paste";
 
 export type FieldType =
   "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
@@ -90,6 +91,7 @@ export function RecordDialog({
 }) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Values>({});
+  const [pasteText, setPasteText] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -99,7 +101,26 @@ export function RecordDialog({
       next[field.name] = value;
     }
     setValues(next);
+    setPasteText("");
   }, [open, record, fields]);
+
+  const sortLeadDetails = () => {
+    const parsed = parseLeadPaste(pasteText);
+    for (const field of fields) {
+      const parsedValue = parsed[field.name];
+      if (!parsedValue || !field.options?.length) continue;
+      const normalized = parsedValue.toLowerCase();
+      const match = field.options.find(
+        (option) =>
+          option.value.toLowerCase() === normalized ||
+          option.label.toLowerCase() === normalized ||
+          normalized.includes(option.label.toLowerCase()),
+      );
+      if (match) parsed[field.name] = match.value;
+    }
+    setValues((current) => ({ ...current, ...parsed }));
+    toast.success("Details sorted into the lead form. Please review before saving.");
+  };
 
   const visibleFields = fields.filter(
     (field) =>
@@ -160,6 +181,34 @@ export function RecordDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
+        {table === "leads" && !record?.["id"] ? (
+          <section className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <div className="mb-2">
+              <Label htmlFor="lead-smart-paste" className="text-sm font-semibold text-foreground">
+                Paste company details
+              </Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Paste the information, then review the fields before creating the lead.
+              </p>
+            </div>
+            <Textarea
+              id="lead-smart-paste"
+              rows={5}
+              value={pasteText}
+              onChange={(event) => setPasteText(event.target.value)}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              disabled={!pasteText.trim()}
+              onClick={sortLeadDetails}
+            >
+              Sort into fields
+            </Button>
+          </section>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           {visibleFields.map((field) => {
             const type = field.type ?? "text";
