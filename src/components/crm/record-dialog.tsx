@@ -62,6 +62,12 @@ function writePath(target: Record<string, unknown>, path: string, value: unknown
 }
 
 type Values = Record<string, string>;
+type PasteConflict = {
+  field: string;
+  label: string;
+  current: string;
+  incoming: string;
+};
 
 function toInputValue(type: FieldType, raw: unknown): string {
   if (raw === null || raw === undefined) return "";
@@ -92,6 +98,7 @@ export function RecordDialog({
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Values>({});
   const [pasteText, setPasteText] = useState("");
+  const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,6 +109,7 @@ export function RecordDialog({
     }
     setValues(next);
     setPasteText("");
+    setPasteConflicts([]);
   }, [open, record, fields]);
 
   const sortPastedDetails = () => {
@@ -119,8 +127,37 @@ export function RecordDialog({
       if (match) parsed[field.name] = match.value;
       else delete parsed[field.name];
     }
-    setValues((current) => ({ ...current, ...parsed }));
-    toast.success("Details sorted into the form. Please review before saving.");
+    setValues((current) => {
+      const next = { ...current };
+      const conflicts: PasteConflict[] = [];
+      for (const [fieldName, incoming] of Object.entries(parsed)) {
+        if (!incoming) continue;
+        const existing = current[fieldName]?.trim() ?? "";
+        if (!existing) {
+          next[fieldName] = incoming;
+          continue;
+        }
+        if (existing.toLowerCase() === incoming.trim().toLowerCase()) continue;
+        conflicts.push({
+          field: fieldName,
+          label: fields.find((field) => field.name === fieldName)?.label ?? fieldName,
+          current: existing,
+          incoming,
+        });
+      }
+      setPasteConflicts(conflicts);
+      return next;
+    });
+    toast.success(
+      record?.["id"]
+        ? "Empty fields were filled. Review any differences before saving."
+        : "Details sorted into the form. Please review before saving.",
+    );
+  };
+
+  const usePastedValue = (conflict: PasteConflict) => {
+    setValues((current) => ({ ...current, [conflict.field]: conflict.incoming }));
+    setPasteConflicts((current) => current.filter((item) => item.field !== conflict.field));
   };
 
   const visibleFields = fields.filter(
@@ -182,14 +219,16 @@ export function RecordDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        {SMART_PASTE_TABLES.includes(table) && !record?.["id"] ? (
+        {SMART_PASTE_TABLES.includes(table) ? (
           <section className="rounded-lg border border-primary/20 bg-primary/5 p-3">
             <div className="mb-2">
               <Label htmlFor={`${table}-smart-paste`} className="text-sm font-semibold text-foreground">
                 Paste details
               </Label>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Paste the information, then review the fields before creating the lead.
+                {record?.["id"]
+                  ? "Empty fields will be filled. Existing information will not be replaced without your approval."
+                  : "Paste the information, then review the fields before creating the record."}
               </p>
             </div>
             <Textarea
@@ -208,6 +247,33 @@ export function RecordDialog({
             >
               Sort into fields
             </Button>
+            {pasteConflicts.length ? (
+              <div className="mt-3 space-y-2 border-t border-primary/15 pt-3">
+                <p className="text-xs font-semibold text-foreground">
+                  Review differences ({pasteConflicts.length})
+                </p>
+                {pasteConflicts.map((conflict) => (
+                  <div key={conflict.field} className="rounded-md border border-border bg-background p-2.5">
+                    <p className="text-xs font-semibold text-foreground">{conflict.label}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Current: {conflict.current}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Pasted: {conflict.incoming}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-7 text-xs"
+                      onClick={() => usePastedValue(conflict)}
+                    >
+                      Use pasted value
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
