@@ -1,3 +1,5 @@
+import type { CrmTable } from "@/lib/crm";
+
 type LeadPasteValues = Record<string, string>;
 
 const LABELS: Record<string, keyof LeadPasteValues> = {
@@ -29,6 +31,7 @@ const LABELS: Record<string, keyof LeadPasteValues> = {
 
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE = /(?:\+?\d[\d\s().-]{7,}\d)/;
+const WEBSITE = /https?:\/\/[^\s]+|www\.[^\s]+/i;
 
 function clean(value: string) {
   return value.replace(/^[\s•*\-–—]+/, "").trim();
@@ -102,4 +105,145 @@ export function parseLeadPaste(raw: string): LeadPasteValues {
     values.notes = [values.notes, ...unmatched].filter(Boolean).join("\n");
   }
   return values;
+}
+
+function labelledValues(raw: string) {
+  const result: Record<string, string> = {};
+  for (const line of raw.split(/\r?\n/).map(clean).filter(Boolean)) {
+    const match = line.match(/^([^:–—-]{2,40})\s*[:–—-]\s*(.+)$/);
+    if (match) result[match[1]!.trim().toLowerCase()] = match[2]!.trim();
+  }
+  return result;
+}
+
+function firstLabel(labels: Record<string, string>, names: string[]) {
+  return names.map((name) => labels[name]).find(Boolean);
+}
+
+function numberValue(value: string | undefined) {
+  return value?.replace(/[^\d.]/g, "") ?? "";
+}
+
+function dateValue(value: string | undefined) {
+  if (!value) return "";
+  const dmy = value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2]!.padStart(2, "0")}-${dmy[1]!.padStart(2, "0")}`;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0, 10);
+}
+
+function splitName(fullName: string | undefined) {
+  const parts = fullName?.trim().split(/\s+/) ?? [];
+  return {
+    first_name: parts.length > 1 ? parts.slice(0, -1).join(" ") : "",
+    last_name: parts.at(-1) ?? "",
+  };
+}
+
+export const SMART_PASTE_TABLES: readonly CrmTable[] = [
+  "leads",
+  "accounts",
+  "contacts",
+  "deals",
+  "trainers",
+  "training_requests",
+  "training_batches",
+];
+
+export function parseSmartPaste(table: CrmTable, raw: string): Record<string, string> {
+  if (table === "leads") return parseLeadPaste(raw);
+
+  const labels = labelledValues(raw);
+  const commonEmail = raw.match(EMAIL)?.[0] ?? "";
+  const commonPhone = raw.match(PHONE)?.[0] ?? "";
+  const website = raw.match(WEBSITE)?.[0]?.replace(/[.,;]+$/, "") ?? "";
+
+  if (table === "accounts") {
+    const lead = parseLeadPaste(raw);
+    return {
+      name: firstLabel(labels, ["client name", "company name", "company", "organisation", "organization"]) ?? lead.company_name ?? "",
+      industry: firstLabel(labels, ["industry", "sector"]) ?? lead.industry ?? "",
+      client_type: firstLabel(labels, ["engagement type", "client type"]) ?? "",
+      city: firstLabel(labels, ["city", "location"]) ?? lead.city ?? "",
+      website: firstLabel(labels, ["website", "web", "url"]) ?? website,
+      phone: firstLabel(labels, ["phone", "mobile", "contact number"]) ?? commonPhone,
+      owner_name: firstLabel(labels, ["owner", "account owner"]) ?? "",
+    };
+  }
+
+  if (table === "contacts") {
+    const explicitName = firstLabel(labels, ["contact person", "contact name", "name"]);
+    const sentenceName = raw.match(/\b(?:contact|reach|speak (?:to|with))\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3})\b/)?.[1];
+    const name = splitName(explicitName ?? sentenceName);
+    return {
+      ...name,
+      email: firstLabel(labels, ["email", "email id"]) ?? commonEmail,
+      phone: firstLabel(labels, ["phone", "mobile", "contact number"]) ?? commonPhone,
+      title: firstLabel(labels, ["designation", "job title", "title", "position"]) ?? "",
+      department: firstLabel(labels, ["department", "function", "team"]) ?? "",
+      account_id: firstLabel(labels, ["company", "company name", "corporate client", "client"]) ?? "",
+      owner_name: firstLabel(labels, ["owner", "contact owner"]) ?? "",
+      last_activity_date: dateValue(firstLabel(labels, ["last activity", "last contacted"])),
+    };
+  }
+
+  if (table === "deals") {
+    const amount = firstLabel(labels, ["amount", "contract value", "value", "estimated value", "budget"]);
+    return {
+      deal_name: firstLabel(labels, ["proposal name", "deal name", "opportunity", "requirement"]) ?? clean(raw.split(/\r?\n/)[0] ?? ""),
+      amount: numberValue(amount),
+      stage: firstLabel(labels, ["stage", "pipeline stage", "status"]) ?? "",
+      service_line: firstLabel(labels, ["service", "service line", "service interest"]) ?? "",
+      account_id: firstLabel(labels, ["company", "company name", "corporate client", "client"]) ?? "",
+      contact_id: firstLabel(labels, ["contact", "contact person", "client contact"]) ?? "",
+      closing_date: dateValue(firstLabel(labels, ["expected close", "closing date", "close date"])),
+      sla_signed_date: dateValue(firstLabel(labels, ["sla signed on", "sla date"])),
+      owner_name: firstLabel(labels, ["owner", "deal owner"]) ?? "",
+    };
+  }
+
+  if (table === "trainers") {
+    const name = firstLabel(labels, ["trainer", "trainer name", "name"]);
+    return {
+      full_name: name ?? clean(raw.split(/\r?\n/)[0] ?? ""),
+      email: firstLabel(labels, ["email", "email id"]) ?? commonEmail,
+      phone: firstLabel(labels, ["phone", "mobile", "contact number"]) ?? commonPhone,
+      training_type: firstLabel(labels, ["training type", "trainer type", "type"]) ?? "",
+      expertise: firstLabel(labels, ["expertise", "specialisation", "specialization", "skills", "topics"]) ?? "",
+      rating: numberValue(firstLabel(labels, ["rating"])),
+      day_rate: numberValue(firstLabel(labels, ["day rate", "daily rate", "trainer fee", "fee"])),
+      bio: firstLabel(labels, ["profile summary", "bio", "summary"]) ?? raw.trim(),
+    };
+  }
+
+  if (table === "training_requests") {
+    return {
+      account_id: firstLabel(labels, ["corporate client", "existing client"]) ?? "",
+      client_name: firstLabel(labels, ["client name", "company", "company name", "client"]) ?? "",
+      training_type: firstLabel(labels, ["training type", "type"]) ?? "",
+      course_topic: firstLabel(labels, ["course", "course topic", "topic", "training topic", "program"] ) ?? "",
+      trainer_id: firstLabel(labels, ["trainer", "assigned trainer"]) ?? "",
+      participants: numberValue(firstLabel(labels, ["participants", "number of participants", "no. of participants", "batch size"])),
+      start_date: dateValue(firstLabel(labels, ["start date", "batch start", "from"])),
+      end_date: dateValue(firstLabel(labels, ["end date", "batch end", "to"])),
+      status: firstLabel(labels, ["status", "pipeline stage"]) ?? "",
+      budget: numberValue(firstLabel(labels, ["budget", "value"])),
+      owner_name: firstLabel(labels, ["owner"]) ?? "",
+      notes: firstLabel(labels, ["notes", "remarks", "requirement details"]) ?? raw.trim(),
+    };
+  }
+
+  return {
+    batch_code: firstLabel(labels, ["batch code", "code", "batch id"]) ?? "",
+    course_topic: firstLabel(labels, ["course", "course topic", "topic", "training topic", "program"]) ?? "",
+    training_type: firstLabel(labels, ["training type", "type"]) ?? "",
+    request_id: firstLabel(labels, ["linked request", "request", "course request"]) ?? "",
+    trainer_id: firstLabel(labels, ["trainer", "assigned trainer"]) ?? "",
+    participants: numberValue(firstLabel(labels, ["participants", "number of participants", "batch size"])),
+    start_date: dateValue(firstLabel(labels, ["start date", "batch start", "from"])),
+    end_date: dateValue(firstLabel(labels, ["end date", "batch end", "to"])),
+    mode: firstLabel(labels, ["delivery mode", "mode"]) ?? "",
+    status: firstLabel(labels, ["status", "batch status"]) ?? "",
+    notes: firstLabel(labels, ["notes", "remarks"]) ?? raw.trim(),
+  };
 }
