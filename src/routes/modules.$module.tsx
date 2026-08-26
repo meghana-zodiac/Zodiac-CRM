@@ -1,13 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
+import { ReportsAnalyticsModule } from "@/components/crm/reports-analytics-module";
 
 export const Route = createFileRoute("/modules/$module")({
   head: () => ({
     meta: [
       { title: "Module — Zodiac HR Consultants" },
-      { name: "description", content: "Reports and analytics module inside the Zodiac HR Consultants BD & L&D workspace." },
+      {
+        name: "description",
+        content:
+          "Reports and analytics module inside the Zodiac HR Consultants BD & L&D workspace.",
+      },
       { property: "og:title", content: "Module — Zodiac HR Consultants" },
-      { property: "og:description", content: "Reports and analytics module inside the Zodiac HR Consultants BD & L&D workspace." },
+      {
+        property: "og:description",
+        content:
+          "Reports and analytics module inside the Zodiac HR Consultants BD & L&D workspace.",
+      },
     ],
   }),
   component: ModulePlaceholder,
@@ -15,6 +24,9 @@ export const Route = createFileRoute("/modules/$module")({
 
 function ModulePlaceholder() {
   const { module } = Route.useParams();
+  if (module === "reports" || module === "analytics") {
+    return <ReportsAnalyticsModule view={module} />;
+  }
   const label = module
     .split("-")
     .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
