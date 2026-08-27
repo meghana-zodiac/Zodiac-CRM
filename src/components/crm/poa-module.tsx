@@ -104,10 +104,12 @@ function SpreadsheetCell({
   value,
   onChange,
   money = false,
+  disabled = false,
 }: {
   value: number;
   onChange: (value: number) => void;
   money?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -115,8 +117,9 @@ function SpreadsheetCell({
       min={0}
       step={money ? 1000 : 1}
       value={value || ""}
+      disabled={disabled}
       onChange={(event) => onChange(Number(event.target.value) || 0)}
-      className="h-9 w-full min-w-20 border-0 bg-transparent px-2 text-center text-xs tabular-nums outline-none focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary"
+      className="h-9 w-full min-w-20 border-0 bg-transparent px-2 text-center text-xs tabular-nums outline-none focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary disabled:cursor-default disabled:opacity-70"
     />
   );
 }
@@ -125,10 +128,12 @@ function DailyGrid({
   month,
   member,
   entries,
+  editable,
 }: {
   month: string;
   member: string;
   entries: PoaEntry[];
+  editable: boolean;
 }) {
   const queryClient = useQueryClient();
   const dates = useMemo(() => monthDates(month), [month]);
@@ -169,7 +174,7 @@ function DailyGrid({
           </p>
         </div>
         <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-          {Object.keys(drafts).length} unsaved
+          {editable ? `${Object.keys(drafts).length} unsaved` : "View only"}
         </span>
       </div>
       <div className="max-h-[68vh] overflow-auto">
@@ -270,6 +275,7 @@ function DailyGrid({
                     <td key={field} className="border border-border">
                       <SpreadsheetCell
                         value={row[field]}
+                        disabled={!editable}
                         onChange={(value) => update(date, field, value)}
                       />
                     </td>
@@ -278,6 +284,7 @@ function DailyGrid({
                     <td key={field} className="border border-border">
                       <SpreadsheetCell
                         value={row[field]}
+                        disabled={!editable}
                         onChange={(value) => update(date, field, value)}
                       />
                     </td>
@@ -305,6 +312,7 @@ function DailyGrid({
                       <SpreadsheetCell
                         money={moneyFields.has(field)}
                         value={row[field]}
+                        disabled={!editable}
                         onChange={(value) => update(date, field, value)}
                       />
                     </td>
@@ -314,7 +322,7 @@ function DailyGrid({
                       size="icon"
                       variant={drafts[date] ? "default" : "ghost"}
                       className="size-7"
-                      disabled={!drafts[date] || save.isPending}
+                      disabled={!editable || !drafts[date] || save.isPending}
                       onClick={() => save.mutate(row)}
                       aria-label={`Save ${date}`}
                     >
@@ -384,10 +392,12 @@ function TargetEditor({
   month,
   member,
   target,
+  editable,
 }: {
   month: string;
   member: string;
   target: KraTargetInput | undefined;
+  editable: boolean;
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<KraTargetInput>(
@@ -458,6 +468,7 @@ function TargetEditor({
               min={0}
               step={money ? 1000 : 1}
               value={Number(form[key]) || ""}
+              disabled={!editable}
               onChange={(event) =>
                 setForm((current) => ({ ...current, [key]: Number(event.target.value) || 0 }))
               }
@@ -465,7 +476,11 @@ function TargetEditor({
           </div>
         ))}
       </div>
-      <Button className="mt-5" onClick={() => save.mutate(form)} disabled={save.isPending}>
+      <Button
+        className="mt-5"
+        onClick={() => save.mutate(form)}
+        disabled={!editable || save.isPending}
+      >
         <Save className="size-4" />
         Save KRA targets
       </Button>
@@ -518,34 +533,30 @@ export function PoaModule() {
   const targetsQuery = useQuery(kraTargetsQuery());
   const profilesQuery = useQuery(bdTeamMembersQuery());
   const currentUserEmail = useQuery(currentUserEmailQuery());
-  const members = useMemo(() => {
-    const available = memberNames(
-      entriesQuery.data ?? [],
-      profilesQuery.data ?? [],
-      (targetsQuery.data ?? []).map((item) => item.team_member),
-    );
-    const ownProfile = (profilesQuery.data ?? []).find(
-      (profile) => profile.email.toLowerCase() === currentUserEmail.data,
-    );
-    if (ownProfile?.display_name === "Edward D") return ["Edward D"];
-    return available.filter((name) => name !== "Edward D");
-  }, [currentUserEmail.data, entriesQuery.data, profilesQuery.data, targetsQuery.data]);
+  const members = useMemo(
+    () =>
+      memberNames(
+        entriesQuery.data ?? [],
+        profilesQuery.data ?? [],
+        (targetsQuery.data ?? []).map((item) => item.team_member),
+      ),
+    [entriesQuery.data, profilesQuery.data, targetsQuery.data],
+  );
   const [member, setMember] = useState("");
-  const selectedInitialDataMonth = useRef(false);
+  const ownMember = (profilesQuery.data ?? []).find(
+    (profile) => profile.email.toLowerCase() === currentUserEmail.data,
+  )?.display_name;
+  const selectedInitialDataMonth = useRef(new Set<string>());
   useEffect(() => {
     if (!member && members[0]) setMember(members[0]);
   }, [member, members]);
   useEffect(() => {
-    if (
-      selectedInitialDataMonth.current ||
-      currentUserEmail.data !== "edward@zodiachrc.com" ||
-      !entriesQuery.data
-    ) {
+    if (!member || selectedInitialDataMonth.current.has(member) || !entriesQuery.data) {
       return;
     }
-    selectedInitialDataMonth.current = true;
+    selectedInitialDataMonth.current.add(member);
     const monthCounts = new Map<string, number>();
-    for (const row of entriesQuery.data.filter((item) => item.team_member === "Edward D")) {
+    for (const row of entriesQuery.data.filter((item) => item.team_member === member)) {
       const label = monthLabelFromDate(row.date);
       monthCounts.set(label, (monthCounts.get(label) ?? 0) + 1);
     }
@@ -555,7 +566,7 @@ export function PoaModule() {
         monthBounds(rightMonth).start.localeCompare(monthBounds(leftMonth).start),
     )[0]?.[0];
     if (bestMonth) setMonth(bestMonth);
-  }, [currentUserEmail.data, entriesQuery.data]);
+  }, [entriesQuery.data, member]);
   const bounds = monthBounds(month);
   const monthRows = useMemo(
     () =>
@@ -746,7 +757,12 @@ export function PoaModule() {
         </TabsList>
         <TabsContent value="daily" className="mt-0 min-h-0">
           {member ? (
-            <DailyGrid month={month} member={member} entries={monthRows} />
+            <DailyGrid
+              month={month}
+              member={member}
+              entries={monthRows}
+              editable={member === ownMember}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">No active team members found.</p>
           )}
@@ -806,7 +822,14 @@ export function PoaModule() {
           </section>
         </TabsContent>
         <TabsContent value="targets" className="mt-0">
-          {member ? <TargetEditor month={month} member={member} target={targetInput} /> : null}
+          {member ? (
+            <TargetEditor
+              month={month}
+              member={member}
+              target={targetInput}
+              editable={member === ownMember}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
