@@ -28,6 +28,7 @@ import {
   toPoaEntryInput,
   upsertKraTarget,
   upsertPoaEntry,
+  updateCagMonthlySummary,
   type DailyNumberField,
   type CagMonthlySummary,
   type KraTargetInput,
@@ -83,10 +84,11 @@ function memberNames(
   profiles: { display_name: string }[],
   targetNames: string[],
 ) {
+  const aliases: Record<string, string> = { Edward: "Edward D", Nuzhat: "Nuzhat K" };
   const names = new Set<string>([
     ...profiles.map((item) => item.display_name),
-    ...entries.map((item) => item.team_member),
-    ...targetNames,
+    ...entries.map((item) => aliases[item.team_member] ?? item.team_member),
+    ...targetNames.map((name) => aliases[name] ?? name),
   ]);
   if (!names.size) BD_OWNERS.forEach((name) => names.add(name));
   return [...names].sort((a, b) => a.localeCompare(b));
@@ -390,13 +392,35 @@ function SummaryTable({ title, rows }: { title: string; rows: SummaryRow[] }) {
   );
 }
 
-function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
-  const names = useMemo(() => {
-    const available = new Set(rows.map((row) => row.team_member));
-    return ["Total CAG", ...[...available].filter((name) => name !== "Total CAG")];
-  }, [rows]);
-  const [selected, setSelected] = useState("Total CAG");
-  const selectedRows = rows.filter((row) => row.team_member === selected);
+function CagSummaryView({
+  rows,
+  member,
+  ownMember,
+}: {
+  rows: CagMonthlySummary[];
+  member: string;
+  ownMember?: string;
+}) {
+  const queryClient = useQueryClient();
+  const [drafts, setDrafts] = useState<Record<string, CagMonthlySummary>>({});
+  const storedMember = member === "Nuzhat K" ? "Nuzhat" : member;
+  const selectedRows = rows.filter((row) => row.team_member === storedMember);
+  const editable =
+    storedMember !== "Total CAG" &&
+    (storedMember === ownMember || (storedMember === "Nuzhat" && ownMember === "Nuzhat K"));
+  const save = useMutation({
+    mutationFn: updateCagMonthlySummary,
+    onSuccess: (_, values) => {
+      queryClient.invalidateQueries({ queryKey: ["cag_monthly_summary"] });
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[values.id];
+        return next;
+      });
+      toast.success(`${monthLabelFromDate(values.month)} summary saved`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const number = (value: number) => Number(value ?? 0).toLocaleString("en-IN");
   const percentClass = (actual: number, target: number) => {
     const value = pct(actual, target);
@@ -410,23 +434,6 @@ function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
         <div>
           <h2 className="text-sm font-semibold">CAG monthly summary · FY 2026–27</h2>
           <p className="text-xs text-muted-foreground">Imported monthly targets and actuals.</p>
-        </div>
-        <div className="ml-auto flex max-w-full items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
-          {names.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setSelected(name)}
-              className={cn(
-                "whitespace-nowrap rounded px-3 py-1 text-xs font-medium",
-                selected === name
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {name}
-            </button>
-          ))}
         </div>
       </div>
       <div className="max-h-[68vh] overflow-auto">
@@ -481,22 +488,38 @@ function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
           </thead>
           <tbody>
             {selectedRows.map((row) => {
-              const clientsTarget = Number(row.clients_acquired_target);
-              const clientsActual = Number(row.clients_acquired_actual);
-              const bookingsTarget = Number(row.bookings_target);
-              const bookingsActual = Number(row.bookings_actual);
-              const revenueTarget = Number(row.recruitment_revenue_target);
-              const revenueActual = Number(row.recruitment_revenue_actual);
+              const value = drafts[row.id] ?? row;
+              const clientsTarget = Number(value.clients_acquired_target);
+              const clientsActual = Number(value.clients_acquired_actual);
+              const bookingsTarget = Number(value.bookings_target);
+              const bookingsActual = Number(value.bookings_actual);
+              const revenueTarget = Number(value.recruitment_revenue_target);
+              const revenueActual = Number(value.recruitment_revenue_actual);
+              const edit = (field: keyof CagMonthlySummary, amount: number) =>
+                setDrafts((current) => ({
+                  ...current,
+                  [row.id]: { ...value, [field]: amount },
+                }));
+              const cell = (field: keyof CagMonthlySummary, amount: number, money = false) =>
+                editable ? (
+                  <SpreadsheetCell
+                    value={amount}
+                    money={money}
+                    onChange={(next) => edit(field, next)}
+                  />
+                ) : (
+                  <span>{money ? currency(amount) : number(amount)}</span>
+                );
               return (
                 <tr key={row.id} className="border-t border-border hover:bg-muted/30">
                   <td className="border border-border px-3 py-2 font-medium">
                     {monthLabelFromDate(row.month)}
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {number(clientsTarget)}
+                    {cell("clients_acquired_target", clientsTarget)}
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {number(clientsActual)}
+                    {cell("clients_acquired_actual", clientsActual)}
                   </td>
                   <td
                     className={cn(
@@ -507,10 +530,10 @@ function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
                     {pct(clientsActual, clientsTarget)}%
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {currency(bookingsTarget)}
+                    {cell("bookings_target", bookingsTarget, true)}
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {currency(bookingsActual)}
+                    {cell("bookings_actual", bookingsActual, true)}
                   </td>
                   <td
                     className={cn(
@@ -521,13 +544,13 @@ function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
                     {pct(bookingsActual, bookingsTarget)}%
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {number(row.clients_billed_actual)}
+                    {cell("clients_billed_actual", Number(value.clients_billed_actual))}
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {currency(revenueTarget)}
+                    {cell("recruitment_revenue_target", revenueTarget, true)}
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {currency(revenueActual)}
+                    {cell("recruitment_revenue_actual", revenueActual, true)}
                   </td>
                   <td
                     className={cn(
@@ -538,11 +561,29 @@ function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
                     {pct(revenueActual, revenueTarget)}%
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {currency(Number(row.other_services_revenue_actual))}
+                    {cell(
+                      "other_services_revenue_actual",
+                      Number(value.other_services_revenue_actual),
+                      true,
+                    )}
                   </td>
                   <td className="border border-border px-3 py-2 text-right font-medium tabular-nums">
-                    {currency(Number(row.total_revenue_actual))}
+                    {cell("total_revenue_actual", Number(value.total_revenue_actual), true)}
                   </td>
+                  {editable ? (
+                    <td className="sticky right-0 border border-border bg-surface px-2 text-center">
+                      <Button
+                        size="icon"
+                        variant={drafts[row.id] ? "default" : "ghost"}
+                        className="size-7"
+                        disabled={!drafts[row.id] || save.isPending}
+                        onClick={() => save.mutate(value)}
+                        aria-label={`Save ${row.month}`}
+                      >
+                        <Save className="size-3.5" />
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -693,6 +734,7 @@ async function exportWorkbook(
 
 export function PoaModule() {
   const [month, setMonth] = useState(defaultMonth());
+  const [section, setSection] = useState("daily");
   const options = useMemo(() => monthOptions(), []);
   const entriesQuery = useQuery(poaEntriesQuery());
   const targetsQuery = useQuery(kraTargetsQuery());
@@ -712,6 +754,25 @@ export function PoaModule() {
   const ownMember = (profilesQuery.data ?? []).find(
     (profile) => profile.email.toLowerCase() === currentUserEmail.data,
   )?.display_name;
+  const cagMembers = useMemo(() => {
+    const names = new Set(
+      (cagSummaryQuery.data ?? []).map((row) =>
+        row.team_member === "Nuzhat" ? "Nuzhat K" : row.team_member,
+      ),
+    );
+    return ["Total CAG", ...[...names].filter((name) => name !== "Total CAG")];
+  }, [cagSummaryQuery.data]);
+  const navigationMembers = section === "team" ? cagMembers : members;
+  const changeSection = (next: string) => {
+    setSection(next);
+    if (next === "team") {
+      const ownCagMember = ownMember === "Nuzhat K" ? "Nuzhat K" : ownMember;
+      if (!cagMembers.includes(member))
+        setMember(ownCagMember && cagMembers.includes(ownCagMember) ? ownCagMember : "Total CAG");
+    } else if (member === "Total CAG" || !members.includes(member)) {
+      setMember(ownMember && members.includes(ownMember) ? ownMember : (members[0] ?? ""));
+    }
+  };
   const selectedInitialDataMonth = useRef(new Set<string>());
   useEffect(() => {
     if (!member && members[0]) setMember(members[0]);
@@ -866,7 +927,7 @@ export function PoaModule() {
           </Button>
         </div>
         <div className="flex max-w-full items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
-          {members.map((name) => (
+          {navigationMembers.map((name) => (
             <button
               key={name}
               type="button"
@@ -897,7 +958,11 @@ export function PoaModule() {
           Export Excel
         </Button>
       </div>
-      <Tabs defaultValue="daily" className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
+      <Tabs
+        value={section}
+        onValueChange={changeSection}
+        className="flex min-h-0 flex-1 flex-col p-4 sm:p-6"
+      >
         <TabsList className="mb-4 w-fit">
           <TabsTrigger value="daily">Daily POA</TabsTrigger>
           <TabsTrigger value="individual">Individual Summary</TabsTrigger>
@@ -923,7 +988,7 @@ export function PoaModule() {
           </div>
         </TabsContent>
         <TabsContent value="team" className="mt-0">
-          <CagSummaryView rows={cagSummaryQuery.data ?? []} />
+          <CagSummaryView rows={cagSummaryQuery.data ?? []} member={member} ownMember={ownMember} />
         </TabsContent>
         <TabsContent value="targets" className="mt-0">
           {member ? (
