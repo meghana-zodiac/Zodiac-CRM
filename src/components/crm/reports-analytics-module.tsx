@@ -6,6 +6,10 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -56,10 +60,45 @@ function dateCutoff(range: Range) {
   return cutoff;
 }
 
-function inRange(value: string | null | undefined, range: Range) {
+function monthBounds(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  if (!year || !monthIndex) return null;
+  return {
+    start: new Date(year, monthIndex - 1, 1),
+    end: new Date(year, monthIndex, 1),
+  };
+}
+
+function previousMonth(month: string) {
+  const bounds = monthBounds(month);
+  if (!bounds) return "";
+  const previous = new Date(bounds.start.getFullYear(), bounds.start.getMonth() - 1, 1);
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function inPeriod(value: string | null | undefined, range: Range, month: string) {
   if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (month) {
+    const bounds = monthBounds(month);
+    return Boolean(
+      bounds && timestamp >= bounds.start.getTime() && timestamp < bounds.end.getTime(),
+    );
+  }
   const cutoff = dateCutoff(range);
-  return !cutoff || new Date(value).getTime() >= cutoff.getTime();
+  return !cutoff || timestamp >= cutoff.getTime();
+}
+
+function monthLabel(month: string) {
+  const bounds = monthBounds(month);
+  return bounds
+    ? bounds.start.toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : month;
+}
+
+function percentChange(current: number, previous: number) {
+  if (!previous) return current ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 function targetMonthDate(value: string) {
@@ -104,11 +143,13 @@ function StatCard({
   value,
   detail,
   icon: Icon,
+  change,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: typeof Sparkles;
+  change?: number;
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-panel">
@@ -120,6 +161,21 @@ function StatCard({
           </p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
           <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+          {change !== undefined ? (
+            <p
+              className={cn(
+                "mt-2 text-xs font-medium tabular-nums",
+                change > 0
+                  ? "text-success"
+                  : change < 0
+                    ? "text-destructive"
+                    : "text-muted-foreground",
+              )}
+            >
+              {change > 0 ? "+" : ""}
+              {change}% vs previous month
+            </p>
+          ) : null}
         </div>
         <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
           <Icon className="size-4" />
@@ -165,6 +221,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
   const targets = useQuery(kraTargetsQuery());
   const bdMembers = useQuery(bdTeamMembersQuery());
   const [range, setRange] = useState<Range>("30");
+  const [selectedMonth, setSelectedMonth] = useState("");
   const [owner, setOwner] = useState("all");
 
   const loading = [leads, accounts, deals, activities, poa, targets, bdMembers].some(
@@ -176,21 +233,26 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
 
   const data = useMemo(() => {
     const leadRows = (leads.data ?? []).filter(
-      (lead) => inRange(lead.created_at, range) && ownerMatches(lead.owner_name, owner),
+      (lead) =>
+        inPeriod(lead.created_at, range, selectedMonth) && ownerMatches(lead.owner_name, owner),
     );
     const accountRows = (accounts.data ?? []).filter(
-      (account) => inRange(account.created_at, range) && ownerMatches(account.owner_name, owner),
+      (account) =>
+        inPeriod(account.created_at, range, selectedMonth) &&
+        ownerMatches(account.owner_name, owner),
     );
     const dealRows = (deals.data ?? []).filter(
-      (deal) => inRange(deal.created_at, range) && ownerMatches(deal.owner_name, owner),
+      (deal) =>
+        inPeriod(deal.created_at, range, selectedMonth) && ownerMatches(deal.owner_name, owner),
     );
     const activityRows = (activities.data ?? []).filter(
       (activity) =>
-        inRange(activity.due_date ?? activity.created_at, range) &&
+        inPeriod(activity.due_date ?? activity.created_at, range, selectedMonth) &&
         ownerMatches(activity.owner_name, owner),
     );
     const poaRows = (poa.data ?? []).filter(
-      (entry) => inRange(entry.date, range) && ownerMatches(entry.team_member, owner),
+      (entry) =>
+        inPeriod(entry.date, range, selectedMonth) && ownerMatches(entry.team_member, owner),
     );
 
     const owners = new Set<string>();
@@ -245,7 +307,8 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
       const ownedPoa = poaRows.filter((entry) => ownerMatches(entry.team_member, name));
       const ownerTargets = (targets.data ?? []).filter(
         (target) =>
-          ownerMatches(target.team_member, name) && inRange(targetMonthDate(target.month), range),
+          ownerMatches(target.team_member, name) &&
+          inPeriod(targetMonthDate(target.month), range, selectedMonth),
       );
       return {
         name,
@@ -289,6 +352,90 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
     owner,
     poa.data,
     range,
+    selectedMonth,
+    targets.data,
+  ]);
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 24 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      return { value, label: monthLabel(value) };
+    });
+  }, []);
+
+  const monthly = useMemo(() => {
+    const anchor = selectedMonth || monthOptions[0]?.value || "";
+    const previous = previousMonth(anchor);
+    const ownerLeadRows = (leads.data ?? []).filter((row) => ownerMatches(row.owner_name, owner));
+    const ownerAccountRows = (accounts.data ?? []).filter((row) =>
+      ownerMatches(row.owner_name, owner),
+    );
+    const ownerDealRows = (deals.data ?? []).filter((row) => ownerMatches(row.owner_name, owner));
+    const ownerActivityRows = (activities.data ?? []).filter((row) =>
+      ownerMatches(row.owner_name, owner),
+    );
+    const ownerPoaRows = (poa.data ?? []).filter((row) => ownerMatches(row.team_member, owner));
+    const ownerTargetRows = (targets.data ?? []).filter((row) =>
+      ownerMatches(row.team_member, owner),
+    );
+
+    const totalsFor = (month: string) => {
+      const monthLeads = ownerLeadRows.filter((row) => inPeriod(row.created_at, "all", month));
+      const monthAccounts = ownerAccountRows.filter((row) =>
+        inPeriod(row.created_at, "all", month),
+      );
+      const monthDeals = ownerDealRows.filter((row) => inPeriod(row.created_at, "all", month));
+      const monthActivities = ownerActivityRows.filter((row) =>
+        inPeriod(row.due_date ?? row.created_at, "all", month),
+      );
+      const monthPoa = ownerPoaRows.filter((row) => inPeriod(row.date, "all", month));
+      const monthTargets = ownerTargetRows.filter((row) =>
+        inPeriod(targetMonthDate(row.month), "all", month),
+      );
+      const converted = monthLeads.filter((row) => funnelStage(row.status) === "Converted").length;
+      return {
+        leads: monthLeads.length,
+        clients: monthAccounts.length,
+        converted,
+        conversion: monthLeads.length ? Math.round((converted / monthLeads.length) * 100) : 0,
+        proposals: monthDeals.length,
+        calls: monthPoa.reduce((sum, row) => sum + Number(row.calls_made ?? 0), 0),
+        meetings: monthActivities.filter(
+          (row) => row.activity_type === "Meeting" && row.status === "Completed",
+        ).length,
+        revenue: monthPoa.reduce((sum, row) => sum + Number(row.actual_revenue ?? 0), 0),
+        target: monthTargets.reduce((sum, row) => sum + Number(row.target_revenue ?? 0), 0),
+      };
+    };
+
+    const trendMonths = Array.from({ length: 12 }, (_, index) => {
+      const bounds = monthBounds(anchor);
+      const date = bounds
+        ? new Date(bounds.start.getFullYear(), bounds.start.getMonth() - (11 - index), 1)
+        : new Date();
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    });
+
+    return {
+      current: totalsFor(anchor),
+      previous: totalsFor(previous),
+      previousLabel: monthLabel(previous),
+      trend: trendMonths.map((month) => ({
+        month: monthLabel(month),
+        ...totalsFor(month),
+      })),
+    };
+  }, [
+    accounts.data,
+    activities.data,
+    deals.data,
+    leads.data,
+    monthOptions,
+    owner,
+    poa.data,
+    selectedMonth,
     targets.data,
   ]);
 
@@ -366,7 +513,10 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               <Filter className="size-3.5 text-muted-foreground" />
               <select
                 value={range}
-                onChange={(event) => setRange(event.target.value as Range)}
+                onChange={(event) => {
+                  setRange(event.target.value as Range);
+                  setSelectedMonth("");
+                }}
                 aria-label="Report date range"
                 className="h-9 bg-transparent text-sm outline-none"
               >
@@ -376,6 +526,19 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 <option value="all">All time</option>
               </select>
             </div>
+            <select
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              aria-label="Select calendar month"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
+            >
+              <option value="">Select month</option>
+              {monthOptions.map((month) => (
+                <option key={month.value} value={month.value}>
+                  {month.label}
+                </option>
+              ))}
+            </select>
             <select
               value={owner}
               onChange={(event) => setOwner(event.target.value)}
@@ -440,6 +603,11 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 value={String(data.leadRows.length)}
                 detail={`${data.accountRows.length} clients added`}
                 icon={Sparkles}
+                change={
+                  selectedMonth
+                    ? percentChange(monthly.current.leads, monthly.previous.leads)
+                    : undefined
+                }
               />
               <StatCard
                 label="Open pipeline"
@@ -452,6 +620,11 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 value={`${conversion}%`}
                 detail={`${data.convertedLeads.length} converted leads`}
                 icon={Target}
+                change={
+                  selectedMonth
+                    ? percentChange(monthly.current.converted, monthly.previous.converted)
+                    : undefined
+                }
               />
               <StatCard
                 label="Overdue follow-ups"
@@ -464,6 +637,11 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 value={String(callTotal)}
                 detail="From Daily POA entries"
                 icon={PhoneCall}
+                change={
+                  selectedMonth
+                    ? percentChange(monthly.current.calls, monthly.previous.calls)
+                    : undefined
+                }
               />
               <StatCard
                 label="Meetings completed"
@@ -482,8 +660,57 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 value={String(data.accountRows.length)}
                 detail="Added in selected period"
                 icon={Building2}
+                change={
+                  selectedMonth
+                    ? percentChange(monthly.current.clients, monthly.previous.clients)
+                    : undefined
+                }
               />
             </div>
+
+            {selectedMonth ? (
+              <Section
+                title="Monthly comparison"
+                description={`${monthLabel(selectedMonth)} compared with ${monthly.previousLabel}`}
+              >
+                <div className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-6">
+                  {[
+                    ["Leads", monthly.current.leads, monthly.previous.leads],
+                    ["Clients", monthly.current.clients, monthly.previous.clients],
+                    ["Calls", monthly.current.calls, monthly.previous.calls],
+                    ["Proposals", monthly.current.proposals, monthly.previous.proposals],
+                    ["Converted", monthly.current.converted, monthly.previous.converted],
+                    ["Revenue", monthly.current.revenue, monthly.previous.revenue],
+                  ].map(([label, current, previous]) => {
+                    const change = percentChange(Number(current), Number(previous));
+                    return (
+                      <div
+                        key={String(label)}
+                        className="rounded-lg border border-border bg-muted/25 p-3"
+                      >
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="mt-1 text-lg font-semibold tabular-nums">
+                          {label === "Revenue" ? currency(Number(current)) : current}
+                        </p>
+                        <p
+                          className={cn(
+                            "mt-1 text-xs font-medium tabular-nums",
+                            change > 0
+                              ? "text-success"
+                              : change < 0
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {change > 0 ? "+" : ""}
+                          {change}%
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+            ) : null}
 
             <Section
               title="BD team performance"
@@ -649,6 +876,121 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 icon={FileSignature}
               />
             </div>
+
+            <Section
+              title="Monthly trends"
+              description={`12-month performance ending ${monthLabel(selectedMonth || monthOptions[0]?.value || "")}`}
+            >
+              <div className="grid gap-4 p-4 xl:grid-cols-2">
+                <div className="h-[340px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthly.trend} margin={{ left: 4, right: 18, bottom: 18 }}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--color-border)"
+                      />
+                      <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="leads"
+                        name="Leads"
+                        stroke="#002b66"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="clients"
+                        name="Clients"
+                        stroke="#d1197e"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="calls"
+                        name="Calls"
+                        stroke="#4b2c86"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="proposals"
+                        name="Proposals"
+                        stroke="#16a34a"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="meetings"
+                        name="Meetings"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="h-[340px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={monthly.trend} margin={{ left: 4, right: 18, bottom: 18 }}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--color-border)"
+                      />
+                      <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                      <YAxis
+                        yAxisId="money"
+                        tickFormatter={(value) => `₹${Math.round(Number(value) / 1000)}k`}
+                        tick={{ fontSize: 10 }}
+                      />
+                      <YAxis
+                        yAxisId="percent"
+                        orientation="right"
+                        domain={[0, 100]}
+                        tickFormatter={(value) => `${value}%`}
+                        tick={{ fontSize: 10 }}
+                      />
+                      <Tooltip
+                        formatter={(value, name) =>
+                          name === "Conversion %" ? `${value}%` : currency(Number(value))
+                        }
+                      />
+                      <Legend />
+                      <Bar
+                        yAxisId="money"
+                        dataKey="revenue"
+                        name="Revenue"
+                        fill="#4b2c86"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        yAxisId="money"
+                        dataKey="target"
+                        name="Target"
+                        fill="#d1197e"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Line
+                        yAxisId="percent"
+                        type="monotone"
+                        dataKey="conversion"
+                        name="Conversion %"
+                        stroke="#16a34a"
+                        strokeWidth={2}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </Section>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <Section
