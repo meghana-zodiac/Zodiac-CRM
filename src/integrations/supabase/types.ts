@@ -164,6 +164,57 @@ export type Database = {
         };
         Relationships: [];
       };
+      cag_monthly_summary: {
+        Row: {
+          bookings_actual: number;
+          bookings_target: number;
+          clients_acquired_actual: number;
+          clients_acquired_target: number;
+          clients_billed_actual: number;
+          created_at: string;
+          id: string;
+          month: string;
+          other_services_revenue_actual: number;
+          recruitment_revenue_actual: number;
+          recruitment_revenue_target: number;
+          team_member: string;
+          total_revenue_actual: number;
+          updated_at: string;
+        };
+        Insert: {
+          bookings_actual?: number;
+          bookings_target?: number;
+          clients_acquired_actual?: number;
+          clients_acquired_target?: number;
+          clients_billed_actual?: number;
+          created_at?: string;
+          id?: string;
+          month: string;
+          other_services_revenue_actual?: number;
+          recruitment_revenue_actual?: number;
+          recruitment_revenue_target?: number;
+          team_member: string;
+          total_revenue_actual?: number;
+          updated_at?: string;
+        };
+        Update: {
+          bookings_actual?: number;
+          bookings_target?: number;
+          clients_acquired_actual?: number;
+          clients_acquired_target?: number;
+          clients_billed_actual?: number;
+          created_at?: string;
+          id?: string;
+          month?: string;
+          other_services_revenue_actual?: number;
+          recruitment_revenue_actual?: number;
+          recruitment_revenue_target?: number;
+          team_member?: string;
+          total_revenue_actual?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       call_logs: {
         Row: {
           call_type: string | null;
