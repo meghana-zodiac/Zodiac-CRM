@@ -5,6 +5,7 @@ import type { Tables } from "@/integrations/supabase/types";
 export type PoaEntry = Tables<"poa_entries">;
 export type KraTarget = Tables<"kra_targets">;
 export type BdTeamMember = Tables<"bd_team_members">;
+export type CagMonthlySummary = Tables<"cag_monthly_summary">;
 
 function unwrap<T>({ data, error }: { data: unknown; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
@@ -44,6 +45,15 @@ export const currentUserEmailQuery = () =>
       return data.user?.email?.toLowerCase() ?? "";
     },
     staleTime: Infinity,
+  });
+
+export const cagMonthlySummaryQuery = () =>
+  queryOptions({
+    queryKey: ["cag_monthly_summary"],
+    queryFn: async () =>
+      unwrap<CagMonthlySummary[]>(
+        await supabase.from("cag_monthly_summary").select("*").order("month").order("team_member"),
+      ),
   });
 
 export type DailyNumberField =
