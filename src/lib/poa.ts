@@ -56,6 +56,25 @@ export const cagMonthlySummaryQuery = () =>
       ),
   });
 
+export async function updateCagMonthlySummary(values: CagMonthlySummary): Promise<void> {
+  const { error } = await supabase
+    .from("cag_monthly_summary")
+    .update({
+      clients_acquired_target: values.clients_acquired_target,
+      clients_acquired_actual: values.clients_acquired_actual,
+      bookings_target: values.bookings_target,
+      bookings_actual: values.bookings_actual,
+      clients_billed_actual: values.clients_billed_actual,
+      recruitment_revenue_target: values.recruitment_revenue_target,
+      recruitment_revenue_actual: values.recruitment_revenue_actual,
+      other_services_revenue_actual: values.other_services_revenue_actual,
+      total_revenue_actual: values.total_revenue_actual,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", values.id);
+  if (error) throw new Error(error.message);
+}
+
 export type DailyNumberField =
   | "target_leads"
   | "target_follow_up_calls"
