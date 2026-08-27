@@ -12,6 +12,7 @@ import { BD_OWNERS } from "@/components/crm/nav-data";
 import { currency, formatDate } from "@/lib/crm";
 import {
   bdTeamMembersQuery,
+  cagMonthlySummaryQuery,
   currentUserEmailQuery,
   DAILY_FIELDS,
   defaultMonth,
@@ -28,6 +29,7 @@ import {
   upsertKraTarget,
   upsertPoaEntry,
   type DailyNumberField,
+  type CagMonthlySummary,
   type KraTargetInput,
   type PoaEntry,
   type PoaEntryInput,
@@ -388,6 +390,169 @@ function SummaryTable({ title, rows }: { title: string; rows: SummaryRow[] }) {
   );
 }
 
+function CagSummaryView({ rows }: { rows: CagMonthlySummary[] }) {
+  const names = useMemo(() => {
+    const available = new Set(rows.map((row) => row.team_member));
+    return ["Total CAG", ...[...available].filter((name) => name !== "Total CAG")];
+  }, [rows]);
+  const [selected, setSelected] = useState("Total CAG");
+  const selectedRows = rows.filter((row) => row.team_member === selected);
+  const number = (value: number) => Number(value ?? 0).toLocaleString("en-IN");
+  const percentClass = (actual: number, target: number) => {
+    const value = pct(actual, target);
+    return value >= 100 ? "text-emerald-600" : value >= 75 ? "text-amber-600" : "text-red-600";
+  };
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+        <Users className="size-4 text-primary" />
+        <div>
+          <h2 className="text-sm font-semibold">CAG monthly summary · FY 2026–27</h2>
+          <p className="text-xs text-muted-foreground">Imported monthly targets and actuals.</p>
+        </div>
+        <div className="ml-auto flex max-w-full items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
+          {names.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setSelected(name)}
+              className={cn(
+                "whitespace-nowrap rounded px-3 py-1 text-xs font-medium",
+                selected === name
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="max-h-[68vh] overflow-auto">
+        <table className="w-full min-w-[1250px] border-collapse text-xs">
+          <thead className="sticky top-0 z-10">
+            <tr className="text-center font-semibold text-white">
+              <th rowSpan={2} className="border border-border bg-slate-700 px-3 py-2 text-left">
+                Month
+              </th>
+              <th colSpan={3} className="border border-border bg-violet-700 px-3 py-2">
+                Clients acquired
+              </th>
+              <th colSpan={3} className="border border-border bg-fuchsia-700 px-3 py-2">
+                Bookings
+              </th>
+              <th rowSpan={2} className="border border-border bg-slate-700 px-3 py-2">
+                Clients billed
+              </th>
+              <th colSpan={3} className="border border-border bg-emerald-700 px-3 py-2">
+                Recruitment revenue
+              </th>
+              <th rowSpan={2} className="border border-border bg-emerald-700 px-3 py-2">
+                Other services actual
+              </th>
+              <th rowSpan={2} className="border border-border bg-emerald-700 px-3 py-2">
+                Total revenue actual
+              </th>
+            </tr>
+            <tr className="bg-muted text-center font-semibold">
+              {Array.from({ length: 3 }, (_, index) => ["Target", "Actual", "%"][index]).map(
+                (label, index) => (
+                  <th key={`clients-${index}`} className="border border-border px-3 py-2">
+                    {label}
+                  </th>
+                ),
+              )}
+              {Array.from({ length: 3 }, (_, index) => ["Target", "Actual", "%"][index]).map(
+                (label, index) => (
+                  <th key={`bookings-${index}`} className="border border-border px-3 py-2">
+                    {label}
+                  </th>
+                ),
+              )}
+              {Array.from({ length: 3 }, (_, index) => ["Target", "Actual", "%"][index]).map(
+                (label, index) => (
+                  <th key={`revenue-${index}`} className="border border-border px-3 py-2">
+                    {label}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {selectedRows.map((row) => {
+              const clientsTarget = Number(row.clients_acquired_target);
+              const clientsActual = Number(row.clients_acquired_actual);
+              const bookingsTarget = Number(row.bookings_target);
+              const bookingsActual = Number(row.bookings_actual);
+              const revenueTarget = Number(row.recruitment_revenue_target);
+              const revenueActual = Number(row.recruitment_revenue_actual);
+              return (
+                <tr key={row.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="border border-border px-3 py-2 font-medium">
+                    {monthLabelFromDate(row.month)}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {number(clientsTarget)}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {number(clientsActual)}
+                  </td>
+                  <td
+                    className={cn(
+                      "border border-border px-3 py-2 text-right font-semibold",
+                      percentClass(clientsActual, clientsTarget),
+                    )}
+                  >
+                    {pct(clientsActual, clientsTarget)}%
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {currency(bookingsTarget)}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {currency(bookingsActual)}
+                  </td>
+                  <td
+                    className={cn(
+                      "border border-border px-3 py-2 text-right font-semibold",
+                      percentClass(bookingsActual, bookingsTarget),
+                    )}
+                  >
+                    {pct(bookingsActual, bookingsTarget)}%
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {number(row.clients_billed_actual)}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {currency(revenueTarget)}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {currency(revenueActual)}
+                  </td>
+                  <td
+                    className={cn(
+                      "border border-border px-3 py-2 text-right font-semibold",
+                      percentClass(revenueActual, revenueTarget),
+                    )}
+                  >
+                    {pct(revenueActual, revenueTarget)}%
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right tabular-nums">
+                    {currency(Number(row.other_services_revenue_actual))}
+                  </td>
+                  <td className="border border-border px-3 py-2 text-right font-medium tabular-nums">
+                    {currency(Number(row.total_revenue_actual))}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function TargetEditor({
   month,
   member,
@@ -533,6 +698,7 @@ export function PoaModule() {
   const targetsQuery = useQuery(kraTargetsQuery());
   const profilesQuery = useQuery(bdTeamMembersQuery());
   const currentUserEmail = useQuery(currentUserEmailQuery());
+  const cagSummaryQuery = useQuery(cagMonthlySummaryQuery());
   const members = useMemo(
     () =>
       memberNames(
@@ -666,23 +832,6 @@ export function PoaModule() {
       money: true,
     },
   ];
-  const teamSummary = members.map((name) => {
-    const rows = monthRows.filter((row) => row.team_member === name);
-    const sum = aggregate(rows);
-    const target = (targetsQuery.data ?? []).find(
-      (item) => item.month === month && item.team_member === name,
-    );
-    return {
-      name,
-      clients: sum.clients_onboarded,
-      clientsTarget: Number(target?.acquired_clients_target ?? 0),
-      bookings: sum.deals_closed_value,
-      bookingsTarget: Number(target?.target_bookings ?? 0),
-      revenue:
-        sum.recruitment_revenue + sum.learning_development_revenue + sum.other_services_revenue,
-      revenueTarget: Number(target?.target_revenue ?? 0),
-    };
-  });
   const monthIndex = options.indexOf(month);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -752,7 +901,7 @@ export function PoaModule() {
         <TabsList className="mb-4 w-fit">
           <TabsTrigger value="daily">Daily POA</TabsTrigger>
           <TabsTrigger value="individual">Individual Summary</TabsTrigger>
-          <TabsTrigger value="team">Team Summary</TabsTrigger>
+          <TabsTrigger value="team">CAG Summary</TabsTrigger>
           <TabsTrigger value="targets">KRA Targets</TabsTrigger>
         </TabsList>
         <TabsContent value="daily" className="mt-0 min-h-0">
@@ -774,52 +923,7 @@ export function PoaModule() {
           </div>
         </TabsContent>
         <TabsContent value="team" className="mt-0">
-          <section className="rounded-lg border border-border bg-surface">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-              <Users className="size-4 text-primary" />
-              <h2 className="text-sm font-semibold">Consolidated team summary · {month}</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-2">Team member</th>
-                    <th className="px-4 py-2 text-right">Clients</th>
-                    <th className="px-4 py-2 text-right">Client %</th>
-                    <th className="px-4 py-2 text-right">Bookings</th>
-                    <th className="px-4 py-2 text-right">Booking %</th>
-                    <th className="px-4 py-2 text-right">Revenue</th>
-                    <th className="px-4 py-2 text-right">Revenue %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamSummary.map((row) => (
-                    <tr key={row.name} className="border-t border-border">
-                      <td className="px-4 py-3 font-medium">{row.name}</td>
-                      <td className="px-4 py-3 text-right">
-                        {row.clients} / {row.clientsTarget}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {pct(row.clients, row.clientsTarget)}%
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {currency(row.bookings)} / {currency(row.bookingsTarget)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {pct(row.bookings, row.bookingsTarget)}%
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {currency(row.revenue)} / {currency(row.revenueTarget)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {pct(row.revenue, row.revenueTarget)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <CagSummaryView rows={cagSummaryQuery.data ?? []} />
         </TabsContent>
         <TabsContent value="targets" className="mt-0">
           {member ? (
