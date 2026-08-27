@@ -1,704 +1,786 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Gauge,
-  Pencil,
-  Plus,
-  Target,
-  Trash2,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Save, Target, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { BD_OWNERS } from "@/components/crm/nav-data";
 import { currency, formatDate } from "@/lib/crm";
 import {
-  POA_MONTHS,
   bdTeamMembersQuery,
-  createPoaEntry,
+  DAILY_FIELDS,
   defaultMonth,
-  deletePoaEntry,
+  emptyPoaEntry,
+  fiscalYearStart,
   kraTargetsQuery,
   monthBounds,
-  monthLabelFromDate,
+  monthDates,
+  monthOptions,
   pct,
   poaEntriesQuery,
-  todayKey,
-  updatePoaEntry,
-  varianceTone,
+  toPoaEntryInput,
+  upsertKraTarget,
+  upsertPoaEntry,
+  type DailyNumberField,
+  type KraTargetInput,
   type PoaEntry,
   type PoaEntryInput,
 } from "@/lib/poa";
 
-type TeamFilter = "all" | string;
-type SortKey = keyof Pick<
-  PoaEntry,
-  "date" | "team_member" | "calls_made" | "proposals_sent" | "deals_closed_value" | "actual_revenue"
->;
+type Metric = { field: DailyNumberField; label: string; short: string };
 
-const toneClasses: Record<"success" | "warning" | "danger", string> = {
-  success: "text-emerald-600 dark:text-emerald-400",
-  warning: "text-amber-600 dark:text-amber-400",
-  danger: "text-red-600 dark:text-red-400",
-};
+const TARGETS: Metric[] = [
+  { field: "target_leads", label: "Target Leads", short: "Leads" },
+  { field: "target_follow_up_calls", label: "Follow-up Calls", short: "Follow-ups" },
+  { field: "target_calls_connected", label: "Target Calls Connected", short: "Connected" },
+  { field: "target_proposals_shared", label: "Target Proposals Shared", short: "Proposals" },
+  { field: "target_vc_meetings", label: "VC Meeting Target", short: "VC Meet" },
+  { field: "target_f2f_meetings", label: "F2F Meeting Target", short: "F2F Meet" },
+  { field: "target_clients_onboarded", label: "Target Clients Onboarded", short: "Onboarded" },
+];
 
-const toneBar: Record<"success" | "warning" | "danger", string> = {
-  success: "[&>div]:bg-emerald-500",
-  warning: "[&>div]:bg-amber-500",
-  danger: "[&>div]:bg-red-500",
-};
+const ACTUALS: Metric[] = [
+  { field: "actual_leads", label: "Actual Leads", short: "Leads" },
+  { field: "follow_up_calls_connected", label: "Follow-up Calls Connected", short: "Follow-ups" },
+  { field: "clients_called", label: "Clients Called", short: "Called" },
+  { field: "proposals_shared", label: "Proposals Shared", short: "Proposals" },
+  { field: "vc_meetings", label: "VC Meetings", short: "VC Meet" },
+  { field: "f2f_meetings", label: "F2F Meetings", short: "F2F Meet" },
+  { field: "clients_onboarded", label: "New Clients Onboarded", short: "Onboarded" },
+];
 
-function emptyForm(defaultMember: string): PoaEntryInput {
-  return {
-    date: todayKey(),
-    team_member: defaultMember,
-    calls_made: 0,
-    proposals_sent: 0,
-    deals_closed_value: 0,
-    actual_revenue: 0,
-    notes: null,
-  };
+const PERCENTAGES = TARGETS.map((target, index) => ({
+  label: target.short,
+  target: target.field,
+  actual: ACTUALS[index].field,
+}));
+
+const EXTRA_METRICS: Metric[] = [
+  { field: "clients_billed", label: "Clients Billed", short: "Clients Billed" },
+  { field: "deals_closed_value", label: "Bookings", short: "Bookings" },
+  { field: "recruitment_revenue", label: "Recruitment Revenue", short: "Recruitment" },
+  { field: "learning_development_revenue", label: "L&D Revenue", short: "L&D" },
+  { field: "other_services_revenue", label: "Other Services Revenue", short: "Other Services" },
+];
+
+const moneyFields = new Set<DailyNumberField>([
+  "deals_closed_value",
+  "recruitment_revenue",
+  "learning_development_revenue",
+  "other_services_revenue",
+]);
+
+function memberNames(
+  entries: PoaEntry[],
+  profiles: { display_name: string }[],
+  targetNames: string[],
+) {
+  const names = new Set<string>([
+    ...profiles.map((item) => item.display_name),
+    ...entries.map((item) => item.team_member),
+    ...targetNames,
+  ]);
+  if (!names.size) BD_OWNERS.forEach((name) => names.add(name));
+  return [...names].sort((a, b) => a.localeCompare(b));
 }
 
-/* --------------------------------- KPI card -------------------------------- */
+function aggregate(rows: PoaEntry[]) {
+  const totals = Object.fromEntries(DAILY_FIELDS.map((field) => [field, 0])) as Record<
+    DailyNumberField,
+    number
+  >;
+  for (const row of rows)
+    for (const field of DAILY_FIELDS) totals[field] += Number(row[field] ?? 0);
+  return totals;
+}
 
-function KpiCard({
-  icon: Icon,
-  label,
-  actual,
-  target,
-  formatter = (value: number) => String(value),
-  footer,
-  tone,
+function SpreadsheetCell({
+  value,
+  onChange,
+  money = false,
 }: {
-  icon: typeof Target;
-  label: string;
-  actual: number;
-  target: number;
-  formatter?: (value: number) => string;
-  footer?: React.ReactNode;
-  tone?: "success" | "warning" | "danger";
+  value: number;
+  onChange: (value: number) => void;
+  money?: boolean;
 }) {
-  const percent = pct(actual, target);
-  const resolved = tone ?? varianceTone(percent);
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-muted-foreground" />
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
-      </div>
-      <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
-        {formatter(actual)}
-        <span className="ml-1 text-sm font-normal text-muted-foreground">
-          / {formatter(target)}
+    <input
+      type="number"
+      min={0}
+      step={money ? 1000 : 1}
+      value={value || ""}
+      onChange={(event) => onChange(Number(event.target.value) || 0)}
+      className="h-9 w-full min-w-20 border-0 bg-transparent px-2 text-center text-xs tabular-nums outline-none focus:bg-primary/5 focus:ring-2 focus:ring-inset focus:ring-primary"
+    />
+  );
+}
+
+function DailyGrid({
+  month,
+  member,
+  entries,
+}: {
+  month: string;
+  member: string;
+  entries: PoaEntry[];
+}) {
+  const queryClient = useQueryClient();
+  const dates = useMemo(() => monthDates(month), [month]);
+  const existing = useMemo(
+    () =>
+      new Map(entries.filter((row) => row.team_member === member).map((row) => [row.date, row])),
+    [entries, member],
+  );
+  const [drafts, setDrafts] = useState<Record<string, PoaEntryInput>>({});
+  useEffect(() => setDrafts({}), [month, member]);
+
+  const rowValue = (date: string) =>
+    drafts[date] ??
+    (existing.get(date) ? toPoaEntryInput(existing.get(date)!) : emptyPoaEntry(date, member));
+  const update = (date: string, field: DailyNumberField, value: number) =>
+    setDrafts((current) => ({ ...current, [date]: { ...rowValue(date), [field]: value } }));
+  const save = useMutation({
+    mutationFn: upsertPoaEntry,
+    onSuccess: (_, values) => {
+      queryClient.invalidateQueries({ queryKey: ["poa_entries"] });
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[values.date];
+        return next;
+      });
+      toast.success(`Saved ${formatDate(values.date)}`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold">{member} · Daily POA</h2>
+          <p className="text-xs text-muted-foreground">
+            Enter targets and achievements directly into the grid. Save each completed row.
+          </p>
+        </div>
+        <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+          {Object.keys(drafts).length} unsaved
         </span>
-      </p>
-      <Progress value={Math.min(percent, 100)} className={cn("mt-3 h-2", toneBar[resolved])} />
-      <p className={cn("mt-1.5 text-xs font-medium tabular-nums", toneClasses[resolved])}>
-        {percent}% of target
-      </p>
-      {footer ? <div className="mt-1 text-[11px] text-muted-foreground">{footer}</div> : null}
+      </div>
+      <div className="max-h-[68vh] overflow-auto">
+        <table className="w-max min-w-full border-collapse text-xs">
+          <thead className="sticky top-0 z-20 shadow-sm">
+            <tr>
+              <th
+                rowSpan={2}
+                className="sticky left-0 z-30 w-28 min-w-28 border border-border bg-slate-100 px-2 dark:bg-slate-900"
+              >
+                Date
+              </th>
+              <th
+                colSpan={TARGETS.length}
+                className="border border-amber-300 bg-amber-300 px-2 py-2 text-center font-bold text-slate-950"
+              >
+                TARGET
+              </th>
+              <th
+                colSpan={ACTUALS.length}
+                className="border border-emerald-400 bg-emerald-400 px-2 py-2 text-center font-bold text-slate-950"
+              >
+                ACHIEVEMENT
+              </th>
+              <th
+                colSpan={PERCENTAGES.length}
+                className="border border-orange-300 bg-orange-300 px-2 py-2 text-center font-bold text-slate-950"
+              >
+                PERCENTAGE ACHIEVEMENT (%)
+              </th>
+              <th
+                colSpan={EXTRA_METRICS.length}
+                className="border border-violet-300 bg-violet-300 px-2 py-2 text-center font-bold text-slate-950"
+              >
+                BOOKINGS & REVENUE
+              </th>
+              <th
+                rowSpan={2}
+                className="sticky right-0 z-30 min-w-20 border border-border bg-slate-100 px-2 dark:bg-slate-900"
+              >
+                Save
+              </th>
+            </tr>
+            <tr>
+              {TARGETS.map((column) => (
+                <th
+                  key={column.field}
+                  title={column.label}
+                  className="h-20 w-24 min-w-24 border border-amber-300 bg-amber-100 px-2 text-center font-semibold text-slate-900"
+                >
+                  {column.label}
+                </th>
+              ))}
+              {ACTUALS.map((column) => (
+                <th
+                  key={column.field}
+                  title={column.label}
+                  className="h-20 w-24 min-w-24 border border-emerald-300 bg-emerald-100 px-2 text-center font-semibold text-slate-900"
+                >
+                  {column.label}
+                </th>
+              ))}
+              {PERCENTAGES.map((column) => (
+                <th
+                  key={column.label}
+                  className="h-20 w-24 min-w-24 border border-orange-300 bg-orange-100 px-2 text-center font-semibold text-slate-900"
+                >
+                  {column.label}
+                </th>
+              ))}
+              {EXTRA_METRICS.map((column) => (
+                <th
+                  key={column.field}
+                  title={column.label}
+                  className="h-20 w-28 min-w-28 border border-violet-300 bg-violet-100 px-2 text-center font-semibold text-slate-900"
+                >
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dates.map((date) => {
+              const row = rowValue(date);
+              const day = new Date(`${date}T12:00:00`).getDay();
+              const weekend = day === 0 || day === 6;
+              return (
+                <tr key={date} className={cn(weekend && "bg-amber-50/70 dark:bg-amber-950/20")}>
+                  <td
+                    className={cn(
+                      "sticky left-0 z-10 border border-border px-2 py-1 font-medium",
+                      weekend ? "bg-amber-100 dark:bg-amber-950" : "bg-surface",
+                    )}
+                  >
+                    {formatDate(date)}
+                  </td>
+                  {TARGETS.map(({ field }) => (
+                    <td key={field} className="border border-border">
+                      <SpreadsheetCell
+                        value={row[field]}
+                        onChange={(value) => update(date, field, value)}
+                      />
+                    </td>
+                  ))}
+                  {ACTUALS.map(({ field }) => (
+                    <td key={field} className="border border-border">
+                      <SpreadsheetCell
+                        value={row[field]}
+                        onChange={(value) => update(date, field, value)}
+                      />
+                    </td>
+                  ))}
+                  {PERCENTAGES.map((column) => {
+                    const percent = pct(row[column.actual], row[column.target]);
+                    return (
+                      <td
+                        key={column.label}
+                        className={cn(
+                          "border border-border px-2 text-center font-semibold tabular-nums",
+                          percent >= 100
+                            ? "text-emerald-600"
+                            : percent >= 75
+                              ? "text-amber-600"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {percent}%
+                      </td>
+                    );
+                  })}
+                  {EXTRA_METRICS.map(({ field }) => (
+                    <td key={field} className="border border-border">
+                      <SpreadsheetCell
+                        money={moneyFields.has(field)}
+                        value={row[field]}
+                        onChange={(value) => update(date, field, value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="sticky right-0 border border-border bg-surface px-2 text-center">
+                    <Button
+                      size="icon"
+                      variant={drafts[date] ? "default" : "ghost"}
+                      className="size-7"
+                      disabled={!drafts[date] || save.isPending}
+                      onClick={() => save.mutate(row)}
+                      aria-label={`Save ${date}`}
+                    >
+                      <Save className="size-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
 
-/* ------------------------------- entry dialog ------------------------------ */
-
-function EntryDialog({
-  open,
-  onOpenChange,
-  editing,
-  teamMembers,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  editing: PoaEntry | null;
-  teamMembers: string[];
-}) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState<PoaEntryInput>(() =>
-    editing
-      ? {
-          date: editing.date,
-          team_member: editing.team_member,
-          calls_made: editing.calls_made,
-          proposals_sent: editing.proposals_sent,
-          deals_closed_value: Number(editing.deals_closed_value),
-          actual_revenue: Number(editing.actual_revenue),
-          notes: editing.notes,
-        }
-      : emptyForm(teamMembers[0] ?? BD_OWNERS[0]),
-  );
-
-  const save = useMutation({
-    mutationFn: async () => (editing ? updatePoaEntry(editing.id, form) : createPoaEntry(form)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["poa_entries"] });
-      toast.success(
-        `${editing ? "Updated" : "Logged"} POA for ${form.team_member} — ${formatDate(form.date)}`,
-      );
-      onOpenChange(false);
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
-  const num = (field: keyof PoaEntryInput) => (value: number) =>
-    setForm((prev) => ({ ...prev, [field]: Number.isFinite(value) ? value : 0 }));
-
+type SummaryRow = { label: string; target: number; actual: number; money?: boolean };
+function SummaryTable({ title, rows }: { title: string; rows: SummaryRow[] }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Edit daily entry" : "Log daily POA / KRA"}</DialogTitle>
-          <DialogDescription>
-            Capture the day's BD activity and closures for one team member.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="entry-date">Date</Label>
-            <Input
-              id="entry-date"
-              type="date"
-              value={form.date}
-              onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Team member</Label>
-            <div className="flex rounded-md border border-input bg-background p-0.5">
-              {teamMembers.map((owner) => (
-                <button
-                  key={owner}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, team_member: owner }))}
-                  className={cn(
-                    "flex-1 rounded px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground",
-                    form.team_member === owner && "bg-accent font-medium text-accent-foreground",
-                  )}
-                >
-                  {owner}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="entry-calls">Calls made</Label>
-            <Input
-              id="entry-calls"
-              type="number"
-              min={0}
-              value={form.calls_made}
-              onChange={(event) => num("calls_made")(event.target.valueAsNumber)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="entry-proposals">Proposals sent</Label>
-            <Input
-              id="entry-proposals"
-              type="number"
-              min={0}
-              value={form.proposals_sent}
-              onChange={(event) => num("proposals_sent")(event.target.valueAsNumber)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="entry-bookings">Deals closed value (₹)</Label>
-            <Input
-              id="entry-bookings"
-              type="number"
-              min={0}
-              value={form.deals_closed_value}
-              onChange={(event) => num("deals_closed_value")(event.target.valueAsNumber)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="entry-revenue">Revenue generated (₹)</Label>
-            <Input
-              id="entry-revenue"
-              type="number"
-              min={0}
-              value={form.actual_revenue}
-              onChange={(event) => num("actual_revenue")(event.target.valueAsNumber)}
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="entry-notes">Notes</Label>
-            <Textarea
-              id="entry-notes"
-              value={form.notes ?? ""}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, notes: event.target.value || null }))
-              }
-              className="min-h-20"
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {editing ? "Save changes" : "Log entry"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <section className="rounded-lg border border-border bg-surface">
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-2">Measure</th>
+              <th className="px-4 py-2 text-right">Target</th>
+              <th className="px-4 py-2 text-right">Actual</th>
+              <th className="px-4 py-2 text-right">Achievement</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const percent = pct(row.actual, row.target);
+              const show = (value: number) =>
+                row.money ? currency(value) : value.toLocaleString("en-IN");
+              return (
+                <tr key={row.label} className="border-t border-border">
+                  <td className="px-4 py-3 font-medium">{row.label}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{show(row.target)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{show(row.actual)}</td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-right font-semibold tabular-nums",
+                      percent >= 100
+                        ? "text-emerald-600"
+                        : percent >= 75
+                          ? "text-amber-600"
+                          : "text-red-600",
+                    )}
+                  >
+                    {percent}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
-/* --------------------------------- module --------------------------------- */
-
-export function PoaModule() {
+function TargetEditor({
+  month,
+  member,
+  target,
+}: {
+  month: string;
+  member: string;
+  target: KraTargetInput | undefined;
+}) {
   const queryClient = useQueryClient();
-  const [month, setMonth] = useState<string>(defaultMonth());
-  const [range, setRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [team, setTeam] = useState<TeamFilter>("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
-    key: "date",
-    dir: "desc",
-  });
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<PoaEntry | null>(null);
-
-  const entries = useQuery(poaEntriesQuery());
-  const targets = useQuery(kraTargetsQuery());
-  const memberProfiles = useQuery(bdTeamMembersQuery());
-
-  const teamMembers = useMemo(() => {
-    const names = new Set<string>();
-    for (const profile of memberProfiles.data ?? []) names.add(profile.display_name);
-    for (const row of entries.data ?? []) names.add(row.team_member);
-    for (const row of targets.data ?? []) names.add(row.team_member);
-    if (names.size === 0) BD_OWNERS.forEach((owner) => names.add(owner));
-    return [...names].sort((left, right) => left.localeCompare(right));
-  }, [memberProfiles.data, entries.data, targets.data]);
-
-  const usingRange = Boolean(range.from && range.to);
-  const bounds = monthBounds(month);
-
-  const filtered = useMemo(() => {
-    const rows = (entries.data ?? []).filter((row) => {
-      if (team !== "all" && row.team_member !== team) return false;
-      if (usingRange) return row.date >= range.from && row.date <= range.to;
-      return monthLabelFromDate(row.date) === month;
-    });
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const left = a[sort.key];
-      const right = b[sort.key];
-      if (typeof left === "number" || typeof right === "number") {
-        return (Number(left) - Number(right)) * dir;
-      }
-      return String(left).localeCompare(String(right)) * dir;
-    });
-  }, [entries.data, team, month, range, usingRange, sort]);
-
-  const monthTargets = useMemo(() => {
-    const rows = (targets.data ?? []).filter((row) => {
-      if (usingRange) return true;
-      return row.month === month;
-    });
-    const scoped = team === "all" ? rows : rows.filter((row) => row.team_member === team);
-    return {
-      bookings: scoped.reduce((total, row) => total + Number(row.target_bookings), 0),
-      revenue: scoped.reduce((total, row) => total + Number(row.target_revenue), 0),
-      clients: scoped.reduce((total, row) => total + Number(row.acquired_clients_target), 0),
-    };
-  }, [targets.data, month, team, usingRange]);
-
-  const actuals = useMemo(
-    () => ({
-      bookings: filtered.reduce((total, row) => total + Number(row.deals_closed_value), 0),
-      revenue: filtered.reduce((total, row) => total + Number(row.actual_revenue), 0),
-      clients: filtered.filter((row) => Number(row.deals_closed_value) > 0).length,
-      calls: filtered.reduce((total, row) => total + row.calls_made, 0),
-      proposals: filtered.reduce((total, row) => total + row.proposals_sent, 0),
-    }),
-    [filtered],
+  const [form, setForm] = useState<KraTargetInput>(
+    () =>
+      target ?? {
+        month,
+        team_member: member,
+        target_bookings: 0,
+        acquired_clients_target: 0,
+        target_clients_billed: 0,
+        target_recruitment_revenue: 0,
+        target_learning_development_revenue: 0,
+        target_other_services_revenue: 0,
+      },
   );
-
-  /* Run-rate pacing: project the month's revenue from elapsed days. */
-  const pacing = useMemo(() => {
-    const days = bounds.days;
-    const today = todayKey();
-    let elapsed = days;
-    if (bounds.start && today < bounds.start) elapsed = 0;
-    else if (bounds.end && today < bounds.end) elapsed = Number(today.slice(8, 10));
-    // Never pace on fewer days than the log already covers.
-    const loggedDays = filtered.reduce(
-      (max, row) => Math.max(max, Number(row.date.slice(8, 10))),
-      0,
-    );
-    elapsed = Math.min(days, Math.max(elapsed, loggedDays));
-    const projected = elapsed > 0 ? (actuals.revenue / elapsed) * days : 0;
-    return {
-      elapsed,
-      days,
-      projected,
-      percent: pct(projected, monthTargets.revenue),
-    };
-  }, [bounds, actuals.revenue, monthTargets.revenue, filtered]);
-
-  const remove = useMutation({
-    mutationFn: deletePoaEntry,
+  useEffect(
+    () =>
+      setForm(
+        target ?? {
+          month,
+          team_member: member,
+          target_bookings: 0,
+          acquired_clients_target: 0,
+          target_clients_billed: 0,
+          target_recruitment_revenue: 0,
+          target_learning_development_revenue: 0,
+          target_other_services_revenue: 0,
+        },
+      ),
+    [month, member, target],
+  );
+  const save = useMutation({
+    mutationFn: upsertKraTarget,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["poa_entries"] });
-      toast.success("Entry deleted");
+      queryClient.invalidateQueries({ queryKey: ["kra_targets"] });
+      toast.success("Monthly KRA targets saved");
     },
     onError: (error: Error) => toast.error(error.message),
   });
+  const fields: { key: keyof KraTargetInput; label: string; money?: boolean }[] = [
+    { key: "acquired_clients_target", label: "Clients acquired target" },
+    { key: "target_clients_billed", label: "Clients billed target" },
+    { key: "target_bookings", label: "Bookings target", money: true },
+    { key: "target_recruitment_revenue", label: "Recruitment revenue target", money: true },
+    { key: "target_learning_development_revenue", label: "L&D revenue target", money: true },
+    { key: "target_other_services_revenue", label: "Other services revenue target", money: true },
+  ];
+  return (
+    <section className="max-w-4xl rounded-lg border border-border bg-surface p-5">
+      <div className="mb-5 flex items-start gap-3">
+        <Target className="mt-0.5 size-5 text-primary" />
+        <div>
+          <h2 className="font-semibold">
+            {member} · {month}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            These targets power the monthly, YTD and team achievement calculations.
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {fields.map(({ key, label, money }) => (
+          <div key={key} className="space-y-1.5">
+            <Label htmlFor={String(key)}>{label}</Label>
+            <Input
+              id={String(key)}
+              type="number"
+              min={0}
+              step={money ? 1000 : 1}
+              value={Number(form[key]) || ""}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, [key]: Number(event.target.value) || 0 }))
+              }
+            />
+          </div>
+        ))}
+      </div>
+      <Button className="mt-5" onClick={() => save.mutate(form)} disabled={save.isPending}>
+        <Save className="size-4" />
+        Save KRA targets
+      </Button>
+    </section>
+  );
+}
 
-  const monthIndex = POA_MONTHS.indexOf(month as (typeof POA_MONTHS)[number]);
-  const shiftMonth = (delta: number) => {
-    const next = POA_MONTHS[monthIndex + delta];
-    if (next) {
-      setMonth(next);
-      setRange({ from: "", to: "" });
-    }
-  };
+async function exportWorkbook(
+  month: string,
+  member: string,
+  rows: PoaEntry[],
+  summaries: SummaryRow[],
+) {
+  const XLSX = await import("xlsx");
+  const daily = rows.map((row) => {
+    const output: Record<string, string | number> = {
+      Date: row.date,
+      "Team Member": row.team_member,
+    };
+    for (const column of [...TARGETS, ...ACTUALS, ...EXTRA_METRICS])
+      output[column.label] = Number(row[column.field] ?? 0);
+    for (const column of PERCENTAGES)
+      output[`${column.label} %`] = pct(Number(row[column.actual]), Number(row[column.target]));
+    output.Notes = row.notes ?? "";
+    return output;
+  });
+  const wb = XLSX.utils.book_new();
+  const dailySheet = XLSX.utils.json_to_sheet(daily);
+  dailySheet["!freeze"] = { xSplit: 2, ySplit: 1 };
+  XLSX.utils.book_append_sheet(wb, dailySheet, "Daily POA");
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(
+      summaries.map((row) => ({
+        Measure: row.label,
+        Target: row.target,
+        Actual: row.actual,
+        "Achievement %": pct(row.actual, row.target),
+      })),
+    ),
+    "KRA Summary",
+  );
+  XLSX.writeFile(wb, `POA-KRA-${member}-${month.replace(" ", "-")}.xlsx`);
+}
 
-  const toggleSort = (key: SortKey) =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
+export function PoaModule() {
+  const [month, setMonth] = useState(defaultMonth());
+  const options = useMemo(() => monthOptions(), []);
+  const entriesQuery = useQuery(poaEntriesQuery());
+  const targetsQuery = useQuery(kraTargetsQuery());
+  const profilesQuery = useQuery(bdTeamMembersQuery());
+  const members = useMemo(
+    () =>
+      memberNames(
+        entriesQuery.data ?? [],
+        profilesQuery.data ?? [],
+        (targetsQuery.data ?? []).map((item) => item.team_member),
+      ),
+    [entriesQuery.data, profilesQuery.data, targetsQuery.data],
+  );
+  const [member, setMember] = useState("");
+  useEffect(() => {
+    if (!member && members[0]) setMember(members[0]);
+  }, [member, members]);
+  const bounds = monthBounds(month);
+  const monthRows = useMemo(
+    () =>
+      (entriesQuery.data ?? []).filter((row) => row.date >= bounds.start && row.date <= bounds.end),
+    [entriesQuery.data, bounds.start, bounds.end],
+  );
+  const memberRows = useMemo(
+    () => monthRows.filter((row) => row.team_member === member),
+    [monthRows, member],
+  );
+  const memberTarget = (targetsQuery.data ?? []).find(
+    (row) => row.month === month && row.team_member === member,
+  );
+  const targetInput: KraTargetInput | undefined = memberTarget
+    ? {
+        month,
+        team_member: member,
+        target_bookings: Number(memberTarget.target_bookings),
+        acquired_clients_target: Number(memberTarget.acquired_clients_target),
+        target_clients_billed: Number(memberTarget.target_clients_billed),
+        target_recruitment_revenue: Number(memberTarget.target_recruitment_revenue),
+        target_learning_development_revenue: Number(
+          memberTarget.target_learning_development_revenue,
+        ),
+        target_other_services_revenue: Number(memberTarget.target_other_services_revenue),
+      }
+    : undefined;
+  const actual = aggregate(memberRows);
+  const summaryRows: SummaryRow[] = [
+    {
+      label: "Clients acquired",
+      target: Number(memberTarget?.acquired_clients_target ?? 0),
+      actual: actual.clients_onboarded,
+    },
+    {
+      label: "Clients billed",
+      target: Number(memberTarget?.target_clients_billed ?? 0),
+      actual: actual.clients_billed,
+    },
+    {
+      label: "Bookings",
+      target: Number(memberTarget?.target_bookings ?? 0),
+      actual: actual.deals_closed_value,
+      money: true,
+    },
+    {
+      label: "Recruitment revenue",
+      target: Number(memberTarget?.target_recruitment_revenue ?? 0),
+      actual: actual.recruitment_revenue,
+      money: true,
+    },
+    {
+      label: "L&D revenue",
+      target: Number(memberTarget?.target_learning_development_revenue ?? 0),
+      actual: actual.learning_development_revenue,
+      money: true,
+    },
+    {
+      label: "Other services revenue",
+      target: Number(memberTarget?.target_other_services_revenue ?? 0),
+      actual: actual.other_services_revenue,
+      money: true,
+    },
+  ];
+  const fiscalStart = fiscalYearStart(month);
+  const ytdRows = useMemo(
+    () =>
+      (entriesQuery.data ?? []).filter(
+        (row) => row.team_member === member && row.date >= fiscalStart && row.date <= bounds.end,
+      ),
+    [entriesQuery.data, member, fiscalStart, bounds.end],
+  );
+  const ytd = aggregate(ytdRows);
+  const ytdTargets = (targetsQuery.data ?? []).filter(
+    (row) =>
+      row.team_member === member &&
+      monthBounds(row.month).start >= fiscalStart &&
+      monthBounds(row.month).end <= bounds.end,
+  );
+  const ytdSummary: SummaryRow[] = [
+    {
+      label: "Clients acquired",
+      target: ytdTargets.reduce((sum, row) => sum + Number(row.acquired_clients_target), 0),
+      actual: ytd.clients_onboarded,
+    },
+    {
+      label: "Bookings",
+      target: ytdTargets.reduce((sum, row) => sum + Number(row.target_bookings), 0),
+      actual: ytd.deals_closed_value,
+      money: true,
+    },
+    {
+      label: "Total revenue",
+      target: ytdTargets.reduce((sum, row) => sum + Number(row.target_revenue), 0),
+      actual:
+        ytd.recruitment_revenue + ytd.learning_development_revenue + ytd.other_services_revenue,
+      money: true,
+    },
+  ];
+  const teamSummary = members.map((name) => {
+    const rows = monthRows.filter((row) => row.team_member === name);
+    const sum = aggregate(rows);
+    const target = (targetsQuery.data ?? []).find(
+      (item) => item.month === month && item.team_member === name,
     );
-
-  const exportCsv = () => {
-    const header = [
-      "Date",
-      "Team Member",
-      "Calls Made",
-      "Proposals Sent",
-      "Deals Closed Value",
-      "Revenue Generated",
-      "Notes",
-    ];
-    const lines = filtered.map((row) =>
-      [
-        row.date,
-        row.team_member,
-        row.calls_made,
-        row.proposals_sent,
-        row.deals_closed_value,
-        row.actual_revenue,
-        `"${(row.notes ?? "").replace(/"/g, '""')}"`,
-      ].join(","),
-    );
-    const csv = [header.join(","), ...lines].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `poa-kra-${usingRange ? `${range.from}_${range.to}` : month.replace(" ", "-")}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const sortIcon = (key: SortKey) =>
-    sort.key !== key ? null : sort.dir === "asc" ? (
-      <ArrowUp className="ml-1 inline size-3" />
-    ) : (
-      <ArrowDown className="ml-1 inline size-3" />
-    );
-
-  const revenuePercent = pct(actuals.revenue, monthTargets.revenue);
-
+    return {
+      name,
+      clients: sum.clients_onboarded,
+      clientsTarget: Number(target?.acquired_clients_target ?? 0),
+      bookings: sum.deals_closed_value,
+      bookingsTarget: Number(target?.target_bookings ?? 0),
+      revenue:
+        sum.recruitment_revenue + sum.learning_development_revenue + sum.other_services_revenue,
+      revenueTarget: Number(target?.target_revenue ?? 0),
+    };
+  });
+  const monthIndex = options.indexOf(month);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* top bar: month selector + range + team tabs */}
       <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-6">
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="icon"
             className="size-8"
-            onClick={() => shiftMonth(-1)}
             disabled={monthIndex <= 0}
-            aria-label="Previous month"
+            onClick={() => setMonth(options[monthIndex - 1])}
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <div className="flex items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
-            {POA_MONTHS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => {
-                  setMonth(option);
-                  setRange({ from: "", to: "" });
-                }}
-                className={cn(
-                  "whitespace-nowrap rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                  !usingRange && month === option
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {option.replace(" 2026", "")}
-              </button>
+          <select
+            value={month}
+            onChange={(event) => setMonth(event.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-medium"
+          >
+            {options.map((item) => (
+              <option key={item}>{item}</option>
             ))}
-          </div>
+          </select>
           <Button
             variant="outline"
             size="icon"
             className="size-8"
-            onClick={() => shiftMonth(1)}
-            disabled={monthIndex < 0 || monthIndex >= POA_MONTHS.length - 1}
-            aria-label="Next month"
+            disabled={monthIndex >= options.length - 1}
+            onClick={() => setMonth(options[monthIndex + 1])}
           >
             <ChevronRight className="size-4" />
           </Button>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="date"
-            aria-label="Range from"
-            value={range.from}
-            onChange={(event) => setRange((prev) => ({ ...prev, from: event.target.value }))}
-            className="h-8 w-36"
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input
-            type="date"
-            aria-label="Range to"
-            value={range.to}
-            onChange={(event) => setRange((prev) => ({ ...prev, to: event.target.value }))}
-            className="h-8 w-36"
-          />
-          {usingRange ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8"
-              onClick={() => setRange({ from: "", to: "" })}
+        <div className="flex max-w-full items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
+          {members.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setMember(name)}
+              className={cn(
+                "whitespace-nowrap rounded px-3 py-1 text-xs font-medium",
+                member === name
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              Clear
-            </Button>
-          ) : null}
+              {name}
+            </button>
+          ))}
         </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center rounded-md border border-input bg-background p-0.5">
-            {(["all", ...teamMembers] as TeamFilter[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setTeam(option)}
-                className={cn(
-                  "whitespace-nowrap rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                  team === option
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {option === "all" ? "All BD Team" : option}
-              </button>
-            ))}
-          </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Log Daily POA / KRA
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          disabled={!memberRows.length}
+          onClick={() =>
+            exportWorkbook(month, member, memberRows, summaryRows).catch((error: Error) =>
+              toast.error(error.message),
+            )
+          }
+        >
+          <Download className="size-4" />
+          Export Excel
+        </Button>
       </div>
-
-      <div className="flex-1 space-y-6 overflow-auto p-4 sm:p-6">
-        {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            icon={Users}
-            label="Acquired clients"
-            actual={actuals.clients}
-            target={monthTargets.clients}
-            footer={`${actuals.calls} calls · ${actuals.proposals} proposals logged`}
-          />
-          <KpiCard
-            icon={Target}
-            label="Bookings"
-            actual={actuals.bookings}
-            target={monthTargets.bookings}
-            formatter={currency}
-          />
-          <KpiCard
-            icon={TrendingUp}
-            label="Revenue"
-            actual={actuals.revenue}
-            target={monthTargets.revenue}
-            formatter={currency}
-            footer={
-              revenuePercent >= 100
-                ? "On or above target"
-                : revenuePercent >= 80
-                  ? "Close to target — push closures"
-                  : "Below target — needs attention"
-            }
-          />
-          <KpiCard
-            icon={Gauge}
-            label="Run rate pacing"
-            actual={pacing.projected}
-            target={monthTargets.revenue}
-            formatter={currency}
-            tone={varianceTone(pacing.percent)}
-            footer={`Projected from ${pacing.elapsed} of ${pacing.days} days${usingRange ? " (range mode)" : ""}`}
-          />
-        </div>
-
-        {/* history table */}
-        <section className="rounded-lg border border-border bg-surface">
-          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-semibold text-foreground">Daily log history</h2>
-              <span className="text-xs text-muted-foreground">{filtered.length} entries</span>
+      <Tabs defaultValue="daily" className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
+        <TabsList className="mb-4 w-fit">
+          <TabsTrigger value="daily">Daily POA</TabsTrigger>
+          <TabsTrigger value="individual">Individual Summary</TabsTrigger>
+          <TabsTrigger value="team">Team Summary</TabsTrigger>
+          <TabsTrigger value="targets">KRA Targets</TabsTrigger>
+        </TabsList>
+        <TabsContent value="daily" className="mt-0 min-h-0">
+          {member ? (
+            <DailyGrid month={month} member={member} entries={monthRows} />
+          ) : (
+            <p className="text-sm text-muted-foreground">No active team members found.</p>
+          )}
+        </TabsContent>
+        <TabsContent value="individual" className="mt-0 space-y-4">
+          <div className="grid gap-4 xl:grid-cols-2">
+            <SummaryTable title={`${month} performance`} rows={summaryRows} />
+            <SummaryTable title="Financial-year-to-date performance" rows={ytdSummary} />
+          </div>
+        </TabsContent>
+        <TabsContent value="team" className="mt-0">
+          <section className="rounded-lg border border-border bg-surface">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <Users className="size-4 text-primary" />
+              <h2 className="text-sm font-semibold">Consolidated team summary · {month}</h2>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={exportCsv}
-              disabled={filtered.length === 0}
-            >
-              <Download className="size-4" />
-              Export to CSV
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {(
-                    [
-                      { key: "date", label: "Date" },
-                      { key: "team_member", label: "Team member" },
-                      { key: "calls_made", label: "Calls" },
-                      { key: "proposals_sent", label: "Proposals" },
-                      { key: "deals_closed_value", label: "Deals closed" },
-                      { key: "actual_revenue", label: "Revenue" },
-                    ] as { key: SortKey; label: string }[]
-                  ).map((column) => (
-                    <TableHead key={column.key}>
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(column.key)}
-                        className="font-medium transition-colors hover:text-foreground"
-                      >
-                        {column.label}
-                        {sortIcon(column.key)}
-                      </button>
-                    </TableHead>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2">Team member</th>
+                    <th className="px-4 py-2 text-right">Clients</th>
+                    <th className="px-4 py-2 text-right">Client %</th>
+                    <th className="px-4 py-2 text-right">Bookings</th>
+                    <th className="px-4 py-2 text-right">Booking %</th>
+                    <th className="px-4 py-2 text-right">Revenue</th>
+                    <th className="px-4 py-2 text-right">Revenue %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamSummary.map((row) => (
+                    <tr key={row.name} className="border-t border-border">
+                      <td className="px-4 py-3 font-medium">{row.name}</td>
+                      <td className="px-4 py-3 text-right">
+                        {row.clients} / {row.clientsTarget}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {pct(row.clients, row.clientsTarget)}%
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {currency(row.bookings)} / {currency(row.bookingsTarget)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {pct(row.bookings, row.bookingsTarget)}%
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {currency(row.revenue)} / {currency(row.revenueTarget)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {pct(row.revenue, row.revenueTarget)}%
+                      </td>
+                    </tr>
                   ))}
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-20 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No entries for this period.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap">{formatDate(row.date)}</TableCell>
-                      <TableCell>{row.team_member}</TableCell>
-                      <TableCell className="tabular-nums">{row.calls_made}</TableCell>
-                      <TableCell className="tabular-nums">{row.proposals_sent}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {currency(Number(row.deals_closed_value))}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {currency(Number(row.actual_revenue))}
-                      </TableCell>
-                      <TableCell className="max-w-64 truncate text-muted-foreground">
-                        {row.notes ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            aria-label="Edit entry"
-                            onClick={() => {
-                              setEditing(row);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            aria-label="Delete entry"
-                            onClick={() => remove.mutate(row.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
-      </div>
-
-      {dialogOpen ? (
-        <EntryDialog
-          key={editing?.id ?? "new"}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          editing={editing}
-          teamMembers={teamMembers}
-        />
-      ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </TabsContent>
+        <TabsContent value="targets" className="mt-0">
+          {member ? <TargetEditor month={month} member={member} target={targetInput} /> : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
