@@ -35,6 +35,17 @@ export const bdTeamMembersQuery = () =>
       ),
   });
 
+export const currentUserEmailQuery = () =>
+  queryOptions({
+    queryKey: ["current_user_email"],
+    queryFn: async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw new Error(error.message);
+      return data.user?.email?.toLowerCase() ?? "";
+    },
+    staleTime: Infinity,
+  });
+
 export type DailyNumberField =
   | "target_leads"
   | "target_follow_up_calls"
