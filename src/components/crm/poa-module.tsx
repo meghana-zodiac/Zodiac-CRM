@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Download, Save, Target, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
   kraTargetsQuery,
   monthBounds,
   monthDates,
+  monthLabelFromDate,
   monthOptions,
   pct,
   poaEntriesQuery,
@@ -530,9 +531,31 @@ export function PoaModule() {
     return available.filter((name) => name !== "Edward D");
   }, [currentUserEmail.data, entriesQuery.data, profilesQuery.data, targetsQuery.data]);
   const [member, setMember] = useState("");
+  const selectedInitialDataMonth = useRef(false);
   useEffect(() => {
     if (!member && members[0]) setMember(members[0]);
   }, [member, members]);
+  useEffect(() => {
+    if (
+      selectedInitialDataMonth.current ||
+      currentUserEmail.data !== "edward@zodiachrc.com" ||
+      !entriesQuery.data
+    ) {
+      return;
+    }
+    selectedInitialDataMonth.current = true;
+    const monthCounts = new Map<string, number>();
+    for (const row of entriesQuery.data.filter((item) => item.team_member === "Edward D")) {
+      const label = monthLabelFromDate(row.date);
+      monthCounts.set(label, (monthCounts.get(label) ?? 0) + 1);
+    }
+    const bestMonth = [...monthCounts.entries()].sort(
+      ([leftMonth, leftCount], [rightMonth, rightCount]) =>
+        rightCount - leftCount ||
+        monthBounds(rightMonth).start.localeCompare(monthBounds(leftMonth).start),
+    )[0]?.[0];
+    if (bestMonth) setMonth(bestMonth);
+  }, [currentUserEmail.data, entriesQuery.data]);
   const bounds = monthBounds(month);
   const monthRows = useMemo(
     () =>
