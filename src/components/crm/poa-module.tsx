@@ -12,6 +12,7 @@ import { BD_OWNERS } from "@/components/crm/nav-data";
 import { currency, formatDate } from "@/lib/crm";
 import {
   bdTeamMembersQuery,
+  currentUserEmailQuery,
   DAILY_FIELDS,
   defaultMonth,
   emptyPoaEntry,
@@ -515,15 +516,19 @@ export function PoaModule() {
   const entriesQuery = useQuery(poaEntriesQuery());
   const targetsQuery = useQuery(kraTargetsQuery());
   const profilesQuery = useQuery(bdTeamMembersQuery());
-  const members = useMemo(
-    () =>
-      memberNames(
-        entriesQuery.data ?? [],
-        profilesQuery.data ?? [],
-        (targetsQuery.data ?? []).map((item) => item.team_member),
-      ),
-    [entriesQuery.data, profilesQuery.data, targetsQuery.data],
-  );
+  const currentUserEmail = useQuery(currentUserEmailQuery());
+  const members = useMemo(() => {
+    const available = memberNames(
+      entriesQuery.data ?? [],
+      profilesQuery.data ?? [],
+      (targetsQuery.data ?? []).map((item) => item.team_member),
+    );
+    const ownProfile = (profilesQuery.data ?? []).find(
+      (profile) => profile.email.toLowerCase() === currentUserEmail.data,
+    );
+    if (ownProfile?.display_name === "Edward D") return ["Edward D"];
+    return available.filter((name) => name !== "Edward D");
+  }, [currentUserEmail.data, entriesQuery.data, profilesQuery.data, targetsQuery.data]);
   const [member, setMember] = useState("");
   useEffect(() => {
     if (!member && members[0]) setMember(members[0]);
