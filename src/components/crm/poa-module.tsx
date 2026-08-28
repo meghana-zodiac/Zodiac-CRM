@@ -140,6 +140,7 @@ function DailyGrid({
   editable: boolean;
 }) {
   const queryClient = useQueryClient();
+  const gridScrollRef = useRef<HTMLDivElement>(null);
   const dates = useMemo(() => monthDates(month), [month]);
   const existing = useMemo(
     () =>
@@ -147,7 +148,13 @@ function DailyGrid({
     [entries, member],
   );
   const [drafts, setDrafts] = useState<Record<string, PoaEntryInput>>({});
-  useEffect(() => setDrafts({}), [month, member]);
+  useEffect(() => {
+    setDrafts({});
+    if (gridScrollRef.current) {
+      gridScrollRef.current.scrollLeft = 0;
+      gridScrollRef.current.scrollTop = 0;
+    }
+  }, [month, member]);
 
   const rowValue = (date: string) =>
     drafts[date] ??
@@ -181,7 +188,7 @@ function DailyGrid({
           {editable ? `${Object.keys(drafts).length} unsaved` : "View only"}
         </span>
       </div>
-      <div className="max-h-[68vh] overflow-auto">
+      <div ref={gridScrollRef} className="max-h-[68vh] overflow-auto">
         <table className="w-max min-w-full border-collapse text-xs">
           <thead className="sticky top-0 z-20 shadow-sm">
             <tr>
