@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ContactRound } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -69,6 +70,60 @@ type PasteConflict = {
   incoming: string;
 };
 
+type AddressBookContact = {
+  name?: string[];
+  email?: string[];
+  tel?: string[];
+};
+
+type ContactPickerNavigator = Navigator & {
+  contacts?: {
+    select: (
+      properties: Array<"name" | "email" | "tel">,
+      options?: { multiple?: boolean },
+    ) => Promise<AddressBookContact[]>;
+  };
+};
+
+function decodeVCardValue(value: string) {
+  return value
+    .replace(/\\n/gi, " ")
+    .replace(/\\,/g, ",")
+    .replace(/\\;/g, ";")
+    .replace(/\\\\/g, "\\")
+    .trim();
+}
+
+function parseVCard(text: string): AddressBookContact | null {
+  const lines = text.replace(/\r?\n[ \t]/g, "").split(/\r?\n/);
+  let name = "";
+  let structuredName = "";
+  let email = "";
+  let tel = "";
+
+  for (const line of lines) {
+    const separator = line.indexOf(":");
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).split(";")[0]?.toUpperCase();
+    const value = decodeVCardValue(line.slice(separator + 1));
+    if (key === "FN" && !name) name = value;
+    if (key === "N" && !structuredName) {
+      const [last = "", first = "", middle = ""] = value.split(";");
+      structuredName = [first, middle, last].filter(Boolean).join(" ").trim();
+    }
+    if (key === "EMAIL" && !email) email = value;
+    if (key === "TEL" && !tel) tel = value;
+  }
+
+  const resolvedName = name || structuredName;
+  if (!resolvedName && !email && !tel) return null;
+  return {
+    name: resolvedName ? [resolvedName] : [],
+    email: email ? [email] : [],
+    tel: tel ? [tel] : [],
+  };
+}
+
 function toInputValue(type: FieldType, raw: unknown): string {
   if (raw === null || raw === undefined) return "";
   if (type === "datetime") return new Date(String(raw)).toISOString().slice(0, 16);
@@ -99,6 +154,7 @@ export function RecordDialog({
   const [values, setValues] = useState<Values>({});
   const [pasteText, setPasteText] = useState("");
   const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
+  const addressBookFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -160,6 +216,64 @@ export function RecordDialog({
     setPasteConflicts((current) => current.filter((item) => item.field !== conflict.field));
   };
 
+  const applyAddressBookContact = (contact: AddressBookContact) => {
+    const fullName = contact.name?.[0]?.trim() ?? "";
+    const email = contact.email?.[0]?.trim() ?? "";
+    const phone = contact.tel?.[0]?.trim() ?? "";
+
+    setValues((current) => {
+      const next = { ...current };
+      if (table === "leads" && fullName) next.contact_name = fullName;
+      if (table === "contacts" && fullName) {
+        const nameParts = fullName.split(/\s+/).filter(Boolean);
+        next.last_name = nameParts.pop() ?? "";
+        next.first_name = nameParts.join(" ");
+      }
+      if (email) next.email = email.toLowerCase();
+      if (phone) next.phone = phone;
+      return next;
+    });
+
+    const importedFields = [fullName, phone, email].filter(Boolean).length;
+    toast.success(
+      importedFields
+        ? `${importedFields} contact details imported. Please review before saving.`
+        : "The selected contact did not contain a name, phone number, or email.",
+    );
+  };
+
+  const importFromAddressBook = async () => {
+    const contactPicker = (navigator as ContactPickerNavigator).contacts;
+    if (!contactPicker?.select) {
+      addressBookFileRef.current?.click();
+      return;
+    }
+
+    try {
+      const contacts = await contactPicker.select(["name", "tel", "email"], {
+        multiple: false,
+      });
+      if (contacts[0]) applyAddressBookContact(contacts[0]);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("The address book could not be opened. You can select a contact file instead.");
+      addressBookFileRef.current?.click();
+    }
+  };
+
+  const importVCardFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const contact = parseVCard(await file.text());
+      if (!contact) throw new Error("No contact details found");
+      applyAddressBookContact(contact);
+    } catch {
+      toast.error("That contact file could not be read. Please choose a .vcf file.");
+    } finally {
+      if (addressBookFileRef.current) addressBookFileRef.current.value = "";
+    }
+  };
+
   const visibleFields = fields.filter(
     (field) =>
       !field.dependsOn ||
@@ -219,6 +333,39 @@ export function RecordDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
+        {!record?.["id"] && (table === "contacts" || table === "leads") ? (
+          <section className="rounded-lg border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 sm:hidden">
+            <div className="mb-2 flex items-start gap-2.5">
+              <span className="rounded-lg bg-white p-2 text-violet-700 shadow-sm">
+                <ContactRound className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Import from address book</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Choose one contact to fill their name, phone number and email.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full border-violet-200 bg-white text-violet-800 hover:bg-violet-50"
+              onClick={importFromAddressBook}
+            >
+              <ContactRound className="mr-2 h-4 w-4" />
+              Choose contact
+            </Button>
+            <input
+              ref={addressBookFileRef}
+              type="file"
+              accept=".vcf,text/vcard,text/x-vcard"
+              className="hidden"
+              aria-label="Choose a contact file"
+              onChange={(event) => void importVCardFile(event.target.files?.[0])}
+            />
+          </section>
+        ) : null}
         {SMART_PASTE_TABLES.includes(table) ? (
           <section className="rounded-lg border border-primary/20 bg-primary/5 p-3">
             <div className="mb-2">
