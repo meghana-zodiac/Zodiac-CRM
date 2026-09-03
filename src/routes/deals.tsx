@@ -285,7 +285,7 @@ function DealsPage() {
           <div
             ref={boardRef}
             onDragOver={handleBoardDragOver}
-            className="flex scroll-smooth gap-3 overflow-x-auto pb-2 scrollbar-thin"
+            className="flex min-w-0 scroll-smooth gap-3 overflow-x-auto pb-2 scrollbar-thin xl:grid xl:grid-cols-5 xl:items-start xl:overflow-x-visible"
           >
             {BD_STAGES.map((stage) => {
               const stageDeals = rows.filter((deal) => deal.stage === stage);
@@ -307,7 +307,7 @@ function DealsPage() {
                     setDragStage(null);
                   }}
                   className={cn(
-                    "flex w-[85vw] max-w-sm shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150 sm:w-72",
+                    "flex w-[85vw] max-w-sm shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150 sm:w-72 xl:w-auto xl:max-w-none xl:min-w-0",
                     dragId &&
                       dragStage === stage &&
                       "border-brand-accent bg-brand-accent/5 ring-2 ring-brand-accent/20",
