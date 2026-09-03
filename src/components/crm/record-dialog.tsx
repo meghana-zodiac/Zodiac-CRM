@@ -155,7 +155,7 @@ export function RecordDialog({
     );
   };
 
-  const usePastedValue = (conflict: PasteConflict) => {
+  const applyPastedValue = (conflict: PasteConflict) => {
     setValues((current) => ({ ...current, [conflict.field]: conflict.incoming }));
     setPasteConflicts((current) => current.filter((item) => item.field !== conflict.field));
   };
@@ -214,7 +214,7 @@ export function RecordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
@@ -222,7 +222,10 @@ export function RecordDialog({
         {SMART_PASTE_TABLES.includes(table) ? (
           <section className="rounded-lg border border-primary/20 bg-primary/5 p-3">
             <div className="mb-2">
-              <Label htmlFor={`${table}-smart-paste`} className="text-sm font-semibold text-foreground">
+              <Label
+                htmlFor={`${table}-smart-paste`}
+                className="text-sm font-semibold text-foreground"
+              >
                 Paste details
               </Label>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -253,20 +256,21 @@ export function RecordDialog({
                   Review differences ({pasteConflicts.length})
                 </p>
                 {pasteConflicts.map((conflict) => (
-                  <div key={conflict.field} className="rounded-md border border-border bg-background p-2.5">
+                  <div
+                    key={conflict.field}
+                    className="rounded-md border border-border bg-background p-2.5"
+                  >
                     <p className="text-xs font-semibold text-foreground">{conflict.label}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Current: {conflict.current}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Pasted: {conflict.incoming}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Pasted: {conflict.incoming}</p>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       className="mt-2 h-7 text-xs"
-                      onClick={() => usePastedValue(conflict)}
+                      onClick={() => applyPastedValue(conflict)}
                     >
                       Use pasted value
                     </Button>

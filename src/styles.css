@@ -2,6 +2,41 @@
 @source "../src";
 @import "tw-animate-css";
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+.crm-table-scroll {
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 639px) {
+  .crm-table-scroll::after {
+    content: "Swipe horizontally to see more";
+    position: sticky;
+    left: 0;
+    display: block;
+    width: max-content;
+    padding: 0.4rem 0.75rem;
+    color: var(--muted-foreground);
+    font-size: 0.6875rem;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

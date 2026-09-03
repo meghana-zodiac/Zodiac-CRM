@@ -357,7 +357,7 @@ function SummaryTable({ title, rows }: { title: string; rows: SummaryRow[] }) {
       <div className="border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      <div className="overflow-x-auto">
+      <div className="crm-table-scroll overflow-x-auto overscroll-x-contain">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -443,7 +443,7 @@ function CagSummaryView({
           <p className="text-xs text-muted-foreground">Imported monthly targets and actuals.</p>
         </div>
       </div>
-      <div className="max-h-[68vh] overflow-auto">
+      <div className="crm-table-scroll max-h-[68dvh] overflow-auto overscroll-contain">
         <table className="w-full min-w-[1250px] border-collapse text-xs">
           <thead className="sticky top-0 z-10">
             <tr className="text-center font-semibold text-white">
@@ -903,8 +903,8 @@ export function PoaModule() {
   const monthIndex = options.indexOf(month);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-3 border-b border-border bg-surface px-3 py-3 sm:px-6 lg:flex-row lg:items-center">
+        <div className="flex w-full items-center gap-1 sm:w-auto">
           <Button
             variant="outline"
             size="icon"
@@ -917,7 +917,7 @@ export function PoaModule() {
           <select
             value={month}
             onChange={(event) => setMonth(event.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-3 text-sm font-medium"
+            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm font-medium sm:flex-none"
           >
             {options.map((item) => (
               <option key={item}>{item}</option>
@@ -933,7 +933,7 @@ export function PoaModule() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <div className="flex max-w-full items-center overflow-x-auto rounded-md border border-input bg-background p-0.5">
+        <div className="flex w-full max-w-full items-center overflow-x-auto overscroll-x-contain rounded-md border border-input bg-background p-0.5 lg:w-auto lg:flex-1">
           {navigationMembers.map((name) => (
             <button
               key={name}
@@ -953,7 +953,7 @@ export function PoaModule() {
         <Button
           variant="outline"
           size="sm"
-          className="ml-auto"
+          className="w-full lg:ml-auto lg:w-auto"
           disabled={!memberRows.length}
           onClick={() =>
             exportWorkbook(month, member, memberRows, summaryRows).catch((error: Error) =>
@@ -968,9 +968,9 @@ export function PoaModule() {
       <Tabs
         value={section}
         onValueChange={changeSection}
-        className="flex min-h-0 flex-1 flex-col p-4 sm:p-6"
+        className="flex min-h-0 flex-1 flex-col p-3 sm:p-6"
       >
-        <TabsList className="mb-4 w-fit">
+        <TabsList className="mb-4 flex h-auto w-full justify-start overflow-x-auto p-1 sm:w-fit">
           <TabsTrigger value="daily">Daily POA</TabsTrigger>
           <TabsTrigger value="individual">Individual Summary</TabsTrigger>
           <TabsTrigger value="team">CAG Summary</TabsTrigger>

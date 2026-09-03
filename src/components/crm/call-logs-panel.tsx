@@ -59,7 +59,7 @@ export function CallLogsPanel() {
           No call logs captured yet. Incoming webhook records will appear here.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="crm-table-scroll overflow-x-auto overscroll-x-contain">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">

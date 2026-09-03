@@ -361,7 +361,7 @@ export function LeadImportDialog({
                   Detected {headers.length} columns
                 </span>
               </div>
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
                     <tr>

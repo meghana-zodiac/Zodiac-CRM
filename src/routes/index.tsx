@@ -198,7 +198,7 @@ function HomePage() {
                 {currency(entry.pipelineValue)}
               </p>
               <p className="text-xs text-muted-foreground">Open pipeline value</p>
-              <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <dl className="mt-3 grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
                 <div className="rounded-md bg-muted/60 py-2">
                   <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     Meetings

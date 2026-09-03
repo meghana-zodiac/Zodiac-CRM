@@ -37,24 +37,24 @@ export function ModuleHeader({
   const views = availableViews ?? ["list", "tile"];
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-6">
-      <div className="flex items-baseline gap-2">
+    <div className="flex flex-col gap-3 border-b border-border bg-surface px-3 py-3 sm:px-6 lg:flex-row lg:items-center">
+      <div className="flex min-w-0 items-baseline gap-2">
         <h1 className="text-base font-semibold text-foreground">{title}</h1>
         <span className="text-xs text-muted-foreground">{count} records</span>
       </div>
 
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
         <Button variant="outline" size="sm" className="lg:hidden" onClick={onToggleFilters}>
           <SlidersHorizontal className="size-4" />
           Filters
         </Button>
-        <div className="relative">
+        <div className="relative min-w-0 flex-1 sm:flex-none">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             aria-label={`Search ${title}`}
-            className="h-9 w-44 pl-8 sm:w-56"
+            className="h-9 w-full pl-8 sm:w-56"
           />
         </div>
         {onViewChange && view ? (

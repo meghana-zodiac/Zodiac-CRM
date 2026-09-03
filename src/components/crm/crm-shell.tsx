@@ -210,7 +210,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-dvh w-full bg-background">
       <RouteProgress />
 
       <aside
@@ -233,7 +233,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-surface px-3 sm:px-5">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b border-border bg-surface px-2 sm:gap-2 sm:px-5">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden">
@@ -249,7 +249,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
 
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground transition-all hover:border-brand-accent/60 hover:shadow-card sm:max-w-md"
+            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-muted-foreground transition-all hover:border-brand-accent/60 hover:shadow-card sm:max-w-md sm:px-3"
           >
             <Search className="size-4 shrink-0" />
             <span className="truncate">Search records</span>

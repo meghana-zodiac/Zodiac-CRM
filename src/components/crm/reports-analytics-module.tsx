@@ -486,7 +486,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-background">
       <header className="border-b border-border bg-surface px-4 py-4 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <div className="grid size-9 place-items-center rounded-lg bg-brand-gradient text-primary-foreground shadow-panel">
@@ -508,7 +508,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full gap-2 sm:grid-cols-2 lg:flex lg:w-auto lg:flex-wrap lg:items-center">
             <div className="flex items-center gap-2 rounded-md border border-input bg-background px-2.5">
               <Filter className="size-3.5 text-muted-foreground" />
               <select
@@ -518,7 +518,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                   setSelectedMonth("");
                 }}
                 aria-label="Report date range"
-                className="h-9 bg-transparent text-sm outline-none"
+                className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
               >
                 <option value="30">Last 30 days</option>
                 <option value="90">Last 90 days</option>
@@ -530,7 +530,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
               aria-label="Select calendar month"
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
+              className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
             >
               <option value="">Select month</option>
               {monthOptions.map((month) => (
@@ -543,7 +543,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               value={owner}
               onChange={(event) => setOwner(event.target.value)}
               aria-label="Filter by BD member"
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
+              className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
             >
               <option value="all">All BD members</option>
               {ownerOptions.map((name) => (
@@ -552,13 +552,18 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
                 </option>
               ))}
             </select>
-            <Button variant="outline" size="sm" onClick={exportCurrentView}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full lg:w-auto"
+              onClick={exportCurrentView}
+            >
               <Download className="size-4" /> Export CSV
             </Button>
           </div>
         </div>
 
-        <nav className="mt-4 flex gap-1" aria-label="Reports and analytics">
+        <nav className="mt-4 flex gap-1 overflow-x-auto" aria-label="Reports and analytics">
           <Link
             to="/modules/$module"
             params={{ module: "reports" }}
@@ -722,7 +727,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               }
             >
               {data.team.length ? (
-                <div className="overflow-x-auto">
+                <div className="crm-table-scroll overflow-x-auto overscroll-x-contain">
                   <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="bg-muted/45 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

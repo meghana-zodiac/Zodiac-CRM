@@ -17,7 +17,7 @@ export function ModuleTabs({
   ];
 
   return (
-    <div className="flex gap-1 border-b border-border bg-surface px-4 pt-2 sm:px-6">
+    <div className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain border-b border-border bg-surface px-3 pt-2 sm:px-6">
       {tabs.map((tab) => (
         <button
           key={tab.id}

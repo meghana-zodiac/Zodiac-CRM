@@ -146,7 +146,7 @@ function AccountsPage() {
             Filter
           </span>
           <Select value={systemFilter} onValueChange={setSystemFilter}>
-            <SelectTrigger className="w-[180px] bg-surface">
+            <SelectTrigger className="w-full bg-surface sm:w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -157,7 +157,7 @@ function AccountsPage() {
           </Select>
 
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="w-[170px] bg-surface">
+            <SelectTrigger className="w-full bg-surface sm:w-[170px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +218,7 @@ function AccountsPage() {
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-panel">
+          <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel">
             <table className="w-full min-w-[1180px] table-fixed text-sm">
               <colgroup>
                 <col className="w-[3%]" />

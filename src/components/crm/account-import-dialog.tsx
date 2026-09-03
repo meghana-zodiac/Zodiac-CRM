@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account } from "@/lib/crm";
 
@@ -55,7 +62,9 @@ function cleanHeader(value: string): string {
 }
 
 function valueFor(row: RawRow, field: ImportField): string {
-  const match = Object.entries(row).find(([header]) => headerAliases[field].includes(cleanHeader(header)));
+  const match = Object.entries(row).find(([header]) =>
+    headerAliases[field].includes(cleanHeader(header)),
+  );
   return clean(match?.[1]);
 }
 
@@ -67,7 +76,10 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], { defval: "", raw: false });
+  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
+    defval: "",
+    raw: false,
+  });
 
   return source.map((row, index) => {
     const name = valueFor(row, "name");
@@ -92,10 +104,17 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
 }
 
 function matchKey(value: string | null | undefined): string {
-  return clean(value).toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return clean(value)
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
 }
 
-export function AccountImportDialog({ open, onOpenChange, accounts }: {
+export function AccountImportDialog({
+  open,
+  onOpenChange,
+  accounts,
+}: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
@@ -130,10 +149,40 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
 
   const downloadTemplate = () => {
     const sheet = XLSX.utils.aoa_to_sheet([
-      ["Company Name", "Client Type", "Industry", "Website", "Company Phone", "City", "Owner Name", "Contact First Name", "Contact Last Name", "Contact Email", "Contact Phone", "Contact Designation", "Contact Department"],
-      ["Example Company", "Corporate", "Technology", "https://example.com", "+91 22 4000 0000", "Mumbai", "", "Ananya", "Sharma", "ananya@example.com", "+91 98765 43210", "Head of L&D", "Human Resources"],
+      [
+        "Company Name",
+        "Client Type",
+        "Industry",
+        "Website",
+        "Company Phone",
+        "City",
+        "Owner Name",
+        "Contact First Name",
+        "Contact Last Name",
+        "Contact Email",
+        "Contact Phone",
+        "Contact Designation",
+        "Contact Department",
+      ],
+      [
+        "Example Company",
+        "Corporate",
+        "Technology",
+        "https://example.com",
+        "+91 22 4000 0000",
+        "Mumbai",
+        "",
+        "Ananya",
+        "Sharma",
+        "ananya@example.com",
+        "+91 98765 43210",
+        "Head of L&D",
+        "Human Resources",
+      ],
     ]);
-    sheet["!cols"] = Array.from({ length: 13 }, (_, index) => ({ wch: index === 0 || index === 3 || index === 9 ? 28 : 20 }));
+    sheet["!cols"] = Array.from({ length: 13 }, (_, index) => ({
+      wch: index === 0 || index === 3 || index === 9 ? 28 : 20,
+    }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Clients");
     XLSX.writeFile(workbook, "zodiac-crm-client-import-template.xlsx");
@@ -143,7 +192,11 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
     setImporting(true);
     try {
       const byName = new Map(accounts.map((account) => [matchKey(account.name), account]));
-      const byWebsite = new Map(accounts.filter((account) => account.website).map((account) => [matchKey(account.website), account]));
+      const byWebsite = new Map(
+        accounts
+          .filter((account) => account.website)
+          .map((account) => [matchKey(account.website), account]),
+      );
       const seen = new Set<string>();
       let skipped = errorCount;
       let inserted = 0;
@@ -160,7 +213,8 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
           continue;
         }
         seen.add(key);
-        const existing = byName.get(key) ?? (row.website ? byWebsite.get(matchKey(row.website)) : undefined);
+        const existing =
+          byName.get(key) ?? (row.website ? byWebsite.get(matchKey(row.website)) : undefined);
         payload.push({
           ...(existing ? { id: existing.id } : {}),
           name: row.name,
@@ -186,18 +240,28 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
         .select("id,name")
         .in("name", accountNames);
       if (savedAccountError) throw savedAccountError;
-      const savedAccountByName = new Map((savedAccounts ?? []).map((account) => [matchKey(account.name), account.id]));
-      const contactEmails = rows.map((row) => row.contact_email).filter((email): email is string => Boolean(email));
+      const savedAccountByName = new Map(
+        (savedAccounts ?? []).map((account) => [matchKey(account.name), account.id]),
+      );
+      const contactEmails = rows
+        .map((row) => row.contact_email)
+        .filter((email): email is string => Boolean(email));
       const { data: existingContacts, error: contactLookupError } = contactEmails.length
         ? await supabase.from("contacts").select("id,email").in("email", contactEmails)
         : { data: [], error: null };
       if (contactLookupError) throw contactLookupError;
-      const contactsByEmail = new Map((existingContacts ?? []).filter((contact) => contact.email).map((contact) => [matchKey(contact.email), contact]));
+      const contactsByEmail = new Map(
+        (existingContacts ?? [])
+          .filter((contact) => contact.email)
+          .map((contact) => [matchKey(contact.email), contact]),
+      );
       const contactPayload: Array<Record<string, unknown>> = [];
       const seenContacts = new Set<string>();
       for (const row of rows) {
         if (row.error) continue;
-        const hasContact = Boolean(row.contact_first_name || row.contact_last_name || row.contact_email || row.contact_phone);
+        const hasContact = Boolean(
+          row.contact_first_name || row.contact_last_name || row.contact_email || row.contact_phone,
+        );
         if (!hasContact) continue;
         const accountId = savedAccountByName.get(matchKey(row.name));
         if (!accountId) continue;
@@ -206,7 +270,9 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
           : `name:${matchKey(`${row.contact_first_name ?? ""} ${row.contact_last_name ?? ""}`)}:${accountId}`;
         if (seenContacts.has(contactKey)) continue;
         seenContacts.add(contactKey);
-        const existingContact = row.contact_email ? contactsByEmail.get(matchKey(row.contact_email)) : undefined;
+        const existingContact = row.contact_email
+          ? contactsByEmail.get(matchKey(row.contact_email))
+          : undefined;
         contactPayload.push({
           ...(existingContact ? { id: existingContact.id } : {}),
           account_id: accountId,
@@ -222,12 +288,16 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
         else contactsAdded += 1;
       }
       for (let index = 0; index < contactPayload.length; index += 200) {
-        const { error } = await supabase.from("contacts").upsert(contactPayload.slice(index, index + 200));
+        const { error } = await supabase
+          .from("contacts")
+          .upsert(contactPayload.slice(index, index + 200));
         if (error) throw error;
       }
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       await queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast.success(`Import complete: ${inserted} clients added, ${updated} updated; ${contactsAdded} contacts added, ${contactsUpdated} updated; ${skipped} rows skipped.`);
+      toast.success(
+        `Import complete: ${inserted} clients added, ${updated} updated; ${contactsAdded} contacts added, ${contactsUpdated} updated; ${skipped} rows skipped.`,
+      );
       reset();
       onOpenChange(false);
     } catch (error) {
@@ -238,54 +308,128 @@ export function AccountImportDialog({ open, onOpenChange, accounts }: {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next && !importing) reset(); onOpenChange(next); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !importing) reset();
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import Corporate Clients</DialogTitle>
-          <DialogDescription>Upload an Excel or CSV file. Client details are imported here; any contact columns automatically create linked Client Contacts.</DialogDescription>
+          <DialogDescription>
+            Upload an Excel or CSV file. Client details are imported here; any contact columns
+            automatically create linked Client Contacts.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <input ref={inputRef} className="hidden" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => void readFile(event.target.files?.[0])} />
-            <Button type="button" onClick={() => inputRef.current?.click()}><Upload className="size-4" /> Choose Excel file</Button>
-            <Button type="button" variant="outline" onClick={downloadTemplate}><Download className="size-4" /> Download template</Button>
+            <input
+              ref={inputRef}
+              className="hidden"
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(event) => void readFile(event.target.files?.[0])}
+            />
+            <Button type="button" onClick={() => inputRef.current?.click()}>
+              <Upload className="size-4" /> Choose Excel file
+            </Button>
+            <Button type="button" variant="outline" onClick={downloadTemplate}>
+              <Download className="size-4" /> Download template
+            </Button>
             {fileName && <span className="text-sm text-muted-foreground">{fileName}</span>}
           </div>
           {!rows.length ? (
             <div className="rounded-lg border border-dashed border-border p-10 text-center">
               <FileSpreadsheet className="mx-auto size-9 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Upload .xlsx, .xls, or .csv</p>
-              <p className="text-xs text-muted-foreground">Company Name is the only required column.</p>
+              <p className="text-xs text-muted-foreground">
+                Company Name is the only required column.
+              </p>
             </div>
           ) : (
             <>
               <div className="flex gap-3 text-sm">
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">{validCount} valid</span>
-                {!!errorCount && <span className="rounded-full bg-red-100 px-3 py-1 text-red-800">{errorCount} invalid</span>}
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">
+                  {validCount} valid
+                </span>
+                {!!errorCount && (
+                  <span className="rounded-full bg-red-100 px-3 py-1 text-red-800">
+                    {errorCount} invalid
+                  </span>
+                )}
               </div>
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground"><tr>
-                    {["Row", "Company Name", "Type", "Industry", "Website", "Phone", "City", "Status"].map((header) => <th key={header} className="px-3 py-2">{header}</th>)}
-                  </tr></thead>
-                  <tbody className="divide-y divide-border">{preview.map((row) => (
-                    <tr key={row.rowNumber}>
-                      <td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td><td className="px-3 py-2 font-medium">{row.name || "—"}</td>
-                      <td className="px-3 py-2">{row.client_type ?? "—"}</td><td className="px-3 py-2">{row.industry ?? "—"}</td>
-                      <td className="px-3 py-2">{row.website ?? "—"}</td><td className="px-3 py-2">{row.phone ?? "—"}</td><td className="px-3 py-2">{row.city ?? "—"}</td>
-                      <td className={row.error ? "px-3 py-2 text-red-600" : "px-3 py-2 text-emerald-700"}>{row.error ?? "Ready"}</td>
+                  <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      {[
+                        "Row",
+                        "Company Name",
+                        "Type",
+                        "Industry",
+                        "Website",
+                        "Phone",
+                        "City",
+                        "Status",
+                      ].map((header) => (
+                        <th key={header} className="px-3 py-2">
+                          {header}
+                        </th>
+                      ))}
                     </tr>
-                  ))}</tbody>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {preview.map((row) => (
+                      <tr key={row.rowNumber}>
+                        <td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td>
+                        <td className="px-3 py-2 font-medium">{row.name || "—"}</td>
+                        <td className="px-3 py-2">{row.client_type ?? "—"}</td>
+                        <td className="px-3 py-2">{row.industry ?? "—"}</td>
+                        <td className="px-3 py-2">{row.website ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone ?? "—"}</td>
+                        <td className="px-3 py-2">{row.city ?? "—"}</td>
+                        <td
+                          className={
+                            row.error ? "px-3 py-2 text-red-600" : "px-3 py-2 text-emerald-700"
+                          }
+                        >
+                          {row.error ?? "Ready"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
-              {rows.length > preview.length && <p className="text-xs text-muted-foreground">Previewing 12 of {rows.length} rows.</p>}
+              {rows.length > preview.length && (
+                <p className="text-xs text-muted-foreground">
+                  Previewing 12 of {rows.length} rows.
+                </p>
+              )}
             </>
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={importing} onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" disabled={!validCount || importing} onClick={() => void importRows()}>
-            {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}{importing ? "Importing…" : `Import ${validCount} clients`}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={importing}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!validCount || importing}
+            onClick={() => void importRows()}
+          >
+            {importing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            {importing ? "Importing…" : `Import ${validCount} clients`}
           </Button>
         </DialogFooter>
       </DialogContent>

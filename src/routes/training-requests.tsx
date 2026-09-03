@@ -99,7 +99,7 @@ function TrainingRequestsPage() {
         onViewChange={setView}
         availableViews={["kanban", "list"]}
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <OwnerFilter value={owner} onChange={setOwner} />
             <Button
               size="sm"
@@ -118,7 +118,7 @@ function TrainingRequestsPage() {
         {requests.isLoading ? (
           <EmptyState message="Loading training requests…" />
         ) : view === "list" ? (
-          <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-panel">
+          <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel">
             <table className="w-full min-w-[1200px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
