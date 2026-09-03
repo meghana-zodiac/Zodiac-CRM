@@ -140,6 +140,7 @@ export function RecordDialog({
   fields,
   record,
   invalidateKeys,
+  fixedValues,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -149,6 +150,8 @@ export function RecordDialog({
   fields: FieldDef[];
   record?: Record<string, unknown> | null;
   invalidateKeys?: string[];
+  /** Values saved with the record but intentionally not shown as editable fields. */
+  fixedValues?: Record<string, unknown>;
 }) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Values>({});
@@ -304,6 +307,9 @@ export function RecordDialog({
           const isIdField = field.options.some((option) => option.value !== option.label);
           writePath(payload, field.name, match ? match.value : isIdField ? null : raw);
         } else writePath(payload, field.name, raw);
+      }
+      for (const [path, value] of Object.entries(fixedValues ?? {})) {
+        writePath(payload, path, value);
       }
       if (record?.["id"]) {
         await updateRecord(table, String(record["id"]), payload);
