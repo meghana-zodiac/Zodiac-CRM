@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
+  Building2,
   CalendarDays,
   ChevronDown,
   ChevronsLeft,
@@ -11,6 +12,9 @@ import {
   Search,
   Layers,
   LogOut,
+  Home,
+  FileSignature,
+  Sparkles,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -42,6 +46,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
 type QuickCreate = "lead" | "contact" | "deal" | null;
+
+const mobileNavItems = [
+  { label: "Home", to: "/", icon: Home },
+  { label: "Leads", to: "/leads", icon: Sparkles },
+  { label: "Clients", to: "/accounts", icon: Building2 },
+  { label: "Deals", to: "/deals", icon: FileSignature },
+] as const;
 
 function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -233,7 +244,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b border-border bg-surface px-2 sm:gap-2 sm:px-5">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b border-border bg-surface/95 px-2 backdrop-blur sm:gap-2 sm:px-5">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden">
@@ -247,12 +258,18 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
 
+          <div className="min-w-0 flex-1 md:hidden">
+            <p className="truncate text-sm font-semibold text-foreground">Zodiac CRM</p>
+            <p className="truncate text-[10px] text-muted-foreground">BD &amp; L&amp;D workspace</p>
+          </div>
+
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-muted-foreground transition-all hover:border-brand-accent/60 hover:shadow-card sm:max-w-md sm:px-3"
+            aria-label="Search records"
+            className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-all hover:bg-muted hover:text-foreground md:flex md:h-9 md:min-w-0 md:flex-1 md:justify-start md:gap-2 md:rounded-lg md:border md:border-input md:bg-background md:px-3 md:text-sm md:hover:border-brand-accent/60 md:hover:shadow-card sm:max-w-md"
           >
             <Search className="size-4 shrink-0" />
-            <span className="truncate">Search records</span>
+            <span className="hidden truncate md:inline">Search records</span>
           </button>
 
           <div className="ml-auto flex items-center gap-1.5">
@@ -291,7 +308,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative"
+              className="relative hidden sm:inline-flex"
               aria-label="Notifications"
               onClick={() => setNotificationsOpen(true)}
             >
@@ -308,7 +325,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full"
+                  className="hidden rounded-full sm:inline-flex"
                   aria-label="Account menu"
                 >
                   <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
@@ -328,10 +345,44 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main key={pathname} className="crm-route-enter min-w-0 flex-1">
+        <main key={pathname} className="crm-route-enter min-w-0 flex-1 pb-20 md:pb-0">
           {children}
         </main>
       </div>
+
+      <nav
+        aria-label="Mobile navigation"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom))] grid-cols-5 border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden"
+      >
+        {mobileNavItems.map((item) => {
+          const active = pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium text-muted-foreground transition-colors",
+                active && "text-primary",
+              )}
+            >
+              {active ? (
+                <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />
+              ) : null}
+              <item.icon className={cn("size-5", active && "stroke-[2.4]")} />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(true)}
+          className="relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Menu className="size-5" />
+          <span>More</span>
+        </button>
+      </nav>
 
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 

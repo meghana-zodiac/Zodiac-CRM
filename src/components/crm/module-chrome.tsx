@@ -39,12 +39,21 @@ export function ModuleHeader({
   return (
     <div className="flex flex-col gap-3 border-b border-border bg-surface px-3 py-3 sm:px-6 lg:flex-row lg:items-center">
       <div className="flex min-w-0 items-baseline gap-2">
-        <h1 className="text-base font-semibold text-foreground">{title}</h1>
-        <span className="text-xs text-muted-foreground">{count} records</span>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-base">
+          {title}
+        </h1>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:bg-transparent sm:p-0 sm:text-xs">
+          {count} records
+        </span>
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
-        <Button variant="outline" size="sm" className="lg:hidden" onClick={onToggleFilters}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full lg:hidden"
+          onClick={onToggleFilters}
+        >
           <SlidersHorizontal className="size-4" />
           Filters
         </Button>
