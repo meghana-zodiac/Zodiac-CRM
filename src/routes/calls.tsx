@@ -6,9 +6,17 @@ export const Route = createFileRoute("/calls")({
   head: () => ({
     meta: [
       { title: "Call Logs — Zodiac HR Consultants" },
-      { name: "description", content: "Logged and upcoming client calls with notes and outcomes across BD and training accounts." },
+      {
+        name: "description",
+        content:
+          "Logged and upcoming client calls with notes and outcomes across BD and training accounts.",
+      },
       { property: "og:title", content: "Call Logs — Zodiac HR Consultants" },
-      { property: "og:description", content: "Logged and upcoming client calls with notes and outcomes across BD and training accounts." },
+      {
+        property: "og:description",
+        content:
+          "Logged and upcoming client calls with notes and outcomes across BD and training accounts.",
+      },
     ],
   }),
   component: CallsPage,
@@ -16,10 +24,9 @@ export const Route = createFileRoute("/calls")({
 
 function CallsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <CallLogsPanel />
       <ActivityModule type="Call" title="Calls" createLabel="Log Call" />
     </div>
   );
 }
-

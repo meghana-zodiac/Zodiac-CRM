@@ -171,67 +171,116 @@ function DealsPage() {
         {deals.isLoading ? (
           <EmptyState message="Loading proposals…" />
         ) : view === "list" ? (
-          <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel">
-            <table className="w-full min-w-[820px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5">Proposal</th>
-                  <th className="px-3 py-2.5">Client</th>
-                  <th className="px-3 py-2.5">Service line</th>
-                  <th className="px-3 py-2.5">Contact</th>
-                  <th className="px-3 py-2.5">Amount</th>
-                  <th className="px-3 py-2.5">Stage</th>
-                  <th className="px-3 py-2.5">Closing date</th>
-                  <th className="px-3 py-2.5">Owner</th>
-                  <th className="w-12 px-3 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((deal) => (
-                  <tr key={deal.id} className="cursor-pointer transition-colors hover:bg-muted/40">
-                    <td
-                      className="px-3 py-2.5 font-medium text-foreground"
+          <>
+            <div className="space-y-2.5 md:hidden">
+              {rows.map((deal) => (
+                <article
+                  key={deal.id}
+                  className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
                       onClick={() => setOpenDeal(deal)}
+                      className="min-w-0 flex-1 text-left"
                     >
-                      {deal.deal_name}
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {deal.accounts?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {deal.service_line ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {deal.contacts
-                        ? fullName(deal.contacts.first_name, deal.contacts.last_name)
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums text-foreground">
-                      {currency(deal.amount)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {formatDate(deal.closing_date)}
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{deal.owner_name ?? "—"}</td>
-                    <td className="px-3 py-2.5">
-                      <RowActions
-                        table="deals"
-                        id={deal.id}
-                        label="Proposal"
-                        onEdit={() => {
-                          setEditing(deal);
-                          setDialogOpen(true);
-                        }}
-                      />
-                    </td>
+                      <p className="truncate text-[15px] font-semibold text-foreground">
+                        {deal.deal_name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {deal.accounts?.name ?? "No client"}
+                      </p>
+                    </button>
+                    <RowActions
+                      table="deals"
+                      id={deal.id}
+                      label="Proposal"
+                      onEdit={() => {
+                        setEditing(deal);
+                        setDialogOpen(true);
+                      }}
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
+                    <span className="font-semibold tabular-nums">{currency(deal.amount)}</span>
+                  </div>
+                  <p className="mt-2 truncate text-xs text-muted-foreground">
+                    {deal.service_line ?? "No service line"} · closes{" "}
+                    {formatDate(deal.closing_date)}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <div className="crm-table-scroll hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel md:block">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className="px-3 py-2.5">Proposal</th>
+                    <th className="px-3 py-2.5">Client</th>
+                    <th className="px-3 py-2.5">Service line</th>
+                    <th className="px-3 py-2.5">Contact</th>
+                    <th className="px-3 py-2.5">Amount</th>
+                    <th className="px-3 py-2.5">Stage</th>
+                    <th className="px-3 py-2.5">Closing date</th>
+                    <th className="px-3 py-2.5">Owner</th>
+                    <th className="w-12 px-3 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((deal) => (
+                    <tr
+                      key={deal.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                    >
+                      <td
+                        className="px-3 py-2.5 font-medium text-foreground"
+                        onClick={() => setOpenDeal(deal)}
+                      >
+                        {deal.deal_name}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {deal.accounts?.name ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {deal.service_line ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {deal.contacts
+                          ? fullName(deal.contacts.first_name, deal.contacts.last_name)
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 tabular-nums text-foreground">
+                        {currency(deal.amount)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusPill tone={bdTone(deal.stage)}>
+                          {bdStageLabel(deal.stage)}
+                        </StatusPill>
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {formatDate(deal.closing_date)}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {deal.owner_name ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <RowActions
+                          table="deals"
+                          id={deal.id}
+                          label="Proposal"
+                          onEdit={() => {
+                            setEditing(deal);
+                            setDialogOpen(true);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div
             ref={boardRef}
@@ -258,7 +307,7 @@ function DealsPage() {
                     setDragStage(null);
                   }}
                   className={cn(
-                    "flex w-72 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150",
+                    "flex w-[85vw] max-w-sm shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150 sm:w-72",
                     dragId &&
                       dragStage === stage &&
                       "border-brand-accent bg-brand-accent/5 ring-2 ring-brand-accent/20",

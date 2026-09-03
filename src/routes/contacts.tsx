@@ -99,7 +99,7 @@ function ContactsPage() {
             availableViews={["list", "tile"]}
             onToggleFilters={() => setShowFilters((prev) => !prev)}
             action={
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                   <FileSpreadsheet className="size-4" /> Import Excel
                 </Button>
@@ -191,83 +191,124 @@ function ContactsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel">
-                  <table className="w-full min-w-[820px] text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <th className="w-10 px-3 py-2.5">
-                          <Checkbox
-                            checked={selected.length > 0 && selected.length === rows.length}
-                            onCheckedChange={(checked) =>
-                              setSelected(checked ? rows.map((row) => row.id) : [])
-                            }
-                            aria-label="Select all"
-                          />
-                        </th>
-                        <th className="px-3 py-2.5">Contact name</th>
-                        <th className="px-3 py-2.5">Account name</th>
-                        <th className="px-3 py-2.5">Email</th>
-                        <th className="px-3 py-2.5">Phone</th>
-                        <th className="px-3 py-2.5">Owner</th>
-                        <th className="px-3 py-2.5">Last activity</th>
-                        <th className="w-12 px-3 py-2.5" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {rows.map((contact) => (
-                        <tr key={contact.id} className="transition-colors hover:bg-muted/40">
-                          <td className="px-3 py-2.5">
-                            <Checkbox
-                              checked={selected.includes(contact.id)}
-                              onCheckedChange={(checked) =>
-                                setSelected((prev) =>
-                                  checked
-                                    ? [...prev, contact.id]
-                                    : prev.filter((id) => id !== contact.id),
-                                )
-                              }
-                              aria-label={`Select ${contact.last_name}`}
-                            />
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className="font-medium text-foreground">
+                <>
+                  <div className="space-y-2.5 md:hidden">
+                    {rows.map((contact) => (
+                      <article
+                        key={contact.id}
+                        className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[15px] font-semibold text-foreground">
                               {fullName(contact.first_name, contact.last_name)}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {contact.title ?? "—"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {contact.accounts?.name ?? "—"}
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {contact.email ?? "—"}
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {contact.phone ?? "—"}
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {contact.owner_name ?? "—"}
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {formatDate(contact.last_activity_date)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <RowActions
-                              table="contacts"
-                              id={contact.id}
-                              label="Contact"
-                              onEdit={() => {
-                                setEditing(contact);
-                                setDialogOpen(true);
-                              }}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {contact.title ?? contact.accounts?.name ?? "No company"}
+                            </p>
+                          </div>
+                          <RowActions
+                            table="contacts"
+                            id={contact.id}
+                            label="Contact"
+                            onEdit={() => {
+                              setEditing(contact);
+                              setDialogOpen(true);
+                            }}
+                          />
+                        </div>
+                        <div className="mt-3 space-y-1.5 text-sm">
+                          <p className="truncate text-foreground/80">
+                            {contact.email ?? "No email"}
+                          </p>
+                          <p className="truncate text-foreground/80">
+                            {contact.phone ?? "No phone"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Last activity: {formatDate(contact.last_activity_date)}
+                          </p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="crm-table-scroll hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel md:block">
+                    <table className="w-full min-w-[820px] text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <th className="w-10 px-3 py-2.5">
+                            <Checkbox
+                              checked={selected.length > 0 && selected.length === rows.length}
+                              onCheckedChange={(checked) =>
+                                setSelected(checked ? rows.map((row) => row.id) : [])
+                              }
+                              aria-label="Select all"
                             />
-                          </td>
+                          </th>
+                          <th className="px-3 py-2.5">Contact name</th>
+                          <th className="px-3 py-2.5">Account name</th>
+                          <th className="px-3 py-2.5">Email</th>
+                          <th className="px-3 py-2.5">Phone</th>
+                          <th className="px-3 py-2.5">Owner</th>
+                          <th className="px-3 py-2.5">Last activity</th>
+                          <th className="w-12 px-3 py-2.5" />
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {rows.map((contact) => (
+                          <tr key={contact.id} className="transition-colors hover:bg-muted/40">
+                            <td className="px-3 py-2.5">
+                              <Checkbox
+                                checked={selected.includes(contact.id)}
+                                onCheckedChange={(checked) =>
+                                  setSelected((prev) =>
+                                    checked
+                                      ? [...prev, contact.id]
+                                      : prev.filter((id) => id !== contact.id),
+                                  )
+                                }
+                                aria-label={`Select ${contact.last_name}`}
+                              />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className="font-medium text-foreground">
+                                {fullName(contact.first_name, contact.last_name)}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">
+                                {contact.title ?? "—"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">
+                              {contact.accounts?.name ?? "—"}
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">
+                              {contact.email ?? "—"}
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">
+                              {contact.phone ?? "—"}
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">
+                              {contact.owner_name ?? "—"}
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">
+                              {formatDate(contact.last_activity_date)}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <RowActions
+                                table="contacts"
+                                id={contact.id}
+                                label="Contact"
+                                onEdit={() => {
+                                  setEditing(contact);
+                                  setDialogOpen(true);
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>

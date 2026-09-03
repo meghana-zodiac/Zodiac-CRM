@@ -118,66 +118,120 @@ function TrainingRequestsPage() {
         {requests.isLoading ? (
           <EmptyState message="Loading training requests…" />
         ) : view === "list" ? (
-          <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel">
-            <table className="w-full min-w-[1200px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5">Client</th>
-                  <th className="px-3 py-2.5">Training type</th>
-                  <th className="px-3 py-2.5">Course / topic</th>
-                  <th className="px-3 py-2.5">Trainer</th>
-                  <th className="px-3 py-2.5">Participants</th>
-                  <th className="px-3 py-2.5">Schedule</th>
-                  <th className="px-3 py-2.5">Budget</th>
-                  <th className="px-3 py-2.5">Pipeline stage</th>
-                  <th className="px-3 py-2.5">Owner</th>
-                  <th className="w-12 px-3 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((row) => (
-                  <tr key={row.id} className="transition-colors hover:bg-muted/40">
-                    <td className="px-3 py-2.5 font-medium text-foreground">
-                      {row.accounts?.name ?? row.client_name ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <StatusPill tone={trainingTypeTone(row.training_type)}>
-                        {row.training_type}
-                      </StatusPill>
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{row.course_topic}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {row.trainers?.full_name ?? "Unassigned"}
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                      {row.participants ?? 0}
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
-                      {formatDate(row.start_date)} → {formatDate(row.end_date)}
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums text-foreground">
-                      {currency(row.budget)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <StatusPill tone={trainingTone(row.status)}>{row.status}</StatusPill>
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{row.owner_name ?? "—"}</td>
-                    <td className="px-3 py-2.5">
-                      <RowActions
-                        table="training_requests"
-                        id={row.id}
-                        label="Training Request"
-                        onEdit={() => {
-                          setEditing(row);
-                          setDialogOpen(true);
-                        }}
-                      />
-                    </td>
+          <>
+            <div className="space-y-2.5 md:hidden">
+              {rows.map((row) => (
+                <article
+                  key={row.id}
+                  className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold text-foreground">
+                        {row.course_topic}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {row.accounts?.name ?? row.client_name ?? "No client"}
+                      </p>
+                    </div>
+                    <RowActions
+                      table="training_requests"
+                      id={row.id}
+                      label="Training Request"
+                      onEdit={() => {
+                        setEditing(row);
+                        setDialogOpen(true);
+                      }}
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <StatusPill tone={trainingTone(row.status)}>{row.status}</StatusPill>
+                    <StatusPill tone={trainingTypeTone(row.training_type)}>
+                      {row.training_type}
+                    </StatusPill>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Schedule</dt>
+                      <dd className="mt-0.5">{formatDate(row.start_date)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Budget</dt>
+                      <dd className="mt-0.5 font-semibold">{currency(row.budget)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Trainer</dt>
+                      <dd className="mt-0.5 truncate">{row.trainers?.full_name ?? "Unassigned"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Participants</dt>
+                      <dd className="mt-0.5">{row.participants ?? 0}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+            <div className="crm-table-scroll hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel md:block">
+              <table className="w-full min-w-[1200px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className="px-3 py-2.5">Client</th>
+                    <th className="px-3 py-2.5">Training type</th>
+                    <th className="px-3 py-2.5">Course / topic</th>
+                    <th className="px-3 py-2.5">Trainer</th>
+                    <th className="px-3 py-2.5">Participants</th>
+                    <th className="px-3 py-2.5">Schedule</th>
+                    <th className="px-3 py-2.5">Budget</th>
+                    <th className="px-3 py-2.5">Pipeline stage</th>
+                    <th className="px-3 py-2.5">Owner</th>
+                    <th className="w-12 px-3 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((row) => (
+                    <tr key={row.id} className="transition-colors hover:bg-muted/40">
+                      <td className="px-3 py-2.5 font-medium text-foreground">
+                        {row.accounts?.name ?? row.client_name ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusPill tone={trainingTypeTone(row.training_type)}>
+                          {row.training_type}
+                        </StatusPill>
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{row.course_topic}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {row.trainers?.full_name ?? "Unassigned"}
+                      </td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+                        {row.participants ?? 0}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {formatDate(row.start_date)} → {formatDate(row.end_date)}
+                      </td>
+                      <td className="px-3 py-2.5 tabular-nums text-foreground">
+                        {currency(row.budget)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusPill tone={trainingTone(row.status)}>{row.status}</StatusPill>
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{row.owner_name ?? "—"}</td>
+                      <td className="px-3 py-2.5">
+                        <RowActions
+                          table="training_requests"
+                          id={row.id}
+                          label="Training Request"
+                          onEdit={() => {
+                            setEditing(row);
+                            setDialogOpen(true);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
             {TRAINING_STATUSES.map((status) => {
@@ -194,7 +248,7 @@ function TrainingRequestsPage() {
                     if (dragId) moveStage.mutate({ id: dragId, status });
                     setDragId(null);
                   }}
-                  className="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-surface shadow-panel"
+                  className="flex w-[85vw] max-w-sm shrink-0 flex-col rounded-lg border border-border bg-surface shadow-panel sm:w-72"
                 >
                   <div className="border-b border-border px-3 py-2.5">
                     <div className="flex items-center justify-between">

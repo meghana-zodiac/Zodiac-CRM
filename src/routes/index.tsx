@@ -179,7 +179,7 @@ function HomePage() {
       </div>
 
       <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">
             BD team split — Nuzhat vs Edward
           </h2>
@@ -231,7 +231,7 @@ function HomePage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">
               Staffing & consulting SLA pipeline
             </h2>
@@ -264,7 +264,7 @@ function HomePage() {
         </section>
 
         <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">L&D training pipeline</h2>
             <Link
               to="/training-requests"

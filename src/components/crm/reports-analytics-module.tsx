@@ -727,58 +727,108 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               }
             >
               {data.team.length ? (
-                <div className="crm-table-scroll overflow-x-auto overscroll-x-contain">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="bg-muted/45 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        <th className="px-4 py-3">BD member</th>
-                        <th className="px-3 py-3 text-right">Leads</th>
-                        <th className="px-3 py-3 text-right">Calls</th>
-                        <th className="px-3 py-3 text-right">Meetings</th>
-                        <th className="px-3 py-3 text-right">Proposals</th>
-                        <th className="px-3 py-3 text-right">Won</th>
-                        <th className="px-3 py-3 text-right">Pipeline</th>
-                        <th className="px-4 py-3 text-right">Revenue / Target</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {data.team.map((row) => {
-                        const achievement = row.target
-                          ? Math.round((row.revenue / row.target) * 100)
-                          : 0;
-                        return (
-                          <tr key={row.name} className="hover:bg-muted/30">
-                            <td className="px-4 py-3 font-medium text-foreground">{row.name}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{row.leads}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{row.calls}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{row.meetings}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{row.proposals}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{row.won}</td>
-                            <td className="px-3 py-3 text-right font-medium tabular-nums">
+                <>
+                  <div className="space-y-2.5 p-3 md:hidden">
+                    {data.team.map((row) => {
+                      const achievement = row.target
+                        ? Math.round((row.revenue / row.target) * 100)
+                        : 0;
+                      return (
+                        <article
+                          key={row.name}
+                          className="rounded-xl border border-border bg-background p-3.5"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-semibold">{row.name}</p>
+                            <span className="text-sm font-semibold text-primary">
                               {currency(row.pipeline)}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="ml-auto w-40">
-                                <div className="flex justify-between text-xs">
-                                  <span>{currency(row.revenue)}</span>
-                                  <span className="text-muted-foreground">
-                                    {row.target ? `${achievement}%` : "No target"}
-                                  </span>
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                            <div className="rounded-lg bg-muted/50 p-2">
+                              <dt className="text-[10px] uppercase text-muted-foreground">Leads</dt>
+                              <dd className="font-semibold">{row.leads}</dd>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-2">
+                              <dt className="text-[10px] uppercase text-muted-foreground">Calls</dt>
+                              <dd className="font-semibold">{row.calls}</dd>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-2">
+                              <dt className="text-[10px] uppercase text-muted-foreground">
+                                Proposals
+                              </dt>
+                              <dd className="font-semibold">{row.proposals}</dd>
+                            </div>
+                          </dl>
+                          <div className="mt-3 flex justify-between text-xs">
+                            <span>{currency(row.revenue)} revenue</span>
+                            <span className="text-muted-foreground">
+                              {row.target ? `${achievement}% of target` : "No target"}
+                            </span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-brand-gradient"
+                              style={{ width: `${Math.min(achievement, 100)}%` }}
+                            />
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <div className="crm-table-scroll hidden overflow-x-auto overscroll-x-contain md:block">
+                    <table className="w-full min-w-[900px] text-sm">
+                      <thead>
+                        <tr className="bg-muted/45 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <th className="px-4 py-3">BD member</th>
+                          <th className="px-3 py-3 text-right">Leads</th>
+                          <th className="px-3 py-3 text-right">Calls</th>
+                          <th className="px-3 py-3 text-right">Meetings</th>
+                          <th className="px-3 py-3 text-right">Proposals</th>
+                          <th className="px-3 py-3 text-right">Won</th>
+                          <th className="px-3 py-3 text-right">Pipeline</th>
+                          <th className="px-4 py-3 text-right">Revenue / Target</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {data.team.map((row) => {
+                          const achievement = row.target
+                            ? Math.round((row.revenue / row.target) * 100)
+                            : 0;
+                          return (
+                            <tr key={row.name} className="hover:bg-muted/30">
+                              <td className="px-4 py-3 font-medium text-foreground">{row.name}</td>
+                              <td className="px-3 py-3 text-right tabular-nums">{row.leads}</td>
+                              <td className="px-3 py-3 text-right tabular-nums">{row.calls}</td>
+                              <td className="px-3 py-3 text-right tabular-nums">{row.meetings}</td>
+                              <td className="px-3 py-3 text-right tabular-nums">{row.proposals}</td>
+                              <td className="px-3 py-3 text-right tabular-nums">{row.won}</td>
+                              <td className="px-3 py-3 text-right font-medium tabular-nums">
+                                {currency(row.pipeline)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="ml-auto w-40">
+                                  <div className="flex justify-between text-xs">
+                                    <span>{currency(row.revenue)}</span>
+                                    <span className="text-muted-foreground">
+                                      {row.target ? `${achievement}%` : "No target"}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full rounded-full bg-brand-gradient"
+                                      style={{ width: `${Math.min(achievement, 100)}%` }}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                                  <div
-                                    className="h-full rounded-full bg-brand-gradient"
-                                    style={{ width: `${Math.min(achievement, 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               ) : (
                 <p className="px-5 py-10 text-center text-sm text-muted-foreground">
                   No team activity is available for this period.

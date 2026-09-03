@@ -970,6 +970,9 @@ export function PoaModule() {
         onValueChange={changeSection}
         className="flex min-h-0 flex-1 flex-col p-3 sm:p-6"
       >
+        <p className="mb-2 text-[11px] text-muted-foreground sm:hidden">
+          Swipe tables sideways to view and edit every column.
+        </p>
         <TabsList className="mb-4 flex h-auto w-full justify-start overflow-x-auto p-1 sm:w-fit">
           <TabsTrigger value="daily">Daily POA</TabsTrigger>
           <TabsTrigger value="individual">Individual Summary</TabsTrigger>

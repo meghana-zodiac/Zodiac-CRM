@@ -74,7 +74,7 @@ export function ActivityModule({
         onSearchChange={setSearch}
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <OwnerFilter value={ownerFilter} onChange={setOwnerFilter} />
             <OwnerFilter
               label="Logging as"
@@ -110,7 +110,11 @@ export function ActivityModule({
           ]}
         />
 
-        <div className={showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"}>
+        <div
+          className={
+            showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"
+          }
+        >
           {activities.isLoading ? (
             <EmptyState message="Loading activities…" />
           ) : rows.length === 0 ? (
@@ -122,7 +126,7 @@ export function ActivityModule({
                 return (
                   <li
                     key={activity.id}
-                    className="flex items-start gap-3 rounded-lg border border-border bg-surface p-3.5 shadow-panel"
+                    className="flex items-start gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-panel sm:gap-3 sm:p-3.5"
                   >
                     <Checkbox
                       className="mt-0.5"
@@ -146,7 +150,9 @@ export function ActivityModule({
                         >
                           {activity.title}
                         </p>
-                        <StatusPill tone={activityTone(activity.status)}>{activity.status}</StatusPill>
+                        <StatusPill tone={activityTone(activity.status)}>
+                          {activity.status}
+                        </StatusPill>
                         {activity.status !== "Completed" ? (
                           <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
                         ) : null}
