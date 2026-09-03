@@ -1,7 +1,18 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { FileSpreadsheet, Plus } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  FileSpreadsheet,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Pencil,
+  Phone,
+  Plus,
+  UserRound,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +31,13 @@ import { contactFields } from "@/components/crm/field-defs";
 import { teamMembers } from "@/components/crm/nav-data";
 import type { ContactWithAccount } from "@/lib/crm";
 import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/contacts")({
   head: () => ({
@@ -54,6 +72,7 @@ function ContactsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
+  const [openContact, setOpenContact] = useState<ContactWithAccount | null>(null);
 
   const all = useMemo(() => contacts.data ?? [], [contacts.data]);
 
@@ -79,6 +98,12 @@ function ContactsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (contact: ContactWithAccount) => {
+    setOpenContact(null);
+    setEditing(contact);
     setDialogOpen(true);
   };
 
@@ -196,37 +221,71 @@ function ContactsPage() {
                     {rows.map((contact) => (
                       <article
                         key={contact.id}
-                        className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                        className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-[15px] font-semibold text-foreground">
-                              {fullName(contact.first_name, contact.last_name)}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {contact.title ?? contact.accounts?.name ?? "No company"}
-                            </p>
+                        <div className="flex items-start gap-3 p-3.5">
+                          <button
+                            type="button"
+                            onClick={() => setOpenContact(contact)}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          >
+                            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-fuchsia-600 text-sm font-bold text-primary-foreground shadow-sm">
+                              {(
+                                contact.first_name?.[0] ??
+                                contact.last_name?.[0] ??
+                                "?"
+                              ).toUpperCase()}
+                              {contact.first_name && contact.last_name
+                                ? contact.last_name[0]?.toUpperCase()
+                                : ""}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-[15px] font-semibold text-foreground">
+                                {fullName(contact.first_name, contact.last_name)}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {contact.title ?? "No designation"}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                {contact.accounts?.name ?? "No company linked"}
+                              </span>
+                            </span>
+                          </button>
+                          <div onClick={(event) => event.stopPropagation()}>
+                            <RowActions
+                              table="contacts"
+                              id={contact.id}
+                              label="Contact"
+                              onEdit={() => openEdit(contact)}
+                            />
                           </div>
-                          <RowActions
-                            table="contacts"
-                            id={contact.id}
-                            label="Contact"
-                            onEdit={() => {
-                              setEditing(contact);
-                              setDialogOpen(true);
-                            }}
-                          />
                         </div>
-                        <div className="mt-3 space-y-1.5 text-sm">
-                          <p className="truncate text-foreground/80">
-                            {contact.email ?? "No email"}
-                          </p>
-                          <p className="truncate text-foreground/80">
-                            {contact.phone ?? "No phone"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Last activity: {formatDate(contact.last_activity_date)}
-                          </p>
+                        <div className="grid grid-cols-4 border-t border-border bg-muted/20">
+                          <ContactAction
+                            href={contact.phone ? `tel:${contact.phone}` : null}
+                            label="Call"
+                            icon={Phone}
+                          />
+                          <ContactAction
+                            href={
+                              contact.phone
+                                ? `https://wa.me/${contact.phone.replace(/\D/g, "")}`
+                                : null
+                            }
+                            label="WhatsApp"
+                            icon={MessageCircle}
+                            external
+                          />
+                          <ContactAction
+                            href={contact.phone ? `sms:${contact.phone}` : null}
+                            label="SMS"
+                            icon={MessageCircle}
+                          />
+                          <ContactAction
+                            href={contact.email ? `mailto:${contact.email}` : null}
+                            label="Email"
+                            icon={Mail}
+                          />
                         </div>
                       </article>
                     ))}
@@ -329,6 +388,161 @@ function ContactsPage() {
         contacts={all}
         accounts={accounts.data ?? []}
       />
+      <Sheet open={Boolean(openContact)} onOpenChange={(open) => !open && setOpenContact(null)}>
+        <SheetContent
+          side="right"
+          className="w-full overflow-y-auto border-0 p-0 sm:max-w-md md:hidden"
+        >
+          {openContact ? (
+            <>
+              <div className="bg-gradient-to-br from-slate-950 via-violet-950 to-fuchsia-900 px-5 pb-6 pt-12 text-white">
+                <SheetHeader className="items-center text-center">
+                  <span className="flex size-20 items-center justify-center rounded-full border border-white/20 bg-white/15 text-2xl font-bold shadow-xl backdrop-blur">
+                    {(
+                      openContact.first_name?.[0] ??
+                      openContact.last_name?.[0] ??
+                      "?"
+                    ).toUpperCase()}
+                    {openContact.first_name && openContact.last_name
+                      ? openContact.last_name[0]?.toUpperCase()
+                      : ""}
+                  </span>
+                  <SheetTitle className="mt-3 text-xl text-white">
+                    {fullName(openContact.first_name, openContact.last_name)}
+                  </SheetTitle>
+                  <SheetDescription className="text-white/70">
+                    {[openContact.title, openContact.accounts?.name].filter(Boolean).join(" · ") ||
+                      "Client contact"}
+                  </SheetDescription>
+                </SheetHeader>
+              </div>
+
+              <div className="grid grid-cols-5 border-b border-border bg-background px-2 py-2">
+                <ContactAction
+                  href={openContact.phone ? `tel:${openContact.phone}` : null}
+                  label="Call"
+                  icon={Phone}
+                />
+                <ContactAction
+                  href={openContact.phone ? `sms:${openContact.phone}` : null}
+                  label="SMS"
+                  icon={MessageCircle}
+                />
+                <ContactAction
+                  href={openContact.email ? `mailto:${openContact.email}` : null}
+                  label="Email"
+                  icon={Mail}
+                />
+                <ContactAction
+                  href={
+                    openContact.phone
+                      ? `https://wa.me/${openContact.phone.replace(/\D/g, "")}`
+                      : null
+                  }
+                  label="WhatsApp"
+                  icon={MessageCircle}
+                  external
+                />
+                <ContactAction
+                  href={
+                    openContact.accounts?.name
+                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(openContact.accounts.name)}`
+                      : null
+                  }
+                  label="Map"
+                  icon={MapPin}
+                  external
+                />
+              </div>
+
+              <div className="space-y-4 p-4">
+                <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel">
+                  <ContactDetail icon={Phone} label="Phone" value={openContact.phone} />
+                  <ContactDetail icon={Mail} label="Email" value={openContact.email} />
+                  <ContactDetail
+                    icon={Building2}
+                    label="Company"
+                    value={openContact.accounts?.name}
+                  />
+                  <ContactDetail
+                    icon={UserRound}
+                    label="Department"
+                    value={openContact.department}
+                  />
+                  <ContactDetail icon={UserRound} label="Owner" value={openContact.owner_name} />
+                  <ContactDetail
+                    icon={CalendarDays}
+                    label="Last activity"
+                    value={formatDate(openContact.last_activity_date)}
+                    last
+                  />
+                </section>
+
+                <Button className="w-full" onClick={() => openEdit(openContact)}>
+                  <Pencil className="size-4" /> Edit contact
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function ContactAction({
+  href,
+  label,
+  icon: Icon,
+  external = false,
+}: {
+  href: string | null;
+  label: string;
+  icon: typeof Phone;
+  external?: boolean;
+}) {
+  const className = `flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[10px] font-medium ${
+    href ? "text-primary" : "pointer-events-none text-muted-foreground/40"
+  }`;
+  return href ? (
+    <a
+      href={href}
+      className={className}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      aria-label={label}
+    >
+      <Icon className="size-[18px]" />
+      <span className="max-w-full truncate">{label}</span>
+    </a>
+  ) : (
+    <span className={className} aria-disabled="true">
+      <Icon className="size-[18px]" />
+      <span className="max-w-full truncate">{label}</span>
+    </span>
+  );
+}
+
+function ContactDetail({
+  icon: Icon,
+  label,
+  value,
+  last = false,
+}: {
+  icon: typeof Phone;
+  label: string;
+  value?: string | null;
+  last?: boolean;
+}) {
+  return (
+    <div className={`flex gap-3 px-4 py-3.5 ${last ? "" : "border-b border-border"}`}>
+      <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-0.5 break-words text-sm text-foreground">{value || "Not available"}</p>
+      </div>
     </div>
   );
 }
