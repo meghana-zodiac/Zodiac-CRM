@@ -72,6 +72,7 @@ function DealsPage() {
   const [openDeal, setOpenDeal] = useState<DealWithRefs | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragStage, setDragStage] = useState<BdStage | null>(null);
+  const [mobileStage, setMobileStage] = useState<BdStage>(BD_STAGES[0]);
   const [note, setNote] = useState("");
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -282,116 +283,212 @@ function DealsPage() {
             </div>
           </>
         ) : (
-          <div
-            ref={boardRef}
-            onDragOver={handleBoardDragOver}
-            className="flex min-w-0 scroll-smooth gap-3 overflow-x-auto pb-2 scrollbar-thin lg:grid lg:grid-cols-2 lg:items-start lg:overflow-x-visible xl:grid-cols-4 2xl:grid-cols-5"
-          >
-            {BD_STAGES.map((stage) => {
-              const stageDeals = rows.filter((deal) => deal.stage === stage);
-              const total = stageDeals.reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
-              return (
-                <div
-                  key={stage}
-                  onDragEnter={() => dragId && setDragStage(stage)}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const movingDeal = rows.find((deal) => deal.id === dragId);
-                    if (dragId && movingDeal?.stage !== stage)
-                      moveStage.mutate({ id: dragId, stage });
-                    setDragId(null);
-                    setDragStage(null);
-                  }}
-                  className={cn(
-                    "flex w-[85vw] max-w-sm shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150 sm:w-72 lg:w-auto lg:max-w-none lg:min-w-0",
-                    dragId &&
-                      dragStage === stage &&
-                      "border-brand-accent bg-brand-accent/5 ring-2 ring-brand-accent/20",
-                  )}
-                >
-                  <div className="border-b border-border px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">{bdStageLabel(stage)}</p>
-                      <span className="text-xs text-muted-foreground">{stageDeals.length}</span>
-                    </div>
-                    <p className="mt-0.5 text-xs font-semibold tabular-nums text-brand-accent">
-                      {currency(total)}
-                    </p>
-                  </div>
-                  <div className="flex-1 space-y-2 p-2">
-                    {stageDeals.map((deal) => (
-                      <div
-                        key={deal.id}
-                        draggable
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", deal.id);
-                          setDragId(deal.id);
-                          setDragStage(deal.stage as BdStage);
-                        }}
-                        onDragEnd={() => {
-                          setDragId(null);
-                          setDragStage(null);
-                        }}
-                        onClick={() => setOpenDeal(deal)}
-                        className={cn(
-                          "group cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-accent/50 hover:shadow-card-hover active:cursor-grabbing",
-                          dragId === deal.id && "scale-[0.98] opacity-40 shadow-none",
-                        )}
-                      >
-                        <div className="flex items-start gap-1.5">
-                          <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-accent" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">
-                              {deal.deal_name}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {deal.accounts?.name ?? "No account"}
-                            </p>
-                          </div>
-                          <div
-                            draggable={false}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <RowActions
-                              table="deals"
-                              id={deal.id}
-                              label="Proposal"
-                              onEdit={() => {
-                                setEditing(deal);
-                                setDialogOpen(true);
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <p className="mt-2 truncate text-xs text-muted-foreground">
-                          {deal.service_line ?? "—"}
-                        </p>
-                        <div className="mt-2 flex items-center justify-between text-xs">
-                          <span className="font-semibold tabular-nums text-foreground">
-                            {currency(deal.amount)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {formatDate(deal.closing_date)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                    {stageDeals.length === 0 ? (
-                      <p className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
-                        Drop proposals here
-                      </p>
-                    ) : null}
-                  </div>
+          <>
+            <div className="space-y-3 md:hidden">
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none">
+                {BD_STAGES.map((stage) => {
+                  const stageDeals = rows.filter((deal) => deal.stage === stage);
+                  return (
+                    <button
+                      key={stage}
+                      type="button"
+                      onClick={() => setMobileStage(stage)}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition-colors",
+                        mobileStage === stage
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border bg-surface text-muted-foreground",
+                      )}
+                    >
+                      {bdStageLabel(stage)}
+                      <span className="ml-1.5 opacity-75">{stageDeals.length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-end justify-between rounded-xl border border-border bg-surface px-4 py-3 shadow-panel">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Selected stage</p>
+                  <p className="mt-0.5 text-base font-semibold text-foreground">
+                    {bdStageLabel(mobileStage)}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+                <p className="text-sm font-semibold tabular-nums text-brand-accent">
+                  {currency(
+                    rows
+                      .filter((deal) => deal.stage === mobileStage)
+                      .reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0),
+                  )}
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {rows
+                  .filter((deal) => deal.stage === mobileStage)
+                  .map((deal) => (
+                    <article
+                      key={deal.id}
+                      className="rounded-xl border border-border bg-card p-3.5 shadow-card"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpenDeal(deal)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate text-[15px] font-semibold text-foreground">
+                            {deal.deal_name}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {deal.accounts?.name ?? "No client"}
+                          </p>
+                        </button>
+                        <RowActions
+                          table="deals"
+                          id={deal.id}
+                          label="Proposal"
+                          onEdit={() => {
+                            setEditing(deal);
+                            setDialogOpen(true);
+                          }}
+                        />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <StatusPill tone={bdTone(deal.stage)}>
+                          {bdStageLabel(deal.stage)}
+                        </StatusPill>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {currency(deal.amount)}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate">
+                          {deal.service_line ?? "No service line"}
+                        </span>
+                        <span className="shrink-0">{formatDate(deal.closing_date)}</span>
+                      </div>
+                    </article>
+                  ))}
+                {rows.filter((deal) => deal.stage === mobileStage).length === 0 ? (
+                  <EmptyState message="No proposals in this stage." />
+                ) : null}
+              </div>
+            </div>
+
+            <div
+              ref={boardRef}
+              onDragOver={handleBoardDragOver}
+              className="hidden scroll-smooth gap-3 overflow-x-auto pb-2 scrollbar-thin md:flex"
+            >
+              {BD_STAGES.map((stage) => {
+                const stageDeals = rows.filter((deal) => deal.stage === stage);
+                const total = stageDeals.reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
+                return (
+                  <div
+                    key={stage}
+                    onDragEnter={() => dragId && setDragStage(stage)}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const movingDeal = rows.find((deal) => deal.id === dragId);
+                      if (dragId && movingDeal?.stage !== stage)
+                        moveStage.mutate({ id: dragId, stage });
+                      setDragId(null);
+                      setDragStage(null);
+                    }}
+                    className={cn(
+                      "flex w-72 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-card transition-all duration-150",
+                      dragId &&
+                        dragStage === stage &&
+                        "border-brand-accent bg-brand-accent/5 ring-2 ring-brand-accent/20",
+                    )}
+                  >
+                    <div className="border-b border-border px-3 py-2.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-foreground">
+                          {bdStageLabel(stage)}
+                        </p>
+                        <span className="text-xs text-muted-foreground">{stageDeals.length}</span>
+                      </div>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-brand-accent">
+                        {currency(total)}
+                      </p>
+                    </div>
+                    <div className="flex-1 space-y-2 p-2">
+                      {stageDeals.map((deal) => (
+                        <div
+                          key={deal.id}
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", deal.id);
+                            setDragId(deal.id);
+                            setDragStage(deal.stage as BdStage);
+                          }}
+                          onDragEnd={() => {
+                            setDragId(null);
+                            setDragStage(null);
+                          }}
+                          onClick={() => setOpenDeal(deal)}
+                          className={cn(
+                            "group cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-accent/50 hover:shadow-card-hover active:cursor-grabbing",
+                            dragId === deal.id && "scale-[0.98] opacity-40 shadow-none",
+                          )}
+                        >
+                          <div className="flex items-start gap-1.5">
+                            <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-accent" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-foreground">
+                                {deal.deal_name}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {deal.accounts?.name ?? "No account"}
+                              </p>
+                            </div>
+                            <div
+                              draggable={false}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <RowActions
+                                table="deals"
+                                id={deal.id}
+                                label="Proposal"
+                                onEdit={() => {
+                                  setEditing(deal);
+                                  setDialogOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 truncate text-xs text-muted-foreground">
+                            {deal.service_line ?? "—"}
+                          </p>
+                          <div className="mt-2 flex items-center justify-between text-xs">
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {currency(deal.amount)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {formatDate(deal.closing_date)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {stageDeals.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
+                          Drop proposals here
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
