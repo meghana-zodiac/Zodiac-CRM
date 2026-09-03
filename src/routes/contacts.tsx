@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   CalendarDays,
@@ -8,11 +8,14 @@ import {
   Mail,
   MapPin,
   MessageCircle,
+  NotebookPen,
   Pencil,
   Phone,
   Plus,
+  Clock3,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,8 +29,20 @@ import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
 import { ApolloProspector } from "@/components/crm/apollo-prospector";
-import { accountsQuery, contactsQuery, formatDate, fullName } from "@/lib/crm";
-import { contactFields } from "@/components/crm/field-defs";
+import {
+  accountsQuery,
+  activitiesQuery,
+  bdStageLabel,
+  contactsQuery,
+  createRecord,
+  currency,
+  dealsQuery,
+  formatDate,
+  formatDateTime,
+  fullName,
+  type ActivityType,
+} from "@/lib/crm";
+import { activityFields, contactFields } from "@/components/crm/field-defs";
 import { teamMembers } from "@/components/crm/nav-data";
 import type { ContactWithAccount } from "@/lib/crm";
 import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
@@ -38,6 +53,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 
 export const Route = createFileRoute("/contacts")({
   head: () => ({
@@ -62,6 +79,9 @@ export const Route = createFileRoute("/contacts")({
 function ContactsPage() {
   const contacts = useQuery(contactsQuery());
   const accounts = useQuery(accountsQuery());
+  const activities = useQuery(activitiesQuery());
+  const deals = useQuery(dealsQuery());
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
   const [systemFilter, setSystemFilter] = useState("all");
@@ -73,6 +93,11 @@ function ContactsPage() {
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
   const [openContact, setOpenContact] = useState<ContactWithAccount | null>(null);
+  const [profileTab, setProfileTab] = useState<"details" | "activity" | "related">("details");
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityType, setActivityType] = useState<ActivityType>("Task");
+  const [activityTitle, setActivityTitle] = useState("Follow up");
+  const [note, setNote] = useState("");
 
   const all = useMemo(() => contacts.data ?? [], [contacts.data]);
 
@@ -105,6 +130,56 @@ function ContactsPage() {
     setOpenContact(null);
     setEditing(contact);
     setDialogOpen(true);
+  };
+
+  const openProfile = (contact: ContactWithAccount) => {
+    setProfileTab("details");
+    setOpenContact(contact);
+  };
+
+  const contactActivities = useMemo(
+    () =>
+      openContact
+        ? (activities.data ?? []).filter(
+            (activity) =>
+              activity.related_to_type === "Client Contact" &&
+              activity.related_to_id === openContact.id,
+          )
+        : [],
+    [activities.data, openContact],
+  );
+
+  const contactDeals = useMemo(
+    () =>
+      openContact ? (deals.data ?? []).filter((deal) => deal.contact_id === openContact.id) : [],
+    [deals.data, openContact],
+  );
+
+  const logNote = useMutation({
+    mutationFn: async () => {
+      if (!openContact || !note.trim()) return;
+      await createRecord("activities", {
+        title: note.trim().slice(0, 80),
+        activity_type: "Task",
+        status: "Completed",
+        notes: note.trim(),
+        related_to_type: "Client Contact",
+        related_to_id: openContact.id,
+        owner_name: openContact.owner_name,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      setNote("");
+      toast.success("Contact note added");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const scheduleActivity = (type: ActivityType, title: string) => {
+    setActivityType(type);
+    setActivityTitle(title);
+    setActivityDialogOpen(true);
   };
 
   return (
@@ -226,7 +301,7 @@ function ContactsPage() {
                         <div className="flex items-start gap-3 p-3.5">
                           <button
                             type="button"
-                            onClick={() => setOpenContact(contact)}
+                            onClick={() => openProfile(contact)}
                             className="flex min-w-0 flex-1 items-center gap-3 text-left"
                           >
                             <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-fuchsia-600 text-sm font-bold text-primary-foreground shadow-sm">
@@ -455,37 +530,211 @@ function ContactsPage() {
                 />
               </div>
 
-              <div className="space-y-4 p-4">
-                <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel">
-                  <ContactDetail icon={Phone} label="Phone" value={openContact.phone} />
-                  <ContactDetail icon={Mail} label="Email" value={openContact.email} />
-                  <ContactDetail
-                    icon={Building2}
-                    label="Company"
-                    value={openContact.accounts?.name}
-                  />
-                  <ContactDetail
-                    icon={UserRound}
-                    label="Department"
-                    value={openContact.department}
-                  />
-                  <ContactDetail icon={UserRound} label="Owner" value={openContact.owner_name} />
-                  <ContactDetail
-                    icon={CalendarDays}
-                    label="Last activity"
-                    value={formatDate(openContact.last_activity_date)}
-                    last
-                  />
-                </section>
+              <div className="sticky top-0 z-10 grid grid-cols-3 border-b border-border bg-background px-3">
+                {(["details", "activity", "related"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setProfileTab(item)}
+                    className={`border-b-2 px-2 py-3 text-xs font-semibold capitalize ${
+                      profileTab === item
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
 
-                <Button className="w-full" onClick={() => openEdit(openContact)}>
-                  <Pencil className="size-4" /> Edit contact
-                </Button>
+              <div className="space-y-4 p-4">
+                {profileTab === "details" ? (
+                  <>
+                    <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel">
+                      <ContactDetail icon={Phone} label="Phone" value={openContact.phone} />
+                      <ContactDetail icon={Mail} label="Email" value={openContact.email} />
+                      <ContactDetail
+                        icon={Building2}
+                        label="Company"
+                        value={openContact.accounts?.name}
+                      />
+                      <ContactDetail
+                        icon={UserRound}
+                        label="Department"
+                        value={openContact.department}
+                      />
+                      <ContactDetail
+                        icon={UserRound}
+                        label="Owner"
+                        value={openContact.owner_name}
+                      />
+                      <ContactDetail
+                        icon={CalendarDays}
+                        label="Last activity"
+                        value={formatDate(openContact.last_activity_date)}
+                        last
+                      />
+                    </section>
+
+                    <Button className="w-full" onClick={() => openEdit(openContact)}>
+                      <Pencil className="size-4" /> Edit contact
+                    </Button>
+                  </>
+                ) : null}
+
+                {profileTab === "activity" ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-auto flex-col gap-1.5 py-3 text-xs"
+                        onClick={() => scheduleActivity("Call", "Call follow-up")}
+                      >
+                        <Phone className="size-4 text-primary" /> Log call
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-auto flex-col gap-1.5 py-3 text-xs"
+                        onClick={() => scheduleActivity("Meeting", "Client meeting")}
+                      >
+                        <CalendarDays className="size-4 text-primary" /> Meeting
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-auto flex-col gap-1.5 py-3 text-xs"
+                        onClick={() => scheduleActivity("Task", "Follow up")}
+                      >
+                        <Clock3 className="size-4 text-primary" /> Follow-up
+                      </Button>
+                    </div>
+
+                    <section className="rounded-2xl border border-border bg-surface p-3 shadow-panel">
+                      <Textarea
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        rows={3}
+                        placeholder="Add a contact note…"
+                      />
+                      <Button
+                        size="sm"
+                        className="mt-2 w-full"
+                        disabled={!note.trim() || logNote.isPending}
+                        onClick={() => logNote.mutate()}
+                      >
+                        <NotebookPen className="size-4" /> Add note
+                      </Button>
+                    </section>
+
+                    <section className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Activity timeline
+                      </h3>
+                      {contactActivities.length ? (
+                        contactActivities.map((activity) => (
+                          <article
+                            key={activity.id}
+                            className="rounded-xl border border-border bg-surface p-3 shadow-panel"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-foreground">
+                                  {activity.title}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {activity.activity_type} · {formatDateTime(activity.due_date)}
+                                </p>
+                              </div>
+                              <StatusPill tone={activityTone(activity.status)}>
+                                {activity.status}
+                              </StatusPill>
+                            </div>
+                            {activity.notes ? (
+                              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                                {activity.notes}
+                              </p>
+                            ) : null}
+                          </article>
+                        ))
+                      ) : (
+                        <MobileEmpty message="No activity has been logged for this contact." />
+                      )}
+                    </section>
+                  </>
+                ) : null}
+
+                {profileTab === "related" ? (
+                  <>
+                    <section className="rounded-2xl border border-border bg-surface p-4 shadow-panel">
+                      <div className="flex items-center gap-3">
+                        <Building2 className="size-5 text-primary" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">Corporate client</p>
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {openContact.accounts?.name ?? "No company linked"}
+                          </p>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Proposals & SLAs ({contactDeals.length})
+                      </h3>
+                      {contactDeals.length ? (
+                        contactDeals.map((deal) => (
+                          <article
+                            key={deal.id}
+                            className="rounded-xl border border-border bg-surface p-3 shadow-panel"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-foreground">
+                                  {deal.deal_name}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {currency(deal.amount)} · Close {formatDate(deal.closing_date)}
+                                </p>
+                              </div>
+                              <StatusPill tone={bdTone(deal.stage)}>
+                                {bdStageLabel(deal.stage)}
+                              </StatusPill>
+                            </div>
+                          </article>
+                        ))
+                      ) : (
+                        <MobileEmpty message="No proposals are linked to this contact." />
+                      )}
+                    </section>
+                  </>
+                ) : null}
               </div>
             </>
           ) : null}
         </SheetContent>
       </Sheet>
+      <RecordDialog
+        open={activityDialogOpen}
+        onOpenChange={setActivityDialogOpen}
+        table="activities"
+        title={activityTitle}
+        fields={activityFields(activityType)}
+        record={{
+          title: activityTitle,
+          activity_type: activityType,
+          status: "Pending",
+          owner_name: openContact?.owner_name ?? null,
+          related_to_type: "Client Contact",
+        }}
+        fixedValues={
+          openContact
+            ? { related_to_type: "Client Contact", related_to_id: openContact.id }
+            : undefined
+        }
+        invalidateKeys={["activities"]}
+      />
     </div>
   );
 }
@@ -543,6 +792,14 @@ function ContactDetail({
         </p>
         <p className="mt-0.5 break-words text-sm text-foreground">{value || "Not available"}</p>
       </div>
+    </div>
+  );
+}
+
+function MobileEmpty({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
+      <p className="text-xs text-muted-foreground">{message}</p>
     </div>
   );
 }
