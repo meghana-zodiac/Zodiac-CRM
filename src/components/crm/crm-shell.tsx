@@ -49,6 +49,21 @@ import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/
 
 type QuickCreate = "lead" | "contact" | "deal" | null;
 
+function userInitials(name: string | undefined, email: string | undefined) {
+  const source =
+    name?.trim() ||
+    email
+      ?.split("@")[0]
+      ?.replace(/[._-]+/g, " ")
+      .trim() ||
+    "User";
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+  }
+  return source.slice(0, 2).toUpperCase();
+}
+
 const mobileNavItems = [
   { label: "Home", to: "/", icon: Home },
   { label: "Leads", to: "/leads", icon: Sparkles },
@@ -205,6 +220,7 @@ export function CrmShell({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [accessManagementOpen, setAccessManagementOpen] = useState(false);
+  const [accountInitials, setAccountInitials] = useState("—");
   const accounts = useQuery({
     ...accountsQuery(),
     enabled: quickCreate === "contact" || quickCreate === "deal",
@@ -215,6 +231,16 @@ export function CrmShell({
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem("zodiac-crm-sidebar") === "collapsed");
+    void supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      const name =
+        typeof user?.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : typeof user?.user_metadata?.name === "string"
+            ? user.user_metadata.name
+            : undefined;
+      setAccountInitials(userInitials(name, user?.email));
+    });
   }, []);
 
   const toggleSidebar = () => {
@@ -338,7 +364,7 @@ export function CrmShell({
                   aria-label="Account menu"
                 >
                   <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                    AM
+                    {accountInitials}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
