@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,6 +19,23 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   EmptyState,
   FilterPanel,
@@ -55,6 +72,41 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
+import { supabase } from "@/integrations/supabase/client";
+
+type PendingCall = {
+  contact: ContactWithAccount;
+  startedAt: number;
+  returnedAt: number | null;
+};
+
+const CALL_OUTCOMES = [
+  "Connected",
+  "Unanswered",
+  "Busy",
+  "Switched Off",
+  "Wrong Number",
+  "Call Back Later",
+] as const;
+
+const NEXT_ACTIONS = [
+  "Call Again",
+  "Send Proposal",
+  "Send Email",
+  "Schedule Meeting",
+  "Close / No Action",
+] as const;
+
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function callDetails(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
 
 export const Route = createFileRoute("/contacts")({
   head: () => ({
@@ -98,6 +150,15 @@ function ContactsPage() {
   const [activityType, setActivityType] = useState<ActivityType>("Task");
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [note, setNote] = useState("");
+  const [pendingCall, setPendingCall] = useState<PendingCall | null>(null);
+  const [callReviewOpen, setCallReviewOpen] = useState(false);
+  const [callOutcome, setCallOutcome] = useState<(typeof CALL_OUTCOMES)[number]>("Connected");
+  const [callNotes, setCallNotes] = useState("");
+  const [nextAction, setNextAction] = useState<(typeof NEXT_ACTIONS)[number]>("Call Again");
+  const [followUpAt, setFollowUpAt] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const callLeftApp = useRef(false);
+  const pendingCallRef = useRef<PendingCall | null>(null);
 
   const all = useMemo(() => contacts.data ?? [], [contacts.data]);
 
@@ -181,6 +242,113 @@ function ContactsPage() {
     setActivityTitle(title);
     setActivityDialogOpen(true);
   };
+
+  const startTrackedCall = (contact: ContactWithAccount) => {
+    callLeftApp.current = false;
+    setCallOutcome("Connected");
+    setCallNotes("");
+    setNextAction("Call Again");
+    setFollowUpAt("");
+    setPriority("Medium");
+    const call = { contact, startedAt: Date.now(), returnedAt: null };
+    pendingCallRef.current = call;
+    setPendingCall(call);
+  };
+
+  useEffect(() => {
+    const showReview = () => {
+      if (!callLeftApp.current || !pendingCallRef.current) return;
+      callLeftApp.current = false;
+      const finishedCall = {
+        ...pendingCallRef.current,
+        returnedAt: pendingCallRef.current.returnedAt ?? Date.now(),
+      };
+      pendingCallRef.current = finishedCall;
+      setPendingCall(finishedCall);
+      setCallReviewOpen(true);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") callLeftApp.current = true;
+      else showReview();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", showReview);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", showReview);
+    };
+  }, []);
+
+  const saveTrackedCall = useMutation({
+    mutationFn: async () => {
+      if (!pendingCall) return;
+      const returnedAt = pendingCall.returnedAt ?? Date.now();
+      const elapsedSeconds = Math.max(0, Math.round((returnedAt - pendingCall.startedAt) / 1000));
+      const { data } = await supabase.auth.getUser();
+      const metadata = data.user?.user_metadata;
+      const signedInName =
+        (typeof metadata?.full_name === "string" && metadata.full_name) ||
+        (typeof metadata?.name === "string" && metadata.name) ||
+        pendingCall.contact.owner_name;
+      const details = {
+        source: "CRM Mobile",
+        phone: pendingCall.contact.phone,
+        company: pendingCall.contact.accounts?.name,
+        started_at: new Date(pendingCall.startedAt).toISOString(),
+        elapsed_seconds: elapsedSeconds,
+        duration_type: "estimated_elapsed",
+        outcome: callOutcome,
+        next_action: nextAction,
+        follow_up_at: followUpAt ? new Date(followUpAt).toISOString() : null,
+        priority,
+      };
+
+      await createRecord("activities", {
+        title: `Call with ${fullName(
+          pendingCall.contact.first_name,
+          pendingCall.contact.last_name,
+        )}`,
+        activity_type: "Call",
+        status: "Completed",
+        due_date: new Date(pendingCall.startedAt).toISOString(),
+        notes: callNotes.trim() || null,
+        owner_name: signedInName || null,
+        related_to_type: "Client Contact",
+        related_to_id: pendingCall.contact.id,
+        service_details: details,
+      });
+
+      if (followUpAt) {
+        await createRecord("activities", {
+          title: `${nextAction}: ${fullName(
+            pendingCall.contact.first_name,
+            pendingCall.contact.last_name,
+          )}`,
+          activity_type: "Task",
+          status: "Pending",
+          due_date: new Date(followUpAt).toISOString(),
+          notes: callNotes.trim() || null,
+          owner_name: signedInName || null,
+          related_to_type: "Client Contact",
+          related_to_id: pendingCall.contact.id,
+          service_details: {
+            source: "Call follow-up",
+            priority,
+            originating_call_started_at: details.started_at,
+          },
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast.success(followUpAt ? "Call and follow-up saved" : "Call saved");
+      setCallReviewOpen(false);
+      pendingCallRef.current = null;
+      setPendingCall(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -340,6 +508,7 @@ function ContactsPage() {
                             href={contact.phone ? `tel:${contact.phone}` : null}
                             label="Call"
                             icon={Phone}
+                            onClick={() => startTrackedCall(contact)}
                           />
                           <ContactAction
                             href={
@@ -497,6 +666,7 @@ function ContactsPage() {
                   href={openContact.phone ? `tel:${openContact.phone}` : null}
                   label="Call"
                   icon={Phone}
+                  onClick={() => startTrackedCall(openContact)}
                 />
                 <ContactAction
                   href={openContact.phone ? `sms:${openContact.phone}` : null}
@@ -656,6 +826,9 @@ function ContactsPage() {
                                 {activity.notes}
                               </p>
                             ) : null}
+                            {activity.activity_type === "Call" ? (
+                              <CallActivityDetails details={activity.service_details} />
+                            ) : null}
                           </article>
                         ))
                       ) : (
@@ -735,6 +908,139 @@ function ContactsPage() {
         }
         invalidateKeys={["activities"]}
       />
+      <Dialog
+        open={callReviewOpen}
+        onOpenChange={(open) => {
+          setCallReviewOpen(open);
+          if (!open && !saveTrackedCall.isPending) {
+            pendingCallRef.current = null;
+            setPendingCall(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Log completed call</DialogTitle>
+            <DialogDescription>
+              Review the call with{" "}
+              {pendingCall
+                ? fullName(pendingCall.contact.first_name, pendingCall.contact.last_name)
+                : "this contact"}
+              . The elapsed time is an estimate from leaving and returning to the CRM.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingCall ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">{pendingCall.contact.phone}</p>
+              <p className="mt-1">
+                Started {formatDateTime(new Date(pendingCall.startedAt).toISOString())} · Approx.
+                elapsed{" "}
+                {formatElapsed(
+                  Math.max(
+                    0,
+                    Math.round(
+                      ((pendingCall.returnedAt ?? Date.now()) - pendingCall.startedAt) / 1000,
+                    ),
+                  ),
+                )}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label>Call outcome</Label>
+              <Select
+                value={callOutcome}
+                onValueChange={(value) => setCallOutcome(value as typeof callOutcome)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CALL_OUTCOMES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="call-notes">Discussion notes</Label>
+              <Textarea
+                id="call-notes"
+                value={callNotes}
+                onChange={(event) => setCallNotes(event.target.value)}
+                rows={3}
+                placeholder="What was discussed?"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Next action</Label>
+                <Select
+                  value={nextAction}
+                  onValueChange={(value) => setNextAction(value as typeof nextAction)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NEXT_ACTIONS.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Priority</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["High", "Medium", "Low"] as const).map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="follow-up-at">Next follow-up (optional)</Label>
+              <Input
+                id="follow-up-at"
+                type="datetime-local"
+                value={followUpAt}
+                onChange={(event) => setFollowUpAt(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCallReviewOpen(false);
+                pendingCallRef.current = null;
+                setPendingCall(null);
+              }}
+              disabled={saveTrackedCall.isPending}
+            >
+              Discard
+            </Button>
+            <Button onClick={() => saveTrackedCall.mutate()} disabled={saveTrackedCall.isPending}>
+              {saveTrackedCall.isPending ? "Saving…" : "Save call"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -744,11 +1050,13 @@ function ContactAction({
   label,
   icon: Icon,
   external = false,
+  onClick,
 }: {
   href: string | null;
   label: string;
   icon: typeof Phone;
   external?: boolean;
+  onClick?: () => void;
 }) {
   const className = `flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[10px] font-medium ${
     href ? "text-primary" : "pointer-events-none text-muted-foreground/40"
@@ -760,6 +1068,7 @@ function ContactAction({
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
       aria-label={label}
+      onClick={onClick}
     >
       <Icon className="size-[18px]" />
       <span className="max-w-full truncate">{label}</span>
@@ -769,6 +1078,31 @@ function ContactAction({
       <Icon className="size-[18px]" />
       <span className="max-w-full truncate">{label}</span>
     </span>
+  );
+}
+
+function CallActivityDetails({ details }: { details: unknown }) {
+  const values = callDetails(details);
+  if (!values) return null;
+  const elapsed = typeof values.elapsed_seconds === "number" ? values.elapsed_seconds : null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+      {typeof values.outcome === "string" ? (
+        <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+          {values.outcome}
+        </span>
+      ) : null}
+      {elapsed !== null ? (
+        <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+          Approx. {formatElapsed(elapsed)}
+        </span>
+      ) : null}
+      {typeof values.next_action === "string" ? (
+        <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+          Next: {values.next_action}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
