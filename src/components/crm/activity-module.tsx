@@ -22,6 +22,17 @@ import {
   type ActivityType,
 } from "@/lib/crm";
 
+function callDetails(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
 export function ActivityModule({
   type,
   title,
@@ -123,6 +134,7 @@ export function ActivityModule({
             <ul className="space-y-2">
               {rows.map((activity) => {
                 const badge = dueBadge(activity.due_date);
+                const details = type === "Call" ? callDetails(activity.service_details) : null;
                 return (
                   <li
                     key={activity.id}
@@ -163,6 +175,30 @@ export function ActivityModule({
                       </p>
                       {activity.notes ? (
                         <p className="mt-1.5 text-xs text-muted-foreground">{activity.notes}</p>
+                      ) : null}
+                      {details ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                          {typeof details.outcome === "string" ? (
+                            <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+                              {details.outcome}
+                            </span>
+                          ) : null}
+                          {typeof details.elapsed_seconds === "number" ? (
+                            <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+                              Approx. {formatElapsed(details.elapsed_seconds)}
+                            </span>
+                          ) : null}
+                          {typeof details.next_action === "string" ? (
+                            <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+                              Next: {details.next_action}
+                            </span>
+                          ) : null}
+                          {typeof details.priority === "string" ? (
+                            <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+                              {details.priority} priority
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                     <RowActions
