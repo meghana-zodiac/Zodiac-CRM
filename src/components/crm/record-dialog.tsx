@@ -74,6 +74,7 @@ type AddressBookContact = {
   name?: string[];
   email?: string[];
   tel?: string[];
+  organization?: string[];
 };
 
 type ContactPickerNavigator = Navigator & {
@@ -100,6 +101,7 @@ function parseVCard(text: string): AddressBookContact | null {
   let structuredName = "";
   let email = "";
   let tel = "";
+  let organization = "";
 
   for (const line of lines) {
     const separator = line.indexOf(":");
@@ -113,14 +115,16 @@ function parseVCard(text: string): AddressBookContact | null {
     }
     if (key === "EMAIL" && !email) email = value;
     if (key === "TEL" && !tel) tel = value;
+    if (key === "ORG" && !organization) organization = value.split(";")[0]?.trim() ?? "";
   }
 
   const resolvedName = name || structuredName;
-  if (!resolvedName && !email && !tel) return null;
+  if (!resolvedName && !email && !tel && !organization) return null;
   return {
     name: resolvedName ? [resolvedName] : [],
     email: email ? [email] : [],
     tel: tel ? [tel] : [],
+    organization: organization ? [organization] : [],
   };
 }
 
@@ -223,25 +227,37 @@ export function RecordDialog({
     const fullName = contact.name?.[0]?.trim() ?? "";
     const email = contact.email?.[0]?.trim() ?? "";
     const phone = contact.tel?.[0]?.trim() ?? "";
+    const organization = contact.organization?.[0]?.trim() ?? "";
 
     setValues((current) => {
       const next = { ...current };
-      if (table === "leads" && fullName) next.contact_name = fullName;
+      if (table === "leads") {
+        if (organization) next.company_name = organization;
+        if (fullName) next.contact_name = fullName;
+      }
       if (table === "contacts" && fullName) {
         const nameParts = fullName.split(/\s+/).filter(Boolean);
         next.last_name = nameParts.pop() ?? "";
         next.first_name = nameParts.join(" ");
+      }
+      if (table === "accounts" && (organization || fullName)) {
+        next.name = organization || fullName;
       }
       if (email) next.email = email.toLowerCase();
       if (phone) next.phone = phone;
       return next;
     });
 
-    const importedFields = [fullName, phone, email].filter(Boolean).length;
+    const importedFields =
+      table === "accounts"
+        ? [organization || fullName, phone].filter(Boolean).length
+        : table === "leads"
+          ? [organization, fullName, phone, email].filter(Boolean).length
+          : [fullName, phone, email].filter(Boolean).length;
     toast.success(
       importedFields
         ? `${importedFields} contact details imported. Please review before saving.`
-        : "The selected contact did not contain a name, phone number, or email.",
+        : "The selected contact did not contain a name, company, phone number, or email.",
     );
   };
 
@@ -339,7 +355,7 @@ export function RecordDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        {!record?.["id"] && (table === "contacts" || table === "leads") ? (
+        {!record?.["id"] && (table === "contacts" || table === "leads" || table === "accounts") ? (
           <section className="rounded-lg border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 sm:hidden">
             <div className="mb-2 flex items-start gap-2.5">
               <span className="rounded-lg bg-white p-2 text-violet-700 shadow-sm">
@@ -348,7 +364,11 @@ export function RecordDialog({
               <div>
                 <p className="text-sm font-semibold text-foreground">Import from address book</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Choose one contact to fill their name, phone number and email.
+                  {table === "accounts"
+                    ? "Choose one contact to fill the client name and phone number. Company details from a contact file are used when available."
+                    : table === "leads"
+                      ? "Choose one contact to fill the contact person, phone and email. Company details from a contact file are used when available."
+                      : "Choose one contact to fill their name, phone number and email."}
                 </p>
               </div>
             </div>
