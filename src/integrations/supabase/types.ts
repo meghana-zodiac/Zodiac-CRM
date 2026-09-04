@@ -10,27 +10,39 @@ export type Database = {
     Tables: {
       bd_team_members: {
         Row: {
+          access_role: string;
+          access_status: string;
           active: boolean;
           created_at: string;
           display_name: string;
           email: string;
           id: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
           updated_at: string;
         };
         Insert: {
+          access_role?: string;
+          access_status?: string;
           active?: boolean;
           created_at?: string;
           display_name: string;
           email: string;
           id: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
           updated_at?: string;
         };
         Update: {
+          access_role?: string;
+          access_status?: string;
           active?: boolean;
           created_at?: string;
           display_name?: string;
           email?: string;
           id?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
           updated_at?: string;
         };
         Relationships: [];

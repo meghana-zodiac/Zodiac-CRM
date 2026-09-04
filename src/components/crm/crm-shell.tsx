@@ -15,6 +15,7 @@ import {
   Home,
   FileSignature,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ import { ScheduleDrawer } from "./schedule-drawer";
 import { NotificationsDrawer, useNotifications } from "./notifications-drawer";
 import { contactFields, dealFields, leadFields } from "./field-defs";
 import { supabase } from "@/integrations/supabase/client";
+import { AccessManagement } from "./access-management";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
@@ -189,13 +191,20 @@ function GlobalSearch({
   );
 }
 
-export function CrmShell({ children }: { children: React.ReactNode }) {
+export function CrmShell({
+  children,
+  isAdmin = false,
+}: {
+  children: React.ReactNode;
+  isAdmin?: boolean;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
+  const [accessManagementOpen, setAccessManagementOpen] = useState(false);
   const accounts = useQuery({
     ...accountsQuery(),
     enabled: quickCreate === "contact" || quickCreate === "deal",
@@ -336,6 +345,12 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Signed-in account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {isAdmin ? (
+                  <DropdownMenuItem onClick={() => setAccessManagementOpen(true)} className="gap-2">
+                    <ShieldCheck className="size-4" />
+                    Access Management
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem onClick={signOut} className="gap-2">
                   <LogOut className="size-4" />
                   Sign out
@@ -385,6 +400,10 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+
+      {isAdmin ? (
+        <AccessManagement open={accessManagementOpen} onOpenChange={setAccessManagementOpen} />
+      ) : null}
 
       <ScheduleDrawer open={scheduleOpen} onOpenChange={setScheduleOpen} />
 

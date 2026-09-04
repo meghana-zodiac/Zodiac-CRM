@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { Clock3, LogOut, ShieldX } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -151,26 +152,53 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [accessStatus, setAccessStatus] = useState<
+    "pending" | "approved" | "rejected" | "suspended" | null
+  >(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    const applyUser = (user: Parameters<typeof isOrganizationGoogleUser>[0]) => {
+    const applyUser = async (user: Parameters<typeof isOrganizationGoogleUser>[0]) => {
       if (!mounted) return;
 
       const isAllowed = isOrganizationGoogleUser(user);
-      setIsSignedIn(isAllowed);
+      setIsSignedIn(Boolean(user) && isAllowed);
       setAccessError(
         user && !isAllowed
           ? `Access is limited to Google Workspace accounts ending in @${ORGANIZATION_EMAIL_DOMAIN}.`
           : null,
       );
-      setIsLoading(false);
-
       if (user && !isAllowed) {
         void supabase.auth.signOut();
+        setIsLoading(false);
+        return;
       }
+
+      if (!user) {
+        setAccessStatus(null);
+        setIsAdmin(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("bd_team_members")
+        .select("access_status,access_role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!mounted) return;
+      if (error) {
+        setAccessError("We could not check your CRM access. Please try again.");
+        setAccessStatus("pending");
+      } else {
+        setAccessStatus((data?.access_status as typeof accessStatus) ?? "pending");
+        setIsAdmin(data?.access_role === "primary_admin" && data?.access_status === "approved");
+      }
+      setIsLoading(false);
     };
 
     // Wait for Supabase to process OAuth tokens from the callback URL before
@@ -184,13 +212,13 @@ function RootComponent() {
         return;
       }
 
-      applyUser(data.session?.user ?? null);
+      void applyUser(data.session?.user ?? null);
     });
 
     // Calling another async auth method inside this callback can deadlock on
     // Supabase's internal auth lock. The event already contains the session.
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      applyUser(session?.user ?? null);
+      void applyUser(session?.user ?? null);
     });
 
     return () => {
@@ -205,15 +233,45 @@ function RootComponent() {
         <main className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">
           Checking your session…
         </main>
-      ) : isSignedIn ? (
-        <CrmShell>
+      ) : isSignedIn && accessStatus === "approved" ? (
+        <CrmShell isAdmin={isAdmin}>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
         </CrmShell>
+      ) : isSignedIn && accessStatus ? (
+        <AccessWaiting status={accessStatus} />
       ) : (
         <GoogleLogin accessError={accessError} />
       )}
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
+  );
+}
+
+function AccessWaiting({ status }: { status: "pending" | "rejected" | "suspended" | "approved" }) {
+  const pending = status === "pending";
+  return (
+    <main className="grid min-h-screen place-items-center bg-muted/30 px-4">
+      <section className="w-full max-w-md rounded-2xl border bg-card p-7 text-center shadow-lg">
+        <span className="mx-auto grid size-14 place-items-center rounded-full bg-primary/10 text-primary">
+          {pending ? <Clock3 className="size-7" /> : <ShieldX className="size-7" />}
+        </span>
+        <h1 className="mt-5 text-xl font-semibold">
+          {pending ? "Access request pending" : `CRM access ${status}`}
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {pending
+            ? "Your Zodiac account has been registered. Preetam Sanil or Meghana must approve it before you can open CRM records."
+            : "Your account cannot currently access the CRM. Please contact Preetam Sanil or Meghana if you believe this should be changed."}
+        </p>
+        <button
+          onClick={() => void supabase.auth.signOut()}
+          className="mt-6 inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </button>
+      </section>
+    </main>
   );
 }
