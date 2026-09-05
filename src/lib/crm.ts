@@ -146,7 +146,7 @@ export const accountsQuery = () =>
     queryKey: ["accounts"],
     queryFn: async () =>
       unwrap<Account[]>(
-        await supabase.from("accounts").select("*").order("created_at", { ascending: true }),
+        await supabase.from("accounts").select("*").order("created_at", { ascending: false }),
       ),
   });
 
@@ -158,7 +158,7 @@ export const contactsQuery = () =>
         await supabase
           .from("contacts")
           .select("*, accounts(name)")
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: false }),
       ),
   });
 
@@ -171,8 +171,8 @@ async function fetchAllLeads() {
     const { data, error } = await supabase
       .from("leads")
       .select("*")
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, from + LEADS_PAGE_SIZE - 1);
 
     const page = unwrap<Lead[]>({ data, error });
@@ -216,7 +216,7 @@ export const dealsQuery = () =>
         await supabase
           .from("deals")
           .select("*, accounts(name), contacts(first_name, last_name)")
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: false }),
       ),
   });
 
@@ -225,7 +225,7 @@ export const activitiesQuery = () =>
     queryKey: ["activities"],
     queryFn: async () =>
       unwrap<Activity[]>(
-        await supabase.from("activities").select("*").order("due_date", { ascending: true }),
+        await supabase.from("activities").select("*").order("created_at", { ascending: false }),
       ),
   });
 
@@ -234,7 +234,7 @@ export const trainersQuery = () =>
     queryKey: ["trainers"],
     queryFn: async () =>
       unwrap<Trainer[]>(
-        await supabase.from("trainers").select("*").order("created_at", { ascending: true }),
+        await supabase.from("trainers").select("*").order("created_at", { ascending: false }),
       ),
   });
 
@@ -246,7 +246,7 @@ export const trainingRequestsQuery = () =>
         await supabase
           .from("training_requests")
           .select("*, accounts(name), trainers(full_name)")
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: false }),
       ),
   });
 
@@ -258,7 +258,7 @@ export const trainingBatchesQuery = () =>
         await supabase
           .from("training_batches")
           .select("*, trainers(full_name), training_requests(course_topic, accounts(name))")
-          .order("start_date", { ascending: true }),
+          .order("created_at", { ascending: false }),
       ),
   });
 
