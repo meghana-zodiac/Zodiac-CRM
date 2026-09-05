@@ -72,7 +72,15 @@ const mobileNavItems = [
   { label: "Deals", to: "/deals", icon: FileSignature },
 ] as const;
 
-function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+function NavList({
+  collapsed,
+  isAdmin,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  isAdmin: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   return (
@@ -87,26 +95,28 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
             <div className="mx-2 mb-2 h-px bg-nav-border" />
           )}
           <ul className="space-y-0.5">
-            {group.items.map((item) => {
-              const active = pathname === item.to;
-              return (
-                <li key={item.to}>
-                  <Link
-                    to={item.to}
-                    onClick={onNavigate}
-                    title={item.label}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-nav-foreground/85 transition-colors hover:bg-nav-accent hover:text-nav-foreground",
-                      active && "bg-nav-accent font-medium text-nav-foreground",
-                      collapsed && "justify-center px-0",
-                    )}
-                  >
-                    <item.icon className="size-4 shrink-0" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </Link>
-                </li>
-              );
-            })}
+            {group.items
+              .filter((item) => !item.adminOnly || isAdmin)
+              .map((item) => {
+                const active = pathname === item.to;
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      onClick={onNavigate}
+                      title={item.label}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-nav-foreground/85 transition-colors hover:bg-nav-accent hover:text-nav-foreground",
+                        active && "bg-nav-accent font-medium text-nav-foreground",
+                        collapsed && "justify-center px-0",
+                      )}
+                    >
+                      <item.icon className="size-4 shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
           </ul>
         </div>
       ))}
@@ -267,7 +277,7 @@ export function CrmShell({
         )}
       >
         <SidebarBrand collapsed={collapsed} />
-        <NavList collapsed={collapsed} />
+        <NavList collapsed={collapsed} isAdmin={isAdmin} />
         <button
           onClick={toggleSidebar}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -290,7 +300,11 @@ export function CrmShell({
             <SheetContent side="left" className="w-64 border-nav-border bg-nav p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <SidebarBrand collapsed={false} />
-              <NavList collapsed={false} onNavigate={() => setMobileNavOpen(false)} />
+              <NavList
+                collapsed={false}
+                isAdmin={isAdmin}
+                onNavigate={() => setMobileNavOpen(false)}
+              />
             </SheetContent>
           </Sheet>
 
