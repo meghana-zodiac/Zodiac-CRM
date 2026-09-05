@@ -250,7 +250,7 @@ export const dashboardOverviewQuery = () =>
           .limit(4),
         supabase
           .from("leads")
-          .select("id,first_name,last_name,company,status,created_at")
+          .select("id,contact_name,company_name,status,created_at")
           .order("created_at", { ascending: false })
           .limit(4),
         supabase
@@ -299,8 +299,8 @@ export const dashboardOverviewQuery = () =>
         ...(recentLeads.data ?? []).map((row) => ({
           id: row.id,
           type: "Lead" as const,
-          title: fullName(row.first_name, row.last_name),
-          detail: [row.company, row.status].filter(Boolean).join(" · ") || "Corporate lead",
+          title: row.contact_name || row.company_name,
+          detail: [row.company_name, row.status].filter(Boolean).join(" · ") || "Corporate lead",
           created_at: row.created_at,
           to: "/leads" as const,
         })),
