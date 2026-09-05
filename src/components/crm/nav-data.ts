@@ -14,10 +14,17 @@ import {
   CheckSquare,
   ClipboardList,
   ClipboardCheck,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { label: string; to: string; icon: LucideIcon; module?: string };
+export type NavItem = {
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  module?: string;
+  adminOnly?: boolean;
+};
 export type NavGroup = { label: string; items: NavItem[] };
 
 const mod = (label: string, icon: LucideIcon, slug: string): NavItem => ({
@@ -45,6 +52,12 @@ export const navGroups: NavGroup[] = [
       { label: "BD Proposals & SLAs", to: "/deals", icon: FileSignature },
       { label: "Daily POA & KRA", to: "/poa", icon: ClipboardList },
       { label: "My Daily EOD", to: "/eod", icon: ClipboardCheck },
+      {
+        label: "Team EOD Review",
+        to: "/eod-review",
+        icon: UsersRound,
+        adminOnly: true,
+      },
     ],
   },
   {
