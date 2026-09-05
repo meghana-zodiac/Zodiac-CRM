@@ -25,6 +25,7 @@ import {
 } from "@/lib/crm";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 import { BD_OWNERS } from "@/components/crm/nav-data";
+import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -52,15 +53,18 @@ const openBdStages = BD_STAGES.filter((stage) => stage !== "SLA Signed");
 const openTrainingStages = TRAINING_STATUSES.filter((status) => status !== "Completed & Invoiced");
 
 function HomePage() {
+  const { owner } = useOwnerScope();
   const leadCounts = useQuery(leadDashboardCountsQuery());
   const deals = useQuery(dealsQuery());
   const activities = useQuery(activitiesQuery());
   const trainingRequests = useQuery(trainingRequestsQuery());
   const trainingBatches = useQuery(trainingBatchesQuery());
 
-  const dealList = deals.data ?? [];
-  const activityList = activities.data ?? [];
-  const requestList = trainingRequests.data ?? [];
+  const dealList = (deals.data ?? []).filter((row) => ownerMatches(owner, row.owner_name));
+  const activityList = (activities.data ?? []).filter((row) => ownerMatches(owner, row.owner_name));
+  const requestList = (trainingRequests.data ?? []).filter((row) =>
+    ownerMatches(owner, row.owner_name),
+  );
   const batchList = trainingBatches.data ?? [];
 
   const pendingSlas = dealList.filter((deal) => deal.stage !== "SLA Signed");

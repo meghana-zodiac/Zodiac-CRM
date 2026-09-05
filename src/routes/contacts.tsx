@@ -60,7 +60,7 @@ import {
   type ActivityType,
 } from "@/lib/crm";
 import { activityFields, contactFields } from "@/components/crm/field-defs";
-import { teamMembers } from "@/components/crm/nav-data";
+import { useOwnerScope } from "@/components/crm/owner-filter";
 import type { ContactWithAccount } from "@/lib/crm";
 import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
 import {
@@ -137,7 +137,7 @@ function ContactsPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
   const [systemFilter, setSystemFilter] = useState("all");
-  const [ownerFilter, setOwnerFilter] = useState("all");
+  const { owner: ownerFilter } = useOwnerScope();
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<ContactWithAccount | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -401,19 +401,6 @@ function ContactsPage() {
                   count: all.filter((c) => !c.last_activity_date).length,
                 },
               ]}
-              fieldFilters={{
-                label: "owner",
-                active: ownerFilter,
-                onChange: setOwnerFilter,
-                options: [
-                  { id: "all", label: "Any owner" },
-                  ...teamMembers.map((member) => ({
-                    id: member,
-                    label: member,
-                    count: all.filter((c) => c.owner_name === member).length,
-                  })),
-                ],
-              }}
             />
 
             <div

@@ -44,6 +44,7 @@ import { NotificationsDrawer, useNotifications } from "./notifications-drawer";
 import { contactFields, dealFields, leadFields } from "./field-defs";
 import { supabase } from "@/integrations/supabase/client";
 import { AccessManagement } from "./access-management";
+import { GlobalOwnerTabs } from "./owner-filter";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
@@ -385,6 +386,8 @@ export function CrmShell({
             </DropdownMenu>
           </div>
         </header>
+
+        <GlobalOwnerTabs />
 
         <main key={pathname} className="crm-route-enter min-w-0 flex-1 pb-20 md:pb-0">
           {children}

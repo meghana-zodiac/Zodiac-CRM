@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
-import { OwnerFilter, ownerMatches, type OwnerFilterValue } from "@/components/crm/owner-filter";
+import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import { StatusPill, trainingTone, trainingTypeTone } from "@/components/crm/status-pill";
 import { trainingRequestFields } from "@/components/crm/field-defs";
 import {
@@ -54,7 +54,7 @@ function TrainingRequestsPage() {
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("kanban");
-  const [owner, setOwner] = useState<OwnerFilterValue>("all");
+  const { owner } = useOwnerScope();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TrainingRequestWithRefs | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -100,7 +100,6 @@ function TrainingRequestsPage() {
         availableViews={["kanban", "list"]}
         action={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <OwnerFilter value={owner} onChange={setOwner} />
             <Button
               size="sm"
               onClick={() => {

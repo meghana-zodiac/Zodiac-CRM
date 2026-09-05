@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useOwnerScope } from "@/components/crm/owner-filter";
 import {
   Bar,
   BarChart,
@@ -222,7 +223,7 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
   const bdMembers = useQuery(bdTeamMembersQuery());
   const [range, setRange] = useState<Range>("30");
   const [selectedMonth, setSelectedMonth] = useState("");
-  const [owner, setOwner] = useState("all");
+  const { owner } = useOwnerScope();
 
   const loading = [leads, accounts, deals, activities, poa, targets, bdMembers].some(
     (query) => query.isLoading,
@@ -439,13 +440,6 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
     targets.data,
   ]);
 
-  const ownerOptions = useMemo(() => {
-    const names = new Set((bdMembers.data ?? []).map((member) => member.display_name));
-    (leads.data ?? []).forEach((lead) => lead.owner_name && names.add(lead.owner_name));
-    (deals.data ?? []).forEach((deal) => deal.owner_name && names.add(deal.owner_name));
-    return [...names].sort();
-  }, [bdMembers.data, deals.data, leads.data]);
-
   const pipelineValue = data.openDeals.reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
   const conversion = data.leadRows.length
     ? Math.round((data.convertedLeads.length / data.leadRows.length) * 100)
@@ -536,19 +530,6 @@ export function ReportsAnalyticsModule({ view }: { view: View }) {
               {monthOptions.map((month) => (
                 <option key={month.value} value={month.value}>
                   {month.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={owner}
-              onChange={(event) => setOwner(event.target.value)}
-              aria-label="Filter by BD member"
-              className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
-            >
-              <option value="all">All BD members</option>
-              {ownerOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
                 </option>
               ))}
             </select>

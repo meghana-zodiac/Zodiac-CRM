@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { BD_OWNERS } from "@/components/crm/nav-data";
+import { useOwnerScope } from "@/components/crm/owner-filter";
 import { currency, formatDate } from "@/lib/crm";
 import {
   bdTeamMembersQuery,
@@ -740,6 +741,7 @@ async function exportWorkbook(
 }
 
 export function PoaModule() {
+  const { owner: globalOwner } = useOwnerScope();
   const [month, setMonth] = useState(defaultMonth());
   const [section, setSection] = useState("daily");
   const options = useMemo(() => monthOptions(), []);
@@ -784,6 +786,9 @@ export function PoaModule() {
   useEffect(() => {
     if (!member && members[0]) setMember(members[0]);
   }, [member, members]);
+  useEffect(() => {
+    if (globalOwner !== "all" && navigationMembers.includes(globalOwner)) setMember(globalOwner);
+  }, [globalOwner, navigationMembers]);
   useEffect(() => {
     if (!member || selectedInitialDataMonth.current.has(member) || !entriesQuery.data) {
       return;

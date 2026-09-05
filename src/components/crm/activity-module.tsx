@@ -10,7 +10,7 @@ import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { StatusPill, activityTone } from "@/components/crm/status-pill";
 import { activityFields } from "@/components/crm/field-defs";
-import { OwnerFilter, ownerMatches, type OwnerFilterValue } from "@/components/crm/owner-filter";
+import { OwnerFilter, ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import { BD_OWNERS } from "@/components/crm/nav-data";
 import {
   ACTIVITY_STATUSES,
@@ -46,7 +46,7 @@ export function ActivityModule({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [ownerFilter, setOwnerFilter] = useState<OwnerFilterValue>("all");
+  const { owner: ownerFilter } = useOwnerScope();
   const [activeRep, setActiveRep] = useState<string>(BD_OWNERS[0]);
   const [editing, setEditing] = useState<Activity | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,7 +86,6 @@ export function ActivityModule({
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <OwnerFilter value={ownerFilter} onChange={setOwnerFilter} />
             <OwnerFilter
               label="Logging as"
               value={activeRep}

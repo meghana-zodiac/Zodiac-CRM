@@ -18,7 +18,7 @@ import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { accountFields, dealFields } from "@/components/crm/field-defs";
-import { teamMembers } from "@/components/crm/nav-data";
+import { useOwnerScope } from "@/components/crm/owner-filter";
 import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "@/lib/crm";
 import type { Account } from "@/lib/crm";
 import { syncCeipalClients } from "@/lib/ceipal.functions";
@@ -50,7 +50,7 @@ function AccountsPage() {
   const deals = useQuery(dealsQuery());
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
-  const [ownerFilter, setOwnerFilter] = useState("all");
+  const { owner: ownerFilter } = useOwnerScope();
   const [systemFilter, setSystemFilter] = useState("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<Account | null>(null);
@@ -67,9 +67,6 @@ function AccountsPage() {
   });
 
   const all = accounts.data ?? [];
-  const ownerOptions = Array.from(
-    new Set([...teamMembers, ...all.map((account) => account.owner_name).filter(Boolean)]),
-  ) as string[];
   const contactCount = (accountId: string) =>
     (contacts.data ?? []).filter((contact) => contact.account_id === accountId).length;
   const pipeline = (accountId: string) =>
@@ -153,20 +150,6 @@ function AccountsPage() {
               <SelectItem value="all">All accounts ({all.length})</SelectItem>
               <SelectItem value="with-deals">With open deals</SelectItem>
               <SelectItem value="no-contacts">Missing contacts</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="w-full bg-surface sm:w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any owner</SelectItem>
-              {ownerOptions.map((owner) => (
-                <SelectItem key={owner} value={owner}>
-                  {owner} ({all.filter((account) => account.owner_name === owner).length})
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </div>

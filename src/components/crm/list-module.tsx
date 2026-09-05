@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "./module-chrome";
 import { RecordDialog, type FieldDef } from "./record-dialog";
 import { RowActions } from "./row-actions";
-import { OwnerFilter, ownerMatches, type OwnerFilterValue } from "./owner-filter";
+import { ownerMatches, useOwnerScope } from "./owner-filter";
 import {
   Select,
   SelectContent,
@@ -65,7 +65,7 @@ export function ListModule<T extends { id: string }>({
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
   const [filter, setFilter] = useState("all");
-  const [owner, setOwner] = useState<OwnerFilterValue>("all");
+  const { owner } = useOwnerScope();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -136,7 +136,6 @@ export function ListModule<T extends { id: string }>({
           : {})}
         action={
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
-            {ownerOf ? <OwnerFilter value={owner} onChange={setOwner} /> : null}
             {headerAction}
             <Button size="sm" className="ml-auto sm:ml-0" onClick={openCreate}>
               <Plus className="size-4" /> {createLabel}

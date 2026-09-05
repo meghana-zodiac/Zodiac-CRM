@@ -13,6 +13,7 @@ import { Clock3, LogOut, ShieldX } from "lucide-react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CrmShell } from "@/components/crm/crm-shell";
+import { OwnerScopeProvider } from "@/components/crm/owner-filter";
 import { Toaster } from "@/components/ui/sonner";
 import { GoogleLogin } from "@/components/auth/google-login";
 import { supabase } from "@/integrations/supabase/client";
@@ -234,10 +235,12 @@ function RootComponent() {
           Checking your session…
         </main>
       ) : isSignedIn && accessStatus === "approved" ? (
-        <CrmShell isAdmin={isAdmin}>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </CrmShell>
+        <OwnerScopeProvider>
+          <CrmShell isAdmin={isAdmin}>
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <Outlet />
+          </CrmShell>
+        </OwnerScopeProvider>
       ) : isSignedIn && accessStatus ? (
         <AccessWaiting status={accessStatus} />
       ) : (
