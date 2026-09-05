@@ -2,11 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarCheck,
+  Building2,
   CheckSquare,
+  Contact,
   FileSignature,
-  GraduationCap,
+  Plus,
   Sparkles,
-  Trophy,
+  UserCog,
 } from "lucide-react";
 
 import {
@@ -14,13 +16,12 @@ import {
   TRAINING_STATUSES,
   activitiesQuery,
   currency,
+  dashboardOverviewQuery,
   dealsQuery,
   dueBadge,
   formatDateTime,
-  isThisMonth,
   isToday,
   leadDashboardCountsQuery,
-  trainingBatchesQuery,
   trainingRequestsQuery,
 } from "@/lib/crm";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
@@ -55,17 +56,16 @@ const openTrainingStages = TRAINING_STATUSES.filter((status) => status !== "Comp
 function HomePage() {
   const { owner } = useOwnerScope();
   const leadCounts = useQuery(leadDashboardCountsQuery());
+  const overview = useQuery(dashboardOverviewQuery());
   const deals = useQuery(dealsQuery());
   const activities = useQuery(activitiesQuery());
   const trainingRequests = useQuery(trainingRequestsQuery());
-  const trainingBatches = useQuery(trainingBatchesQuery());
 
   const dealList = (deals.data ?? []).filter((row) => ownerMatches(owner, row.owner_name));
   const activityList = (activities.data ?? []).filter((row) => ownerMatches(owner, row.owner_name));
   const requestList = (trainingRequests.data ?? []).filter((row) =>
     ownerMatches(owner, row.owner_name),
   );
-  const batchList = trainingBatches.data ?? [];
 
   const pendingSlas = dealList.filter((deal) => deal.stage !== "SLA Signed");
   const pendingSlaValue = pendingSlas.reduce((sum, deal) => sum + (deal.amount ?? 0), 0);
@@ -98,11 +98,6 @@ function HomePage() {
       ).length,
     };
   });
-  const signedThisMonth = dealList.filter(
-    (deal) => deal.stage === "SLA Signed" && isThisMonth(deal.sla_signed_date ?? deal.created_at),
-  );
-  const confirmedBatchesThisMonth = batchList.filter((batch) => isThisMonth(batch.start_date));
-
   const maxBdCount = Math.max(
     1,
     ...openBdStages.map((stage) => dealList.filter((deal) => deal.stage === stage).length),
@@ -116,50 +111,53 @@ function HomePage() {
 
   const upcoming = activityList.filter((activity) => activity.status !== "Completed").slice(0, 6);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
   const stats = [
     {
-      label: "New corporate leads",
-      value: String(leadCounts.data?.active ?? 0),
-      sub: `${leadCounts.data?.total ?? 0} in database`,
+      label: "Corporate leads",
+      value: String(overview.data?.counts.leads ?? leadCounts.data?.total ?? 0),
+      sub: `${leadCounts.data?.active ?? 0} new or contacted`,
       icon: Sparkles,
       to: "/leads",
     },
     {
-      label: "Active SLAs pending",
-      value: String(pendingSlas.length),
-      sub: currency(pendingSlaValue),
+      label: "Corporate clients",
+      value: String(overview.data?.counts.accounts ?? 0),
+      sub: "Client companies",
+      icon: Building2,
+      to: "/accounts",
+    },
+    {
+      label: "Client contacts",
+      value: String(overview.data?.counts.contacts ?? 0),
+      sub: "Contact directory",
+      icon: Contact,
+      to: "/contacts",
+    },
+    {
+      label: "Proposals & SLAs",
+      value: String(overview.data?.counts.deals ?? 0),
+      sub: `${pendingSlas.length} active · ${currency(pendingSlaValue)}`,
       icon: FileSignature,
       to: "/deals",
     },
     {
-      label: "Pending training requests",
-      value: String(pendingTraining.length),
-      sub: "Inquiry to batch scheduled",
-      icon: GraduationCap,
-      to: "/training-requests",
-    },
-    {
-      label: "Client meetings today",
-      value: String(meetingsToday.length),
-      sub: "Scheduled",
-      icon: CalendarCheck,
-      to: "/meetings",
-    },
-    {
-      label: "Signed & confirmed this month",
-      value: String(signedThisMonth.length + confirmedBatchesThisMonth.length),
-      sub: `${signedThisMonth.length} SLAs · ${confirmedBatchesThisMonth.length} batches`,
-      icon: Trophy,
-      to: "/training-batches",
+      label: "Trainer profiles",
+      value: String(overview.data?.counts.trainers ?? 0),
+      sub: `${pendingTraining.length} training requests pending`,
+      icon: UserCog,
+      to: "/trainers",
     },
   ] as const;
 
   return (
     <div className="space-y-5 px-4 py-5 sm:px-6">
       <div>
-        <h1 className="text-lg font-semibold text-foreground">Good morning, team</h1>
+        <h1 className="text-lg font-semibold text-foreground">{greeting}, team</h1>
         <p className="text-sm text-muted-foreground">
-          Here's what's moving across business development and L&D delivery today.
+          Your live overview of business development, client activity and L&amp;D delivery.
         </p>
       </div>
 
@@ -180,6 +178,108 @@ function HomePage() {
             <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
           </Link>
         ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="rounded-lg border border-border bg-surface shadow-panel lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Recently added</h2>
+              <p className="text-xs text-muted-foreground">Newest CRM records appear first</p>
+            </div>
+            <Sparkles className="size-4 text-primary" />
+          </div>
+          <ul className="divide-y divide-border">
+            {(overview.data?.records ?? []).map((record) => (
+              <li key={`${record.type}-${record.id}`}>
+                <Link
+                  to={record.to}
+                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{record.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{record.detail}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <StatusPill tone="neutral">{record.type}</StatusPill>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {formatDateTime(record.created_at)}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+            {!overview.isLoading && (overview.data?.records.length ?? 0) === 0 ? (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No records have been added yet
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Today at a glance</h2>
+              <p className="text-xs text-muted-foreground">Items needing attention</p>
+            </div>
+            <CalendarCheck className="size-4 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <Link
+              to="/meetings"
+              className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-3 text-sm hover:bg-muted"
+            >
+              <span>Client meetings</span>
+              <strong className="tabular-nums">{meetingsToday.length}</strong>
+            </Link>
+            <Link
+              to="/deals"
+              className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-3 text-sm hover:bg-muted"
+            >
+              <span>Active proposals</span>
+              <strong className="tabular-nums">{pendingSlas.length}</strong>
+            </Link>
+            <Link
+              to="/training-requests"
+              className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-3 text-sm hover:bg-muted"
+            >
+              <span>Training requests</span>
+              <strong className="tabular-nums">{pendingTraining.length}</strong>
+            </Link>
+          </div>
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Quick access
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/leads"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
+              >
+                <Plus className="size-3.5" /> Lead
+              </Link>
+              <Link
+                to="/contacts"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
+              >
+                <Plus className="size-3.5" /> Contact
+              </Link>
+              <Link
+                to="/accounts"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
+              >
+                <Plus className="size-3.5" /> Client
+              </Link>
+              <Link
+                to="/tasks"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium hover:bg-muted"
+              >
+                <Plus className="size-3.5" /> Task
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
 
       <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
