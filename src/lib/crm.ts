@@ -208,6 +208,135 @@ export const leadDashboardCountsQuery = () =>
     },
   });
 
+export type DashboardRecord = {
+  id: string;
+  type: "Lead" | "Client" | "Contact" | "Proposal" | "Trainer";
+  title: string;
+  detail: string;
+  created_at: string;
+  to: "/leads" | "/accounts" | "/contacts" | "/deals" | "/trainers";
+};
+
+export const dashboardOverviewQuery = () =>
+  queryOptions({
+    queryKey: ["dashboard", "overview"],
+    queryFn: async () => {
+      const [
+        accounts,
+        contacts,
+        leads,
+        deals,
+        trainers,
+        recentAccounts,
+        recentContacts,
+        recentLeads,
+        recentDeals,
+        recentTrainers,
+      ] = await Promise.all([
+        supabase.from("accounts").select("id", { count: "exact", head: true }),
+        supabase.from("contacts").select("id", { count: "exact", head: true }),
+        supabase.from("leads").select("id", { count: "exact", head: true }),
+        supabase.from("deals").select("id", { count: "exact", head: true }),
+        supabase.from("trainers").select("id", { count: "exact", head: true }),
+        supabase
+          .from("accounts")
+          .select("id,name,industry,created_at")
+          .order("created_at", { ascending: false })
+          .limit(4),
+        supabase
+          .from("contacts")
+          .select("id,first_name,last_name,email,created_at")
+          .order("created_at", { ascending: false })
+          .limit(4),
+        supabase
+          .from("leads")
+          .select("id,first_name,last_name,company,status,created_at")
+          .order("created_at", { ascending: false })
+          .limit(4),
+        supabase
+          .from("deals")
+          .select("id,deal_name,stage,created_at")
+          .order("created_at", { ascending: false })
+          .limit(4),
+        supabase
+          .from("trainers")
+          .select("id,full_name,expertise,created_at")
+          .order("created_at", { ascending: false })
+          .limit(4),
+      ]);
+
+      const results = [accounts, contacts, leads, deals, trainers];
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw new Error(failed.error.message);
+
+      const recentResults = [
+        recentAccounts,
+        recentContacts,
+        recentLeads,
+        recentDeals,
+        recentTrainers,
+      ];
+      const recentFailed = recentResults.find((result) => result.error);
+      if (recentFailed?.error) throw new Error(recentFailed.error.message);
+
+      const records: DashboardRecord[] = [
+        ...(recentAccounts.data ?? []).map((row) => ({
+          id: row.id,
+          type: "Client" as const,
+          title: row.name,
+          detail: row.industry || "Corporate client",
+          created_at: row.created_at,
+          to: "/accounts" as const,
+        })),
+        ...(recentContacts.data ?? []).map((row) => ({
+          id: row.id,
+          type: "Contact" as const,
+          title: fullName(row.first_name, row.last_name),
+          detail: row.email || "Client contact",
+          created_at: row.created_at,
+          to: "/contacts" as const,
+        })),
+        ...(recentLeads.data ?? []).map((row) => ({
+          id: row.id,
+          type: "Lead" as const,
+          title: fullName(row.first_name, row.last_name),
+          detail: [row.company, row.status].filter(Boolean).join(" · ") || "Corporate lead",
+          created_at: row.created_at,
+          to: "/leads" as const,
+        })),
+        ...(recentDeals.data ?? []).map((row) => ({
+          id: row.id,
+          type: "Proposal" as const,
+          title: row.deal_name,
+          detail: row.stage,
+          created_at: row.created_at,
+          to: "/deals" as const,
+        })),
+        ...(recentTrainers.data ?? []).map((row) => ({
+          id: row.id,
+          type: "Trainer" as const,
+          title: row.full_name,
+          detail: row.expertise || "Trainer profile",
+          created_at: row.created_at,
+          to: "/trainers" as const,
+        })),
+      ]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 8);
+
+      return {
+        counts: {
+          accounts: accounts.count ?? 0,
+          contacts: contacts.count ?? 0,
+          leads: leads.count ?? 0,
+          deals: deals.count ?? 0,
+          trainers: trainers.count ?? 0,
+        },
+        records,
+      };
+    },
+  });
+
 export const dealsQuery = () =>
   queryOptions({
     queryKey: ["deals"],
