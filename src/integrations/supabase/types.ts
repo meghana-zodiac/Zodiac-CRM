@@ -367,6 +367,63 @@ export type Database = {
           },
         ];
       };
+      daily_eod_reports: {
+        Row: {
+          best_outcome: string;
+          created_at: string;
+          employee_name: string;
+          id: string;
+          manager_comments: string | null;
+          manager_review: string;
+          metrics_snapshot: Json;
+          next_day_priorities: string;
+          report_date: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          status: string;
+          submitted_at: string | null;
+          support_needed: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          best_outcome?: string;
+          created_at?: string;
+          employee_name: string;
+          id?: string;
+          manager_comments?: string | null;
+          manager_review?: string;
+          metrics_snapshot?: Json;
+          next_day_priorities?: string;
+          report_date?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          submitted_at?: string | null;
+          support_needed?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          best_outcome?: string;
+          created_at?: string;
+          employee_name?: string;
+          id?: string;
+          manager_comments?: string | null;
+          manager_review?: string;
+          metrics_snapshot?: Json;
+          next_day_priorities?: string;
+          report_date?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          submitted_at?: string | null;
+          support_needed?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       kra_targets: {
         Row: {
           acquired_clients_target: number;
