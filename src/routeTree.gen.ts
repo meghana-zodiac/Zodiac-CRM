@@ -15,6 +15,7 @@ import { Route as CallsRouteImport } from './routes/calls'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as EodRouteImport } from './routes/eod'
+import { Route as EodReviewRouteImport } from './routes/eod-review'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as MeetingsRouteImport } from './routes/meetings'
 import { Route as PoaRouteImport } from './routes/poa'
@@ -52,6 +53,11 @@ const DealsRoute = DealsRouteImport.update({
 const EodRoute = EodRouteImport.update({
   id: '/eod',
   path: '/eod',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EodReviewRoute = EodReviewRouteImport.update({
+  id: '/eod-review',
+  path: '/eod-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/deals': typeof DealsRoute
   '/eod': typeof EodRoute
+  '/eod-review': typeof EodReviewRoute
   '/leads': typeof LeadsRoute
   '/meetings': typeof MeetingsRoute
   '/poa': typeof PoaRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/contacts': typeof ContactsRoute
   '/deals': typeof DealsRoute
   '/eod': typeof EodRoute
+  '/eod-review': typeof EodReviewRoute
   '/leads': typeof LeadsRoute
   '/meetings': typeof MeetingsRoute
   '/poa': typeof PoaRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/deals': typeof DealsRoute
   '/eod': typeof EodRoute
+  '/eod-review': typeof EodReviewRoute
   '/leads': typeof LeadsRoute
   '/meetings': typeof MeetingsRoute
   '/poa': typeof PoaRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/deals'
     | '/eod'
+    | '/eod-review'
     | '/leads'
     | '/meetings'
     | '/poa'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/deals'
     | '/eod'
+    | '/eod-review'
     | '/leads'
     | '/meetings'
     | '/poa'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/deals'
     | '/eod'
+    | '/eod-review'
     | '/leads'
     | '/meetings'
     | '/poa'
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   ContactsRoute: typeof ContactsRoute
   DealsRoute: typeof DealsRoute
   EodRoute: typeof EodRoute
+  EodReviewRoute: typeof EodReviewRoute
   LeadsRoute: typeof LeadsRoute
   MeetingsRoute: typeof MeetingsRoute
   PoaRoute: typeof PoaRoute
@@ -254,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/eod'
       fullPath: '/eod'
       preLoaderRoute: typeof EodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/eod-review': {
+      id: '/eod-review'
+      path: '/eod-review'
+      fullPath: '/eod-review'
+      preLoaderRoute: typeof EodReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -322,6 +342,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactsRoute: ContactsRoute,
   DealsRoute: DealsRoute,
   EodRoute: EodRoute,
+  EodReviewRoute: EodReviewRoute,
   LeadsRoute: LeadsRoute,
   MeetingsRoute: MeetingsRoute,
   PoaRoute: PoaRoute,
