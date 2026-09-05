@@ -13,6 +13,7 @@ import {
   PhoneCall,
   CheckSquare,
   ClipboardList,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ export const navGroups: NavGroup[] = [
       { label: "Client Contacts", to: "/contacts", icon: ContactIcon },
       { label: "BD Proposals & SLAs", to: "/deals", icon: FileSignature },
       { label: "Daily POA & KRA", to: "/poa", icon: ClipboardList },
+      { label: "My Daily EOD", to: "/eod", icon: ClipboardCheck },
     ],
   },
   {
