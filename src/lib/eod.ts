@@ -24,6 +24,13 @@ export type DailyEodContext = {
   report: DailyEodReport | null;
 };
 
+export type TeamEodRow = {
+  userId: string;
+  employeeName: string;
+  email: string;
+  report: DailyEodReport | null;
+};
+
 function dayBounds(date: string) {
   const start = new Date(`${date}T00:00:00`);
   const end = new Date(start);
@@ -171,5 +178,70 @@ export async function saveDailyEod(values: {
     },
     { onConflict: "user_id,report_date" },
   );
+  if (error) throw new Error(error.message);
+}
+
+export const teamEodQuery = (reportDate: string) =>
+  queryOptions({
+    queryKey: ["team-eod", reportDate],
+    queryFn: async (): Promise<TeamEodRow[]> => {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError) throw new Error(authError.message);
+      if (!auth.user) throw new Error("Please sign in again.");
+
+      const { data: currentMember, error: currentMemberError } = await supabase
+        .from("bd_team_members")
+        .select("access_role,access_status")
+        .eq("id", auth.user.id)
+        .single();
+      if (currentMemberError) throw new Error(currentMemberError.message);
+      if (
+        currentMember.access_role !== "primary_admin" ||
+        currentMember.access_status !== "approved"
+      ) {
+        throw new Error("Team EOD Review is available only to primary administrators.");
+      }
+
+      const [membersResult, reportsResult] = await Promise.all([
+        supabase
+          .from("bd_team_members")
+          .select("id,display_name,email")
+          .eq("active", true)
+          .eq("access_status", "approved")
+          .order("display_name"),
+        supabase.from("daily_eod_reports").select("*").eq("report_date", reportDate),
+      ]);
+      if (membersResult.error) throw new Error(membersResult.error.message);
+      if (reportsResult.error) throw new Error(reportsResult.error.message);
+
+      const reports = new Map((reportsResult.data ?? []).map((report) => [report.user_id, report]));
+      return (membersResult.data ?? []).map((member) => ({
+        userId: member.id,
+        employeeName: member.display_name,
+        email: member.email,
+        report: reports.get(member.id) ?? null,
+      }));
+    },
+  });
+
+export async function reviewDailyEod(values: {
+  reportId: string;
+  review: "pending" | "reviewed" | "coaching_required";
+  comments: string;
+}) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!auth.user) throw new Error("Please sign in again.");
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("daily_eod_reports")
+    .update({
+      manager_review: values.review,
+      manager_comments: values.comments.trim() || null,
+      reviewed_at: values.review === "pending" ? null : now,
+      reviewed_by: values.review === "pending" ? null : auth.user.id,
+      updated_at: now,
+    })
+    .eq("id", values.reportId);
   if (error) throw new Error(error.message);
 }
