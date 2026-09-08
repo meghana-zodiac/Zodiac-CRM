@@ -85,6 +85,12 @@ export function EodModule() {
   const { metrics, employeeName, report } = eod.data;
   const cards = [
     {
+      label: "Follow-ups done",
+      value: metrics.followUpsCompleted,
+      detail: "Completed CRM tasks",
+      icon: CheckCircle2,
+    },
+    {
       label: "Prospects added",
       value: metrics.prospectsAdded,
       detail: "From Corporate Leads",
@@ -158,7 +164,7 @@ export function EodModule() {
           </div>
           <CheckCircle2 className="size-4 text-emerald-600" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
           {cards.map((card) => (
             <div
               key={card.label}
