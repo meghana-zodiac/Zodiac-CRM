@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, CircleDot, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { OwnerFilter, ownerMatches, useOwnerScope } from "@/components/crm/owner
 import { BD_OWNERS } from "@/components/crm/nav-data";
 import {
   ACTIVITY_STATUSES,
+  activityRelatedRecordsQuery,
   activitiesQuery,
   dueBadge,
   formatDateTime,
@@ -21,6 +22,26 @@ import {
   type Activity,
   type ActivityType,
 } from "@/lib/crm";
+
+type DueFilter = "all" | "open" | "today" | "overdue" | "upcoming" | "completed";
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function dueGroup(activity: Activity): DueFilter {
+  if (activity.status === "Completed") return "completed";
+  if (!activity.due_date) return "open";
+  const due = new Date(activity.due_date);
+  const start = startOfToday();
+  const tomorrow = new Date(start);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (due < start) return "overdue";
+  if (due < tomorrow) return "today";
+  return "upcoming";
+}
 
 function callDetails(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -46,17 +67,23 @@ export function ActivityModule({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dueFilter, setDueFilter] = useState<DueFilter>(type === "Task" ? "open" : "all");
   const { owner: ownerFilter } = useOwnerScope();
   const [activeRep, setActiveRep] = useState<string>(BD_OWNERS[0]);
   const [editing, setEditing] = useState<Activity | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const relatedRecords = useQuery({ ...activityRelatedRecordsQuery(), enabled: dialogOpen });
 
   const all = (activities.data ?? []).filter((activity) => activity.activity_type === type);
 
   const toggleComplete = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      updateRecord("activities", id, { status }),
+      updateRecord("activities", id, {
+        status,
+        completed_at: status === "Completed" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
       toast.success("Activity updated");
@@ -68,13 +95,33 @@ export function ActivityModule({
     const term = search.trim().toLowerCase();
     return all.filter((activity) => {
       if (statusFilter !== "all" && activity.status !== statusFilter) return false;
+      if (type === "Task") {
+        const group = dueGroup(activity);
+        if (dueFilter === "open" && group === "completed") return false;
+        if (dueFilter !== "all" && dueFilter !== "open" && group !== dueFilter) return false;
+      }
       if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
       if (!term) return true;
       return [activity.title, activity.notes, activity.owner_name, activity.related_to_type]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [all, search, statusFilter, ownerFilter]);
+  }, [all, search, statusFilter, ownerFilter, type, dueFilter]);
+
+  const taskCounts = useMemo(
+    () => ({
+      today: all.filter((activity) => dueGroup(activity) === "today").length,
+      overdue: all.filter((activity) => dueGroup(activity) === "overdue").length,
+      upcoming: all.filter((activity) => dueGroup(activity) === "upcoming").length,
+      completed: all.filter((activity) => dueGroup(activity) === "completed").length,
+    }),
+    [all],
+  );
+
+  const relatedLabels = useMemo(
+    () => new Map((relatedRecords.data ?? []).map((record) => [record.value, record.label])),
+    [relatedRecords.data],
+  );
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -104,6 +151,36 @@ export function ActivityModule({
           </div>
         }
       />
+
+      {type === "Task" ? (
+        <div className="grid grid-cols-2 gap-2 border-b border-border bg-muted/20 px-4 py-3 sm:grid-cols-4 sm:px-5">
+          {(
+            [
+              ["today", "Due today", taskCounts.today, CalendarClock],
+              ["overdue", "Overdue", taskCounts.overdue, AlertTriangle],
+              ["upcoming", "Upcoming", taskCounts.upcoming, CircleDot],
+              ["completed", "Completed", taskCounts.completed, CheckCircle2],
+            ] as const
+          ).map(([id, label, count, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setDueFilter(id)}
+              className={`flex min-h-16 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                dueFilter === id
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border bg-surface hover:bg-muted/60"
+              }`}
+            >
+              <Icon className="size-4 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-lg font-semibold tabular-nums">{count}</span>
+                <span className="block truncate text-xs text-muted-foreground">{label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <FilterPanel
@@ -167,11 +244,29 @@ export function ActivityModule({
                         {activity.status !== "Completed" ? (
                           <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
                         ) : null}
+                        {type === "Task" ? (
+                          <StatusPill
+                            tone={
+                              activity.priority === "High"
+                                ? "danger"
+                                : activity.priority === "Low"
+                                  ? "neutral"
+                                  : "warning"
+                            }
+                          >
+                            {activity.priority} priority
+                          </StatusPill>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatDateTime(activity.due_date)} · {activity.owner_name ?? "Unassigned"}
                         {activity.related_to_type ? ` · ${activity.related_to_type}` : ""}
                       </p>
+                      {activity.related_to_id && relatedLabels.get(activity.related_to_id) ? (
+                        <p className="mt-1 truncate text-xs font-medium text-primary">
+                          {relatedLabels.get(activity.related_to_id)}
+                        </p>
+                      ) : null}
                       {activity.notes ? (
                         <p className="mt-1.5 text-xs text-muted-foreground">{activity.notes}</p>
                       ) : null}
@@ -222,8 +317,16 @@ export function ActivityModule({
         onOpenChange={setDialogOpen}
         table="activities"
         title={editing ? `Edit ${type}` : createLabel}
-        fields={activityFields(type)}
-        record={editing ?? { activity_type: type, status: "Pending", owner_name: activeRep }}
+        fields={activityFields(type, relatedRecords.data ?? [])}
+        record={
+          editing ?? {
+            activity_type: type,
+            status: "Pending",
+            priority: "Medium",
+            owner_name: activeRep,
+          }
+        }
+        fixedValues={{ updated_at: new Date().toISOString() }}
       />
     </div>
   );
