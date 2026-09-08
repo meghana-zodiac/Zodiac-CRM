@@ -15,6 +15,7 @@ export type DailyEodMetrics = {
   clientsAdded: number;
   proposalsActive: number;
   activePipelineValue: number;
+  followUpsCompleted: number;
 };
 
 export type DailyEodContext = {
@@ -70,6 +71,7 @@ export const dailyEodQuery = (reportDate: string) =>
         opportunities,
         clients,
         activeDeals,
+        followUpsCompleted,
         reportResult,
       ] = await Promise.all([
         supabase
@@ -119,6 +121,14 @@ export const dailyEodQuery = (reportDate: string) =>
           .lt("created_at", end),
         supabase.from("deals").select("amount").eq("owner_name", owner).neq("stage", "SLA Signed"),
         supabase
+          .from("activities")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_name", owner)
+          .eq("activity_type", "Task")
+          .eq("status", "Completed")
+          .gte("completed_at", start)
+          .lt("completed_at", end),
+        supabase
           .from("daily_eod_reports")
           .select("*")
           .eq("user_id", auth.user.id)
@@ -146,6 +156,7 @@ export const dailyEodQuery = (reportDate: string) =>
           clientsAdded: count(clients),
           proposalsActive: activeDeals.data?.length ?? 0,
           activePipelineValue,
+          followUpsCompleted: count(followUpsCompleted),
         },
         report: reportResult.data,
       };
