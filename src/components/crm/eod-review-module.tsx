@@ -101,6 +101,7 @@ export function EodReviewModule() {
     ["Prospects", metrics.prospectsAdded ?? 0],
     ["Contacts", metrics.contactsAdded ?? 0],
     ["Calls", metrics.outboundCalls ?? 0],
+    ["Follow-ups", metrics.followUpsCompleted ?? 0],
     ["Meetings", metrics.meetingsBooked ?? 0],
     ["Opportunities", metrics.opportunitiesCreated ?? 0],
     ["Pipeline", currency(metrics.activePipelineValue ?? 0)],
