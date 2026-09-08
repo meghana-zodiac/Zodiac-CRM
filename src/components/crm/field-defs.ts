@@ -310,7 +310,10 @@ export const trainingBatchFields = (
   { name: "notes", label: "Notes", type: "textarea" },
 ];
 
-export const activityFields = (type?: string): FieldDef[] => [
+export const activityFields = (
+  type?: string,
+  relatedRecords: { value: string; label: string }[] = [],
+): FieldDef[] => [
   { name: "title", label: "Subject", required: true, span: 2 },
   {
     name: "activity_type",
@@ -320,6 +323,13 @@ export const activityFields = (type?: string): FieldDef[] => [
   },
   { name: "status", label: "Status", type: "select", options: opts(ACTIVITY_STATUSES) },
   { name: "due_date", label: "Date & time", type: "datetime" },
+  {
+    name: "priority",
+    label: "Priority",
+    type: "select",
+    options: opts(["Low", "Medium", "High"]),
+  },
+  { name: "reminder_at", label: "Reminder", type: "datetime" },
   ownerField,
   {
     name: "related_to_type",
@@ -333,6 +343,13 @@ export const activityFields = (type?: string): FieldDef[] => [
       "Training Request",
       "Training Batch",
     ]),
+  },
+  {
+    name: "related_to_id",
+    label: "Linked CRM record",
+    type: "select",
+    options: relatedRecords,
+    span: 2,
   },
   {
     name: "service_line",
