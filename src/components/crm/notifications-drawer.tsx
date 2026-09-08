@@ -124,7 +124,8 @@ export function useNotifications(enabled = true) {
     }
 
     for (const activity of activities.data ?? []) {
-      const left = daysUntil(activity.due_date);
+      const notificationDate = activity.reminder_at ?? activity.due_date;
+      const left = daysUntil(notificationDate);
       if (activity.status !== "Completed") {
         if (left === null || left > 1) continue;
         out.push({
@@ -139,7 +140,7 @@ export function useNotifications(enabled = true) {
                 ? `${activity.activity_type} overdue`
                 : `${activity.activity_type} due`,
           detail: `${activity.title} · ${activity.owner_name ?? "Unassigned"}`,
-          timestamp: activity.due_date,
+          timestamp: notificationDate,
           tone: left !== null && left < 0 ? "danger" : "warning",
         });
       } else if (
