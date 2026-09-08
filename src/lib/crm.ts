@@ -10,6 +10,10 @@ export type Lead = Tables<"leads">;
 export type Trainer = Tables<"trainers">;
 export type TrainingRequest = Tables<"training_requests">;
 export type TrainingBatch = Tables<"training_batches">;
+export type ActivityRelatedRecord = {
+  value: string;
+  label: string;
+};
 
 export type ContactWithAccount = Contact & { accounts: { name: string } | null };
 export type DealWithRefs = Deal & {
@@ -356,6 +360,53 @@ export const activitiesQuery = () =>
       unwrap<Activity[]>(
         await supabase.from("activities").select("*").order("created_at", { ascending: false }),
       ),
+  });
+
+export const activityRelatedRecordsQuery = () =>
+  queryOptions({
+    queryKey: ["activity-related-records"],
+    staleTime: 60_000,
+    queryFn: async (): Promise<ActivityRelatedRecord[]> => {
+      const [accounts, contacts, leads, deals] = await Promise.all([
+        supabase
+          .from("accounts")
+          .select("id,name")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("contacts")
+          .select("id,first_name,last_name")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("leads")
+          .select("id,company_name,contact_name")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("deals")
+          .select("id,deal_name")
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ]);
+      const failed = [accounts, contacts, leads, deals].find((result) => result.error);
+      if (failed?.error) throw new Error(failed.error.message);
+      return [
+        ...(leads.data ?? []).map((row) => ({
+          value: row.id,
+          label: `[Lead] ${row.company_name}${row.contact_name ? ` · ${row.contact_name}` : ""}`,
+        })),
+        ...(accounts.data ?? []).map((row) => ({ value: row.id, label: `[Client] ${row.name}` })),
+        ...(contacts.data ?? []).map((row) => ({
+          value: row.id,
+          label: `[Contact] ${fullName(row.first_name, row.last_name)}`,
+        })),
+        ...(deals.data ?? []).map((row) => ({
+          value: row.id,
+          label: `[Proposal] ${row.deal_name}`,
+        })),
+      ];
+    },
   });
 
 export const trainersQuery = () =>
