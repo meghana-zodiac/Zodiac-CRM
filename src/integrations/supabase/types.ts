@@ -95,45 +95,57 @@ export type Database = {
       activities: {
         Row: {
           activity_type: Database["public"]["Enums"]["activity_type"];
+          completed_at: string | null;
           created_at: string;
           due_date: string | null;
           id: string;
           notes: string | null;
           owner_name: string | null;
+          priority: string;
           related_to_id: string | null;
           related_to_type: string | null;
+          reminder_at: string | null;
           service_details: Json;
           service_line: string | null;
           status: Database["public"]["Enums"]["activity_status"];
           title: string;
+          updated_at: string;
         };
         Insert: {
           activity_type?: Database["public"]["Enums"]["activity_type"];
+          completed_at?: string | null;
           created_at?: string;
           due_date?: string | null;
           id?: string;
           notes?: string | null;
           owner_name?: string | null;
+          priority?: string;
           related_to_id?: string | null;
           related_to_type?: string | null;
+          reminder_at?: string | null;
           service_details?: Json;
           service_line?: string | null;
           status?: Database["public"]["Enums"]["activity_status"];
           title: string;
+          updated_at?: string;
         };
         Update: {
           activity_type?: Database["public"]["Enums"]["activity_type"];
+          completed_at?: string | null;
           created_at?: string;
           due_date?: string | null;
           id?: string;
           notes?: string | null;
           owner_name?: string | null;
+          priority?: string;
           related_to_id?: string | null;
           related_to_type?: string | null;
+          reminder_at?: string | null;
           service_details?: Json;
           service_line?: string | null;
           status?: Database["public"]["Enums"]["activity_status"];
           title?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
