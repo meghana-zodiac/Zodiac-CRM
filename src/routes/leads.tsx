@@ -44,39 +44,30 @@ function LeadsPage() {
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
-  const [contactSyncProgress, setContactSyncProgress] = useState<string | null>(null);
-  const ceipalSync = useMutation({
-    mutationFn: async () => {
-      const leadsResult = await runCeipalSync();
-      let contactsResult = await runCeipalContactSync();
-      let checked = contactsResult.checked;
-      let updated = contactsResult.updated;
-      let withPhone = contactsResult.withPhone;
-      let withoutPhone = contactsResult.withoutPhone;
-      setContactSyncProgress(`${checked} checked · ${contactsResult.remaining} remaining`);
-
-      while (contactsResult.remaining > 0) {
-        const nextBatch = await runCeipalContactSync();
-        if (nextBatch.checked === 0) throw new Error("Contact sync paused because CEIPAL returned no progress.");
-        checked += nextBatch.checked;
-        updated += nextBatch.updated;
-        withPhone += nextBatch.withPhone;
-        withoutPhone += nextBatch.withoutPhone;
-        contactsResult = nextBatch;
-        setContactSyncProgress(`${checked} checked · ${contactsResult.remaining} remaining`);
-      }
-
-      return { leadsResult, checked, updated, withPhone, withoutPhone };
-    },
-    onSuccess: async ({ leadsResult, checked, withPhone, withoutPhone }) => {
+  const ceipalLeadSync = useMutation({
+    mutationFn: () => runCeipalSync(),
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
-      setContactSyncProgress(null);
-      toast.success(`${leadsResult.synced} leads synced. ${checked} contacts checked: ${withPhone} with phone, ${withoutPhone} without phone.`);
+      toast.success(
+        result.complete
+          ? `Lead sync completed. ${result.totalSynced ?? result.synced} CEIPAL leads processed.`
+          : `${result.synced} leads synced. Progress saved at CEIPAL page ${result.nextPage}; click again to continue.`,
+      );
     },
-    onError: (error: Error) => {
-      setContactSyncProgress(null);
-      toast.error(`${error.message} Progress was saved; click Sync from CEIPAL to resume.`);
+    onError: (error: Error) =>
+      toast.error(`${error.message} Progress was saved; try again to resume.`),
+  });
+  const ceipalContactSync = useMutation({
+    mutationFn: () => runCeipalContactSync(),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success(
+        result.checked === 0
+          ? "All CEIPAL lead contacts have already been checked."
+          : `${result.checked} contacts checked: ${result.withPhone} with phone, ${result.withoutPhone} without phone. ${result.remaining} remaining.`,
+      );
     },
+    onError: (error: Error) => toast.error(`${error.message} Completed batches remain saved.`),
   });
 
   const columns: Column<Lead>[] = [
@@ -123,18 +114,31 @@ function LeadsPage() {
             filterPlacement="toolbar"
             ownerOf={(row) => row.owner_name}
             headerAction={
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                   <FileSpreadsheet className="size-4" /> Import Excel
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={ceipalSync.isPending}
-                  onClick={() => ceipalSync.mutate()}
+                  disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
+                  onClick={() => ceipalLeadSync.mutate()}
                 >
-                  <RefreshCw className={ceipalSync.isPending ? "size-4 animate-spin" : "size-4"} />
-                  {ceipalSync.isPending ? contactSyncProgress ?? "Syncing leads…" : "Sync from CEIPAL"}
+                  <RefreshCw
+                    className={ceipalLeadSync.isPending ? "size-4 animate-spin" : "size-4"}
+                  />
+                  {ceipalLeadSync.isPending ? "Syncing 500 leads…" : "Sync CEIPAL leads"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
+                  onClick={() => ceipalContactSync.mutate()}
+                >
+                  <RefreshCw
+                    className={ceipalContactSync.isPending ? "size-4 animate-spin" : "size-4"}
+                  />
+                  {ceipalContactSync.isPending ? "Checking 25 contacts…" : "Resume contact details"}
                 </Button>
               </div>
             }
