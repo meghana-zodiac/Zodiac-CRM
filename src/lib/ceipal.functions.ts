@@ -7,6 +7,9 @@ type JsonObject = Record<string, unknown>;
 export type CeipalSyncResult = {
   synced: number;
   source: "ATS";
+  complete?: boolean;
+  nextPage?: number;
+  totalSynced?: number;
 };
 
 export type CeipalLeadContactSyncResult = {
@@ -24,6 +27,7 @@ const CEIPAL_MAX_RETRIES = 4;
 // Keep each request short enough for the hosting runtime. The UI automatically
 // requests the next batch until every CEIPAL lead has been checked.
 const CEIPAL_CONTACT_BATCH_SIZE = 25;
+const CEIPAL_LEAD_PAGES_PER_RUN = 10;
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -145,8 +149,17 @@ function primaryContactFrom(payload: unknown) {
     ? rawContacts.filter((item): item is JsonObject => !!item && typeof item === "object")
     : [];
   const phoneKeys = [
-    "mobile_no", "mobile", "mobile_number", "mobileNumber", "contact_number",
-    "contactNumber", "phone", "phone_number", "phoneNumber", "work_phone", "office_no",
+    "mobile_no",
+    "mobile",
+    "mobile_number",
+    "mobileNumber",
+    "contact_number",
+    "contactNumber",
+    "phone",
+    "phone_number",
+    "phoneNumber",
+    "work_phone",
+    "office_no",
   ];
   const contact = contacts.find((item) => firstText(item, phoneKeys)) ?? contacts[0];
   if (!contact) return null;
@@ -155,38 +168,26 @@ function primaryContactFrom(payload: unknown) {
   const lastName = firstText(contact, ["contact_last_name", "last_name", "lastName"]);
   const combinedName = [firstName, lastName].filter(Boolean).join(" ") || null;
   return {
-    name: firstText(contact, ["contact_person_name", "contact_name", "contactName", "name"]) ?? combinedName,
+    name:
+      firstText(contact, ["contact_person_name", "contact_name", "contactName", "name"]) ??
+      combinedName,
     phone: firstText(contact, phoneKeys),
-    email: firstText(contact, ["email", "email_id", "emailId", "email_address", "emailAddress", "contact_email"]),
+    email: firstText(contact, [
+      "email",
+      "email_id",
+      "emailId",
+      "email_address",
+      "emailAddress",
+      "contact_email",
+    ]),
   };
 }
 
-async function fetchLeads(token: string): Promise<JsonObject[]> {
-  const leads: JsonObject[] = [];
-  const seenIds = new Set<string>();
-
-  for (let page = 1; page <= 100; page += 1) {
-    const url = new URL(`${CEIPAL_BASE_URL}/v2/getLeadsList/`);
-    url.searchParams.set("limit", "50");
-    url.searchParams.set("page", String(page));
-
-    const payload = await ceipalJson(url.toString(), token);
-    const batch = recordsFrom(payload);
-    let added = 0;
-
-    for (const lead of batch) {
-      const id = text(lead["id"]);
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      leads.push(lead);
-      added += 1;
-    }
-
-    if (batch.length < 50 || added === 0) break;
-    await sleep(CEIPAL_PAGE_DELAY_MS);
-  }
-
-  return leads;
+async function fetchLeadsPage(token: string, page: number): Promise<JsonObject[]> {
+  const url = new URL(`${CEIPAL_BASE_URL}/v2/getLeadsList/`);
+  url.searchParams.set("limit", "50");
+  url.searchParams.set("page", String(page));
+  return recordsFrom(await ceipalJson(url.toString(), token));
 }
 
 async function fetchClients(token: string): Promise<JsonObject[]> {
@@ -282,21 +283,77 @@ export const syncCeipalClients = createServerFn({ method: "POST" })
 export const syncCeipalLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalSyncResult> => {
-    const token = await authenticate();
-    const ceipalLeads = await fetchLeads(token);
-    const leads = ceipalLeads
-      .map(leadFrom)
-      .filter((lead): lead is NonNullable<typeof lead> => lead !== null);
-    if (leads.length === 0) throw new Error("CEIPAL returned no usable leads.");
+    const syncKey = "leads";
+    const { data: savedState, error: stateError } = await context.supabase
+      .from("ceipal_sync_state")
+      .select("next_page,status,total_synced")
+      .eq("sync_key", syncKey)
+      .maybeSingle();
+    if (stateError) throw new Error(`Could not load CEIPAL sync progress: ${stateError.message}`);
 
-    for (let offset = 0; offset < leads.length; offset += 200) {
-      const { error } = await context.supabase
-        .from("leads")
-        .upsert(leads.slice(offset, offset + 200), { onConflict: "ceipal_id" });
-      if (error) throw new Error(`Could not save CEIPAL leads: ${error.message}`);
+    let page = savedState?.next_page ?? 1;
+    let synced = 0;
+    const previousTotal = savedState?.status === "completed" ? 0 : (savedState?.total_synced ?? 0);
+    let complete = false;
+
+    await context.supabase.from("ceipal_sync_state").upsert({
+      sync_key: syncKey,
+      next_page: page,
+      status: "running",
+      total_synced: previousTotal,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    });
+
+    try {
+      const token = await authenticate();
+      for (let batchPage = 0; batchPage < CEIPAL_LEAD_PAGES_PER_RUN; batchPage += 1) {
+        const rawLeads = await fetchLeadsPage(token, page);
+        const leads = rawLeads
+          .map(leadFrom)
+          .filter((lead): lead is NonNullable<typeof lead> => lead !== null);
+
+        if (leads.length > 0) {
+          const { error } = await context.supabase
+            .from("leads")
+            .upsert(leads, { onConflict: "ceipal_id" });
+          if (error) throw new Error(`Could not save CEIPAL leads: ${error.message}`);
+          synced += leads.length;
+        }
+
+        if (rawLeads.length < 50) {
+          complete = true;
+          break;
+        }
+        page += 1;
+        if (batchPage < CEIPAL_LEAD_PAGES_PER_RUN - 1) await sleep(CEIPAL_PAGE_DELAY_MS);
+      }
+
+      const totalSynced = previousTotal + synced;
+      const nextPage = complete ? 1 : page;
+      const { error: saveStateError } = await context.supabase.from("ceipal_sync_state").upsert({
+        sync_key: syncKey,
+        next_page: nextPage,
+        status: complete ? "completed" : "idle",
+        total_synced: totalSynced,
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      });
+      if (saveStateError)
+        throw new Error(`Could not save CEIPAL sync progress: ${saveStateError.message}`);
+
+      return { synced, totalSynced, complete, nextPage, source: "ATS" };
+    } catch (error) {
+      await context.supabase.from("ceipal_sync_state").upsert({
+        sync_key: syncKey,
+        next_page: page,
+        status: "failed",
+        total_synced: previousTotal + synced,
+        last_error: error instanceof Error ? error.message : "Unknown CEIPAL sync error",
+        updated_at: new Date().toISOString(),
+      });
+      throw error;
     }
-
-    return { synced: leads.length, source: "ATS" };
   });
 
 export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
@@ -344,7 +401,8 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
           .from("leads")
           .update({ ceipal_contact_synced_at: new Date().toISOString() })
           .eq("id", candidate.id);
-        if (markError) throw new Error(`Could not mark a CEIPAL lead as checked: ${markError.message}`);
+        if (markError)
+          throw new Error(`Could not mark a CEIPAL lead as checked: ${markError.message}`);
         checked += 1;
         withoutPhone += 1;
       }
@@ -356,6 +414,7 @@ export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
       .select("id", { count: "exact", head: true })
       .not("ceipal_id", "is", null)
       .is("ceipal_contact_synced_at", null);
-    if (countError) throw new Error(`Could not count remaining CEIPAL leads: ${countError.message}`);
+    if (countError)
+      throw new Error(`Could not count remaining CEIPAL leads: ${countError.message}`);
     return { checked, updated, withPhone, withoutPhone, remaining: count ?? 0, source: "ATS" };
   });
