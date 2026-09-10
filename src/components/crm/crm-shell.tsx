@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   Building2,
+  Contact as ContactIcon,
   CalendarDays,
   ChevronDown,
   ChevronsLeft,
@@ -69,6 +70,7 @@ const mobileNavItems = [
   { label: "Home", to: "/", icon: Home },
   { label: "Leads", to: "/leads", icon: Sparkles },
   { label: "Clients", to: "/accounts", icon: Building2 },
+  { label: "Contacts", to: "/contacts", icon: ContactIcon },
   { label: "Deals", to: "/deals", icon: FileSignature },
 ] as const;
 
@@ -410,7 +412,7 @@ export function CrmShell({
 
       <nav
         aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom))] grid-cols-5 border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom))] grid-cols-6 border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden"
       >
         {mobileNavItems.map((item) => {
           const active = pathname === item.to;
