@@ -266,6 +266,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      ceipal_sync_state: {
+        Row: {
+          last_error: string | null;
+          next_page: number;
+          status: string;
+          sync_key: string;
+          total_synced: number;
+          updated_at: string;
+        };
+        Insert: {
+          last_error?: string | null;
+          next_page?: number;
+          status?: string;
+          sync_key: string;
+          total_synced?: number;
+          updated_at?: string;
+        };
+        Update: {
+          last_error?: string | null;
+          next_page?: number;
+          status?: string;
+          sync_key?: string;
+          total_synced?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       contacts: {
         Row: {
           account_id: string | null;
