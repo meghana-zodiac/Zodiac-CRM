@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
-import { parseSmartPaste, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
+import { parseSmartPasteDetailed, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
 
 export type FieldType =
   "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
@@ -68,6 +68,11 @@ type PasteConflict = {
   label: string;
   current: string;
   incoming: string;
+};
+type PasteReport = {
+  filled: string[];
+  review: Array<{ label: string; value: string; reason: string }>;
+  unclassified: string[];
 };
 
 type AddressBookContact = {
@@ -161,6 +166,7 @@ export function RecordDialog({
   const [values, setValues] = useState<Values>({});
   const [pasteText, setPasteText] = useState("");
   const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
+  const [pasteReport, setPasteReport] = useState<PasteReport | null>(null);
   const addressBookFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -173,10 +179,13 @@ export function RecordDialog({
     setValues(next);
     setPasteText("");
     setPasteConflicts([]);
+    setPasteReport(null);
   }, [open, record, fields]);
 
   const sortPastedDetails = () => {
-    const parsed = parseSmartPaste(table, pasteText);
+    const parsedResult = parseSmartPasteDetailed(table, pasteText);
+    const parsed = { ...parsedResult.values };
+    const needsReview: PasteReport["review"] = [];
     for (const field of fields) {
       const parsedValue = parsed[field.name];
       if (!parsedValue || !field.options?.length) continue;
@@ -188,27 +197,50 @@ export function RecordDialog({
           normalized.includes(option.label.toLowerCase()),
       );
       if (match) parsed[field.name] = match.value;
-      else delete parsed[field.name];
+      else {
+        needsReview.push({
+          label: field.label,
+          value: parsedValue,
+          reason: "No exact option was found. Please select this field manually.",
+        });
+        delete parsed[field.name];
+      }
     }
     setValues((current) => {
       const next = { ...current };
       const conflicts: PasteConflict[] = [];
+      const filled: string[] = [];
       for (const [fieldName, incoming] of Object.entries(parsed)) {
         if (!incoming) continue;
+        const field = fields.find((candidate) => candidate.name === fieldName);
+        const label = field?.label ?? fieldName;
         const existing = current[fieldName]?.trim() ?? "";
         if (!existing) {
           next[fieldName] = incoming;
+          filled.push(label);
+          if (parsedResult.confidence[fieldName] === "review") {
+            needsReview.push({
+              label,
+              value: incoming,
+              reason: "Detected from an unstructured sentence. Please verify it.",
+            });
+          }
           continue;
         }
         if (existing.toLowerCase() === incoming.trim().toLowerCase()) continue;
         conflicts.push({
           field: fieldName,
-          label: fields.find((field) => field.name === fieldName)?.label ?? fieldName,
+          label,
           current: existing,
           incoming,
         });
       }
       setPasteConflicts(conflicts);
+      setPasteReport({
+        filled,
+        review: needsReview,
+        unclassified: [...new Set(parsedResult.unclassified)],
+      });
       return next;
     });
     toast.success(
@@ -423,6 +455,44 @@ export function RecordDialog({
             >
               Sort into fields
             </Button>
+            {pasteReport ? (
+              <div className="mt-3 space-y-2 border-t border-primary/15 pt-3 text-xs">
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-900">
+                  <span className="font-semibold">
+                    {pasteReport.filled.length}{" "}
+                    {pasteReport.filled.length === 1 ? "field" : "fields"} filled
+                  </span>
+                  {pasteReport.filled.length ? (
+                    <span>: {pasteReport.filled.join(", ")}</span>
+                  ) : (
+                    <span>. Add more detail or use labels such as Name:, Company:, or Email:.</span>
+                  )}
+                </div>
+                {pasteReport.review.length ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-amber-950">
+                    <p className="font-semibold">Please review</p>
+                    <ul className="mt-1.5 space-y-1">
+                      {pasteReport.review.map((item, index) => (
+                        <li key={`${item.label}-${index}`}>
+                          <span className="font-medium">{item.label}:</span> {item.value} —{" "}
+                          {item.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {pasteReport.unclassified.length ? (
+                  <div className="rounded-md border border-border bg-background p-2.5 text-muted-foreground">
+                    <p className="font-semibold text-foreground">Could not classify</p>
+                    <ul className="mt-1.5 list-disc space-y-1 pl-4">
+                      {pasteReport.unclassified.map((item, index) => (
+                        <li key={`${item}-${index}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {pasteConflicts.length ? (
               <div className="mt-3 space-y-2 border-t border-primary/15 pt-3">
                 <p className="text-xs font-semibold text-foreground">

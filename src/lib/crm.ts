@@ -131,6 +131,7 @@ export const SOFT_SKILL_COURSES = [
   "Communication Skills",
   "Business Etiquette",
   "Team Collaboration",
+  "POSH Awareness",
 ] as const;
 export const ALL_COURSES = [...TECHNICAL_COURSES, ...SOFT_SKILL_COURSES] as const;
 
