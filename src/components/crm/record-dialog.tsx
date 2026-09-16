@@ -84,6 +84,7 @@ type AddressBookContact = {
 
 type ContactPickerNavigator = Navigator & {
   contacts?: {
+    getProperties?: () => Promise<Array<"name" | "email" | "tel">>;
     select: (
       properties: Array<"name" | "email" | "tel">,
       options?: { multiple?: boolean },
@@ -167,6 +168,7 @@ export function RecordDialog({
   const [pasteText, setPasteText] = useState("");
   const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
   const [pasteReport, setPasteReport] = useState<PasteReport | null>(null);
+  const [supportsContactPicker, setSupportsContactPicker] = useState(false);
   const addressBookFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -180,6 +182,7 @@ export function RecordDialog({
     setPasteText("");
     setPasteConflicts([]);
     setPasteReport(null);
+    setSupportsContactPicker(Boolean((navigator as ContactPickerNavigator).contacts?.select));
   }, [open, record, fields]);
 
   const sortPastedDetails = () => {
@@ -301,10 +304,26 @@ export function RecordDialog({
     }
 
     try {
-      const contacts = await contactPicker.select(["name", "tel", "email"], {
-        multiple: false,
-      });
-      if (contacts[0]) applyAddressBookContact(contacts[0]);
+      const requestedProperties: Array<"name" | "email" | "tel"> = ["name", "tel", "email"];
+      const availableProperties = contactPicker.getProperties
+        ? await contactPicker.getProperties()
+        : requestedProperties;
+      const supportedProperties = requestedProperties.filter((property) =>
+        availableProperties.includes(property),
+      );
+      const contacts = await contactPicker.select(
+        supportedProperties.length ? supportedProperties : ["name", "tel"],
+        {
+          multiple: false,
+        },
+      );
+      if (contacts[0]) {
+        applyAddressBookContact(contacts[0]);
+      } else {
+        toast.info(
+          "No contact was selected. You can use Smart Paste or upload a .vcf contact card.",
+        );
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error("The address book could not be opened. You can select a contact file instead.");
@@ -394,13 +413,19 @@ export function RecordDialog({
                 <ContactRound className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-foreground">Import from address book</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {supportsContactPicker
+                    ? "Select from phone contacts"
+                    : "Upload contact card (.vcf)"}
+                </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {table === "accounts"
-                    ? "Choose one contact to fill the client name and phone number. Company details from a contact file are used when available."
-                    : table === "leads"
-                      ? "Choose one contact to fill the contact person, phone and email. Company details from a contact file are used when available."
-                      : "Choose one contact to fill their name, phone number and email."}
+                  {!supportsContactPicker
+                    ? "Direct contact selection is unavailable in this browser. Upload a contact card, use Smart Paste, or enter the details manually."
+                    : table === "accounts"
+                      ? "Choose one contact to fill the client name and phone number. Company details from a contact file are used when available."
+                      : table === "leads"
+                        ? "Choose one contact to fill the contact person, phone and email. Company details from a contact file are used when available."
+                        : "Choose one contact to fill their name, phone number and email."}
                 </p>
               </div>
             </div>
@@ -412,7 +437,7 @@ export function RecordDialog({
               onClick={importFromAddressBook}
             >
               <ContactRound className="mr-2 h-4 w-4" />
-              Choose contact
+              {supportsContactPicker ? "Choose phone contact" : "Choose .vcf file"}
             </Button>
             <input
               ref={addressBookFileRef}
