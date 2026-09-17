@@ -14,7 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICE_LINES, type Lead } from "@/lib/crm";
+
+type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 
 type RawRow = Record<string, unknown>;
 type LeadField =
@@ -109,7 +112,9 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
+  const worksheet = workbook.Sheets[firstSheet];
+  if (!worksheet) throw new Error("The first worksheet could not be read.");
+  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
     defval: "",
     raw: false,
   });
@@ -133,6 +138,7 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       estimatedValue !== null && estimatedValue < 0 ? "Estimated value cannot be negative" : "",
     ].filter(Boolean);
 
+    const error = errors.length ? errors.join("; ") : null;
     return {
       rowNumber: index + 2,
       company_name: companyName,
@@ -147,7 +153,7 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       estimated_value: estimatedValue,
       owner_name: nullable(valueFor(row, "owner_name")),
       notes: nullable(valueFor(row, "notes")),
-      error: errors.length ? errors.join("; ") : undefined,
+      ...(error ? { error } : {}),
     };
   });
 }
@@ -183,7 +189,10 @@ export function LeadImportDialog({
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
+      const sheet = workbook.Sheets[firstSheet];
+      if (!sheet) throw new Error("The first worksheet could not be read.");
       const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
@@ -250,7 +259,7 @@ export function LeadImportDialog({
         ]),
       );
       const seen = new Set<string>();
-      const payload: Array<Record<string, unknown>> = [];
+      const payload: LeadInsert[] = [];
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;

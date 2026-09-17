@@ -150,7 +150,7 @@ function StatCard({
   value: string;
   detail: string;
   icon: typeof Sparkles;
-  change?: number;
+  change?: number | undefined;
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-panel">

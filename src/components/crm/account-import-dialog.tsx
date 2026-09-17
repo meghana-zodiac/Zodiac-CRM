@@ -14,7 +14,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import type { Account } from "@/lib/crm";
+
+type AccountInsert = Database["public"]["Tables"]["accounts"]["Insert"];
+type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
 
 type ImportRow = {
   rowNumber: number;
@@ -76,13 +80,16 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
+  const worksheet = workbook.Sheets[firstSheet];
+  if (!worksheet) throw new Error("The first worksheet could not be read.");
+  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
     defval: "",
     raw: false,
   });
 
   return source.map((row, index) => {
     const name = valueFor(row, "name");
+    const error = name ? null : "Company Name is required";
     return {
       rowNumber: index + 2,
       name,
@@ -98,7 +105,7 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       contact_phone: nullable(valueFor(row, "contact_phone")),
       contact_title: nullable(valueFor(row, "contact_title")),
       contact_department: nullable(valueFor(row, "contact_department")),
-      error: name ? undefined : "Company Name is required",
+      ...(error ? { error } : {}),
     };
   });
 }
@@ -203,7 +210,7 @@ export function AccountImportDialog({
       let updated = 0;
       let contactsAdded = 0;
       let contactsUpdated = 0;
-      const payload: Array<Record<string, string | null>> = [];
+      const payload: AccountInsert[] = [];
 
       for (const row of rows) {
         if (row.error) continue;
@@ -255,7 +262,7 @@ export function AccountImportDialog({
           .filter((contact) => contact.email)
           .map((contact) => [matchKey(contact.email), contact]),
       );
-      const contactPayload: Array<Record<string, unknown>> = [];
+      const contactPayload: ContactInsert[] = [];
       const seenContacts = new Set<string>();
       for (const row of rows) {
         if (row.error) continue;

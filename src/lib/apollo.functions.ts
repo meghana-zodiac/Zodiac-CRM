@@ -51,16 +51,17 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
   const apiKey = process.env["VITE_APOLLO_API_KEY"] || process.env["APOLLO_API_KEY"];
   if (!apiKey) throw new Error("Apollo API Key is missing");
 
-  const response = await fetch(`https://api.apollo.io/v1${path}`, {
+  const requestInit: RequestInit = {
     method: init.method ?? "POST",
-    body: init.body,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
       "X-Api-Key": apiKey,
       ...(init.headers ?? {}),
     },
-  });
+    ...(init.body !== undefined ? { body: init.body } : {}),
+  };
+  const response = await fetch(`https://api.apollo.io/v1${path}`, requestInit);
 
   if (!response.ok) {
     const body = await response.text();
@@ -72,7 +73,7 @@ async function apollo(path: string, init: RequestInit): Promise<Json> {
 }
 
 export const searchApolloContacts = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => searchSchema.parse(data))
+  .validator((data: unknown) => searchSchema.parse(data))
   .handler(async ({ data }): Promise<{ prospects: ApolloProspect[]; total: number }> => {
     try {
       // Pick only non-empty fields and build a clean open keyword string
@@ -97,7 +98,8 @@ export const searchApolloContacts = createServerFn({ method: "POST" })
       });
 
       const people = Array.isArray(result["people"]) ? (result["people"] as Json[]) : [];
-      const total = typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
+      const total =
+        typeof result["total_entries"] === "number" ? result["total_entries"] : people.length;
 
       const enriched = people.slice(0, 8).map((person) => {
         const id = str(person["id"]);

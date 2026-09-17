@@ -14,7 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import type { Account, ContactWithAccount } from "@/lib/crm";
+
+type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
 
 type RawRow = Record<string, unknown>;
 type ContactField =
@@ -103,7 +106,9 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
+  const worksheet = workbook.Sheets[firstSheet];
+  if (!worksheet) throw new Error("The first worksheet could not be read.");
+  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
     defval: "",
     raw: false,
   });
@@ -129,6 +134,7 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
       !lastName ? "Contact name is required" : "",
       accountName && !accountId ? `Company “${accountName}” was not found` : "",
     ].filter(Boolean);
+    const error = errors.length ? errors.join("; ") : null;
     return {
       rowNumber: index + 2,
       first_name: nullable(firstName),
@@ -142,7 +148,7 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
       owner_name: nullable(valueFor(row, "owner_name")),
       last_activity_date: excelDate(valueFor(row, "last_activity_date")),
       additional_fields: additionalFields,
-      error: errors.length ? errors.join("; ") : undefined,
+      ...(error ? { error } : {}),
     };
   });
 }
@@ -180,7 +186,10 @@ export function ContactImportDialog({
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
+      const sheet = workbook.Sheets[firstSheet];
+      if (!sheet) throw new Error("The first worksheet could not be read.");
       const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
@@ -245,7 +254,7 @@ export function ContactImportDialog({
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;
-      const payload: Array<Record<string, unknown>> = [];
+      const payload: ContactInsert[] = [];
       for (const row of rows) {
         if (row.error) continue;
         const match = row.email ? byEmail.get(key(row.email)) : undefined;

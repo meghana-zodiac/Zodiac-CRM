@@ -12,6 +12,7 @@ import { StatusPill, leadTone } from "@/components/crm/status-pill";
 import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { LEAD_STATUSES, currency, formatDate, leadsQuery, type Lead } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 
@@ -42,12 +43,25 @@ function LeadsPage() {
   const runCeipalSync = useServerFn(syncCeipalLeads);
   const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
   const leads = useQuery(leadsQuery());
+  const ceipalState = useQuery({
+    queryKey: ["ceipal-sync-state", "leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ceipal_sync_state")
+        .select("next_page,status,total_synced,last_error,updated_at")
+        .eq("sync_key", "leads")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
   const ceipalLeadSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      await queryClient.invalidateQueries({ queryKey: ["ceipal-sync-state", "leads"] });
       toast.success(
         result.complete
           ? `Lead sync completed. ${result.totalSynced ?? result.synced} CEIPAL leads processed.`
@@ -90,6 +104,9 @@ function LeadsPage() {
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
     { header: "Created", render: (row) => formatDate(row.created_at) },
   ];
+  const remainingContacts = (leads.data ?? []).filter(
+    (lead) => lead.ceipal_id && !lead.ceipal_contact_synced_at,
+  ).length;
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -115,6 +132,13 @@ function LeadsPage() {
             ownerOf={(row) => row.owner_name}
             headerAction={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <p className="w-full text-xs text-muted-foreground sm:text-right">
+                  CEIPAL lead sync: {ceipalState.data?.status ?? "not started"}
+                  {ceipalState.data && ceipalState.data.status !== "completed"
+                    ? ` · next page ${ceipalState.data.next_page}`
+                    : ""}
+                  {` · ${remainingContacts.toLocaleString()} contact details remaining`}
+                </p>
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                   <FileSpreadsheet className="size-4" /> Import Excel
                 </Button>

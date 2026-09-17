@@ -5,9 +5,15 @@ export const Route = createFileRoute("/tasks")({
   head: () => ({
     meta: [
       { title: "Tasks — Zodiac HR Consultants" },
-      { name: "description", content: "Internal BD and L&D tasks with due dates, owners and completion status." },
+      {
+        name: "description",
+        content: "Internal BD and L&D tasks with due dates, owners and completion status.",
+      },
       { property: "og:title", content: "Tasks — Zodiac HR Consultants" },
-      { property: "og:description", content: "Internal BD and L&D tasks with due dates, owners and completion status." },
+      {
+        property: "og:description",
+        content: "Internal BD and L&D tasks with due dates, owners and completion status.",
+      },
     ],
   }),
   component: () => <ActivityModule type="Task" title="Tasks" createLabel="Create Task" />,

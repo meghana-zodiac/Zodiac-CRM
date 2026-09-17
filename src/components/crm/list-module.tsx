@@ -198,7 +198,13 @@ export function ListModule<T extends { id: string }>({
           {isLoading ? (
             <EmptyState message={`Loading ${title.toLowerCase()}…`} />
           ) : filtered.length === 0 ? (
-            <EmptyState message={`No ${title.toLowerCase()} match this view.`} />
+            <EmptyState
+              message={
+                rows.length === 0
+                  ? `No ${title.toLowerCase()} yet. Use “${createLabel}” to add the first record.`
+                  : `No ${title.toLowerCase()} match this view.`
+              }
+            />
           ) : tile && view === "tile" ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {visibleRows.map((row) => (

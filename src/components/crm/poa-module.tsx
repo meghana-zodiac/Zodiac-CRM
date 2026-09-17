@@ -62,7 +62,7 @@ const ACTUALS: Metric[] = [
 const PERCENTAGES = TARGETS.map((target, index) => ({
   label: target.short,
   target: target.field,
-  actual: ACTUALS[index].field,
+  actual: ACTUALS[index]?.field ?? ACTUALS[0]!.field,
 }));
 
 const EXTRA_METRICS: Metric[] = [
@@ -718,7 +718,7 @@ async function exportWorkbook(
       output[column.label] = Number(row[column.field] ?? 0);
     for (const column of PERCENTAGES)
       output[`${column.label} %`] = pct(Number(row[column.actual]), Number(row[column.target]));
-    output.Notes = row.notes ?? "";
+    output["Notes"] = row.notes ?? "";
     return output;
   });
   const wb = XLSX.utils.book_new();
@@ -915,7 +915,7 @@ export function PoaModule() {
             size="icon"
             className="size-8"
             disabled={monthIndex <= 0}
-            onClick={() => setMonth(options[monthIndex - 1])}
+            onClick={() => setMonth(options[monthIndex - 1] ?? month)}
           >
             <ChevronLeft className="size-4" />
           </Button>
@@ -933,7 +933,7 @@ export function PoaModule() {
             size="icon"
             className="size-8"
             disabled={monthIndex >= options.length - 1}
-            onClick={() => setMonth(options[monthIndex + 1])}
+            onClick={() => setMonth(options[monthIndex + 1] ?? month)}
           >
             <ChevronRight className="size-4" />
           </Button>
@@ -1003,7 +1003,11 @@ export function PoaModule() {
           </div>
         </TabsContent>
         <TabsContent value="team" className="mt-0">
-          <CagSummaryView rows={cagSummaryQuery.data ?? []} member={member} ownMember={ownMember} />
+          <CagSummaryView
+            rows={cagSummaryQuery.data ?? []}
+            member={member}
+            {...(ownMember ? { ownMember } : {})}
+          />
         </TabsContent>
         <TabsContent value="targets" className="mt-0">
           {member ? (

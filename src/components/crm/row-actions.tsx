@@ -62,7 +62,6 @@ export function RowActions({
             className="text-destructive focus:text-destructive"
             onClick={() => setConfirming(true)}
           >
-
             <Trash2 className="size-4" /> Delete
           </DropdownMenuItem>
         </DropdownMenuContent>

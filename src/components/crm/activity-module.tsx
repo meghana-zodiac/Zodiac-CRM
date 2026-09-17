@@ -272,24 +272,24 @@ export function ActivityModule({
                       ) : null}
                       {details ? (
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                          {typeof details.outcome === "string" ? (
+                          {typeof details["outcome"] === "string" ? (
                             <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-                              {details.outcome}
+                              {details["outcome"]}
                             </span>
                           ) : null}
-                          {typeof details.elapsed_seconds === "number" ? (
+                          {typeof details["elapsed_seconds"] === "number" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              Approx. {formatElapsed(details.elapsed_seconds)}
+                              Approx. {formatElapsed(details["elapsed_seconds"])}
                             </span>
                           ) : null}
-                          {typeof details.next_action === "string" ? (
+                          {typeof details["next_action"] === "string" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              Next: {details.next_action}
+                              Next: {details["next_action"]}
                             </span>
                           ) : null}
-                          {typeof details.priority === "string" ? (
+                          {typeof details["priority"] === "string" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              {details.priority} priority
+                              {details["priority"]} priority
                             </span>
                           ) : null}
                         </div>

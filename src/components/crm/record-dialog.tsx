@@ -101,7 +101,7 @@ function decodeVCardValue(value: string) {
     .trim();
 }
 
-function parseVCard(text: string): AddressBookContact | null {
+export function parseVCard(text: string): AddressBookContact | null {
   const lines = text.replace(/\r?\n[ \t]/g, "").split(/\r?\n/);
   let name = "";
   let structuredName = "";
@@ -267,19 +267,19 @@ export function RecordDialog({
     setValues((current) => {
       const next = { ...current };
       if (table === "leads") {
-        if (organization) next.company_name = organization;
-        if (fullName) next.contact_name = fullName;
+        if (organization) next["company_name"] = organization;
+        if (fullName) next["contact_name"] = fullName;
       }
       if (table === "contacts" && fullName) {
         const nameParts = fullName.split(/\s+/).filter(Boolean);
-        next.last_name = nameParts.pop() ?? "";
-        next.first_name = nameParts.join(" ");
+        next["last_name"] = nameParts.pop() ?? "";
+        next["first_name"] = nameParts.join(" ");
       }
       if (table === "accounts" && (organization || fullName)) {
-        next.name = organization || fullName;
+        next["name"] = organization || fullName;
       }
-      if (email) next.email = email.toLowerCase();
-      if (phone) next.phone = phone;
+      if (email) next["email"] = email.toLowerCase();
+      if (phone) next["phone"] = phone;
       return next;
     });
 
@@ -425,7 +425,7 @@ export function RecordDialog({
                       ? "Choose one contact to fill the client name and phone number. Company details from a contact file are used when available."
                       : table === "leads"
                         ? "Choose one contact to fill the contact person, phone and email. Company details from a contact file are used when available."
-                        : "Choose one contact to fill their name, phone number and email."}
+                        : "Choose one contact to fill their name, phone number and email. If Android shows ‘No contacts found’, use the contact-card option below."}
                 </p>
               </div>
             </div>
@@ -439,6 +439,17 @@ export function RecordDialog({
               <ContactRound className="mr-2 h-4 w-4" />
               {supportsContactPicker ? "Choose phone contact" : "Choose .vcf file"}
             </Button>
+            {supportsContactPicker ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="mt-1 w-full text-violet-800 hover:bg-violet-100"
+                onClick={() => addressBookFileRef.current?.click()}
+              >
+                Upload contact card instead (.vcf)
+              </Button>
+            ) : null}
             <input
               ref={addressBookFileRef}
               type="file"
@@ -565,7 +576,7 @@ export function RecordDialog({
                 </Label>
                 {type === "select" ? (
                   <Select
-                    value={values[field.name] || undefined}
+                    value={values[field.name] ?? ""}
                     onValueChange={(value) =>
                       setValues((prev) => ({ ...prev, [field.name]: value }))
                     }

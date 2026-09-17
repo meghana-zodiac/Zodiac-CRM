@@ -125,7 +125,7 @@ export function emptyPoaEntry(date: string, teamMember: string): PoaEntryInput {
   return Object.assign(
     { date, team_member: teamMember, notes: null },
     Object.fromEntries(DAILY_FIELDS.map((field) => [field, 0])),
-  ) as PoaEntryInput;
+  ) as unknown as PoaEntryInput;
 }
 
 export function toPoaEntryInput(row: PoaEntry): PoaEntryInput {

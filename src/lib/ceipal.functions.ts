@@ -24,8 +24,8 @@ export type CeipalLeadContactSyncResult = {
 const CEIPAL_BASE_URL = "https://api.ceipal.com";
 const CEIPAL_PAGE_DELAY_MS = 650;
 const CEIPAL_MAX_RETRIES = 4;
-// Keep each request short enough for the hosting runtime. The UI automatically
-// requests the next batch until every CEIPAL lead has been checked.
+// Keep each request short enough for the hosting runtime. Each user action runs
+// one resumable batch, so closing the browser never loses completed work.
 const CEIPAL_CONTACT_BATCH_SIZE = 25;
 const CEIPAL_LEAD_PAGES_PER_RUN = 10;
 
@@ -296,7 +296,7 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
     const previousTotal = savedState?.status === "completed" ? 0 : (savedState?.total_synced ?? 0);
     let complete = false;
 
-    await context.supabase.from("ceipal_sync_state").upsert({
+    const { error: startStateError } = await context.supabase.from("ceipal_sync_state").upsert({
       sync_key: syncKey,
       next_page: page,
       status: "running",
@@ -304,6 +304,9 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
       last_error: null,
       updated_at: new Date().toISOString(),
     });
+    if (startStateError) {
+      throw new Error(`Could not start CEIPAL sync progress: ${startStateError.message}`);
+    }
 
     try {
       const token = await authenticate();
@@ -344,7 +347,7 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
 
       return { synced, totalSynced, complete, nextPage, source: "ATS" };
     } catch (error) {
-      await context.supabase.from("ceipal_sync_state").upsert({
+      const { error: failedStateError } = await context.supabase.from("ceipal_sync_state").upsert({
         sync_key: syncKey,
         next_page: page,
         status: "failed",
@@ -352,6 +355,11 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
         last_error: error instanceof Error ? error.message : "Unknown CEIPAL sync error",
         updated_at: new Date().toISOString(),
       });
+      if (failedStateError) {
+        throw new Error(
+          `${error instanceof Error ? error.message : "CEIPAL sync failed"}. Progress could not be saved: ${failedStateError.message}`,
+        );
+      }
       throw error;
     }
   });

@@ -288,8 +288,8 @@ function ContactsPage() {
       const { data } = await supabase.auth.getUser();
       const metadata = data.user?.user_metadata;
       const signedInName =
-        (typeof metadata?.full_name === "string" && metadata.full_name) ||
-        (typeof metadata?.name === "string" && metadata.name) ||
+        (typeof metadata?.["full_name"] === "string" && metadata["full_name"]) ||
+        (typeof metadata?.["name"] === "string" && metadata["name"]) ||
         pendingCall.contact.owner_name;
       const details = {
         source: "CRM Mobile",
@@ -713,7 +713,7 @@ function ContactsPage() {
                       <ContactDetail
                         icon={Building2}
                         label="Company"
-                        value={openContact.accounts?.name}
+                        value={openContact.accounts?.name ?? null}
                       />
                       <ContactDetail
                         icon={UserRound}
@@ -888,11 +888,14 @@ function ContactsPage() {
           owner_name: openContact?.owner_name ?? null,
           related_to_type: "Client Contact",
         }}
-        fixedValues={
-          openContact
-            ? { related_to_type: "Client Contact", related_to_id: openContact.id }
-            : undefined
-        }
+        {...(openContact
+          ? {
+              fixedValues: {
+                related_to_type: "Client Contact",
+                related_to_id: openContact.id,
+              },
+            }
+          : {})}
         invalidateKeys={["activities"]}
       />
       <Dialog
@@ -1071,12 +1074,12 @@ function ContactAction({
 function CallActivityDetails({ details }: { details: unknown }) {
   const values = callDetails(details);
   if (!values) return null;
-  const elapsed = typeof values.elapsed_seconds === "number" ? values.elapsed_seconds : null;
+  const elapsed = typeof values["elapsed_seconds"] === "number" ? values["elapsed_seconds"] : null;
   return (
     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-      {typeof values.outcome === "string" ? (
+      {typeof values["outcome"] === "string" ? (
         <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-          {values.outcome}
+          {values["outcome"]}
         </span>
       ) : null}
       {elapsed !== null ? (
@@ -1084,9 +1087,9 @@ function CallActivityDetails({ details }: { details: unknown }) {
           Approx. {formatElapsed(elapsed)}
         </span>
       ) : null}
-      {typeof values.next_action === "string" ? (
+      {typeof values["next_action"] === "string" ? (
         <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-          Next: {values.next_action}
+          Next: {values["next_action"]}
         </span>
       ) : null}
     </div>

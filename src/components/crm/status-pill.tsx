@@ -60,7 +60,6 @@ export function trainingTone(status: string): Tone {
   return "neutral";
 }
 
-
 export function batchTone(status: string): Tone {
   if (status === "Completed") return "success";
   if (status === "Cancelled") return "danger";

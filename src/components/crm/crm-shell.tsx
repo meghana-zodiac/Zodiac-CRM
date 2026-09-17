@@ -61,12 +61,14 @@ function userInitials(name: string | undefined, email: string | undefined) {
     "User";
   const words = source.split(/\s+/).filter(Boolean);
   if (words.length > 1) {
-    return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+    const first = words[0] ?? "";
+    const last = words.at(-1) ?? "";
+    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
   }
   return source.slice(0, 2).toUpperCase();
 }
 
-const mobileNavItems = [
+export const mobileNavItems = [
   { label: "Home", to: "/", icon: Home },
   { label: "Leads", to: "/leads", icon: Sparkles },
   { label: "Clients", to: "/accounts", icon: Building2 },
@@ -247,10 +249,10 @@ export function CrmShell({
     void supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       const name =
-        typeof user?.user_metadata?.full_name === "string"
-          ? user.user_metadata.full_name
-          : typeof user?.user_metadata?.name === "string"
-            ? user.user_metadata.name
+        typeof user?.user_metadata?.["full_name"] === "string"
+          ? user.user_metadata["full_name"]
+          : typeof user?.user_metadata?.["name"] === "string"
+            ? user.user_metadata["name"]
             : undefined;
       setAccountInitials(userInitials(name, user?.email));
     });

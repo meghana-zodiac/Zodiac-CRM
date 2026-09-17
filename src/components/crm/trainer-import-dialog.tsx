@@ -14,7 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { TRAINING_TYPES, type Trainer } from "@/lib/crm";
+
+type TrainerInsert = Database["public"]["Tables"]["trainers"]["Insert"];
 
 type RawRow = Record<string, unknown>;
 type TrainingType = (typeof TRAINING_TYPES)[number];
@@ -92,7 +95,9 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
+  const worksheet = workbook.Sheets[firstSheet];
+  if (!worksheet) throw new Error("The first worksheet could not be read.");
+  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
     defval: "",
     raw: false,
   });
@@ -115,6 +120,7 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       dayRate !== null && dayRate < 0 ? "Day rate cannot be negative" : "",
     ].filter(Boolean);
 
+    const error = errors.length ? errors.join("; ") : null;
     return {
       rowNumber: index + 2,
       full_name: fullName,
@@ -125,7 +131,7 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       rating,
       day_rate: dayRate,
       bio: nullable(valueFor(row, "bio")),
-      error: errors.length ? errors.join("; ") : undefined,
+      ...(error ? { error } : {}),
     };
   });
 }
@@ -161,7 +167,10 @@ export function TrainerImportDialog({
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
+      const sheet = workbook.Sheets[firstSheet];
+      if (!sheet) throw new Error("The first worksheet could not be read.");
       const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
@@ -241,7 +250,7 @@ export function TrainerImportDialog({
         ]),
       );
       const seen = new Set<string>();
-      const payload: Array<Record<string, unknown>> = [];
+      const payload: TrainerInsert[] = [];
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;

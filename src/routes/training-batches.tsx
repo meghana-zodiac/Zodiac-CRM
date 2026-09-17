@@ -46,7 +46,10 @@ function TrainingBatchesPage() {
       className: "px-3 py-2.5 font-medium text-foreground",
       render: (row) => row.batch_code,
     },
-    { header: "Course / topic", render: (row) => row.course_topic ?? row.training_requests?.course_topic ?? "—" },
+    {
+      header: "Course / topic",
+      render: (row) => row.course_topic ?? row.training_requests?.course_topic ?? "—",
+    },
     {
       header: "Track",
       render: (row) => (
@@ -99,8 +102,8 @@ function TrainingBatchesPage() {
             <StatusPill tone={batchTone(row.status)}>{row.status}</StatusPill>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {formatDate(row.start_date)} → {formatDate(row.end_date)} · {row.participants ?? 0} pax ·{" "}
-            {row.mode ?? "—"}
+            {formatDate(row.start_date)} → {formatDate(row.end_date)} · {row.participants ?? 0} pax
+            · {row.mode ?? "—"}
           </p>
         </>
       )}

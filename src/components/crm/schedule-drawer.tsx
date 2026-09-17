@@ -141,7 +141,11 @@ export function ScheduleDrawer({
                       >
                         <div className="flex items-start gap-2">
                           <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-accent text-accent-foreground">
-                            {virtual ? <Video className="size-3.5" /> : <MapPin className="size-3.5" />}
+                            {virtual ? (
+                              <Video className="size-3.5" />
+                            ) : (
+                              <MapPin className="size-3.5" />
+                            )}
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{item.title}</p>

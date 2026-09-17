@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  BarChart3,
-  Chrome,
-  LoaderCircle,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-} from "lucide-react";
+import { BarChart3, Chrome, LoaderCircle, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,7 +72,8 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
             Every relationship. <span className="text-brand-gradient">Clearly managed.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-slate-600">
-            Bring your leads, clients, conversations, deals, and team activity together in one focused CRM built for Zodiac HR.
+            Bring your leads, clients, conversations, deals, and team activity together in one
+            focused CRM built for Zodiac HR.
           </p>
 
           <div className="mt-10 grid max-w-xl grid-cols-2 gap-4">
@@ -88,14 +82,18 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
                 <UsersRound className="size-5" />
               </div>
               <p className="mt-4 font-semibold">Connected records</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Keep leads, contacts, and clients easy to find.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Keep leads, contacts, and clients easy to find.
+              </p>
             </div>
             <div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-[0_18px_60px_-32px_rgba(209,25,126,0.34)] backdrop-blur-md">
               <div className="grid size-10 place-items-center rounded-xl bg-pink-50 text-[#d1197e]">
                 <BarChart3 className="size-5" />
               </div>
               <p className="mt-4 font-semibold">Clear visibility</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Follow activity and opportunities from one place.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Follow activity and opportunities from one place.
+              </p>
             </div>
           </div>
         </section>
@@ -131,7 +129,11 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
                 Welcome back
               </h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Sign in with your <strong className="font-semibold text-slate-800">@{ORGANIZATION_EMAIL_DOMAIN}</strong> Google Workspace account to continue.
+                Sign in with your{" "}
+                <strong className="font-semibold text-slate-800">
+                  @{ORGANIZATION_EMAIL_DOMAIN}
+                </strong>{" "}
+                Google Workspace account to continue.
               </p>
             </div>
 
@@ -150,7 +152,10 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
             </Button>
 
             {(error || accessError) && (
-              <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              <p
+                className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                role="alert"
+              >
                 {error || accessError}
               </p>
             )}
@@ -161,7 +166,9 @@ export function GoogleLogin({ accessError }: { accessError?: string | null }) {
             </div>
           </div>
 
-          <p className="mt-6 text-center text-xs text-slate-400">Zodiac HR Consultants · Internal CRM</p>
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Zodiac HR Consultants · Internal CRM
+          </p>
         </section>
       </div>
     </main>

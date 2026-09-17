@@ -478,13 +478,13 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
         "company",
         "organisation",
         "organization",
-      ]) ?? lead.values.company_name,
+      ]) ?? lead.values["company_name"],
     );
     put(
       result,
       "industry",
-      firstLabel(labels, ["industry", "sector"]) ?? lead.values.industry,
-      lead.confidence.industry,
+      firstLabel(labels, ["industry", "sector"]) ?? lead.values["industry"],
+      lead.confidence["industry"],
     );
     const inferredType = /\bmultiple|multi[- ]service\b/i.test(raw)
       ? "Multi-service"
@@ -494,7 +494,7 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
       "client_type",
       firstLabel(labels, ["engagement type", "client type"]) ?? inferredType,
     );
-    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values.city);
+    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values["city"]);
     put(
       result,
       "website",
