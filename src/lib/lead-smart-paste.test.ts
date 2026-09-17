@@ -37,6 +37,18 @@ describe("Smart Paste", () => {
     expect(result.values["email"]).toBe("priya@novaretail.com");
   });
 
+  it("does not mistake a contact pronoun for the person's name", () => {
+    const result = parseSmartPasteDetailed(
+      "contacts",
+      "Riya Mehta is the Talent Acquisition Manager at TEST Aurora Retail Solutions Pvt Ltd. She works in the Human Resources department. Contact her at riya.test@example.com or +91 90000 10001. She is the main decision-maker for recruitment requirements.",
+    );
+
+    expect(result.values["first_name"]).toBe("Riya");
+    expect(result.values["last_name"]).toBe("Mehta");
+    expect(result.values["email"]).toBe("riya.test@example.com");
+    expect(result.values["phone"]).toBe("+91 90000 10001");
+  });
+
   it("keeps unmatched text available for review", () => {
     const result = parseSmartPasteDetailed(
       "training_requests",

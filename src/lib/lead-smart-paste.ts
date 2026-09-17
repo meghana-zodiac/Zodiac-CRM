@@ -245,18 +245,22 @@ function companyName(raw: string) {
 }
 
 function personName(raw: string) {
+  const roleSentence = raw.match(
+    new RegExp(
+      `\\b${PERSON}\\s+is\\s+(?:an?\\s+|the\\s+)?(?:HR|Human Resources|Talent|L&D|Learning|Training|Recruitment|Leadership|POSH|Technical|Soft Skills)\\b`,
+      "i",
+    ),
+  );
+  if (roleSentence?.[1]) return clean(roleSentence[1]);
+
   const direct = raw.match(
     new RegExp(
-      `\\b(?:contact(?:\\s+person)?|reach|speak\\s+(?:to|with)|trainer(?:\\s+is)?|assigned\\s+to)[:\\s]+${PERSON}(?=\\s+(?:at|on|via|is|for|from|will)\\b|[,.;]|$)`,
+      `\\b(?:contact(?:\\s+person)?|reach|speak\\s+(?:to|with)|trainer(?:\\s+is)?|assigned\\s+to)[:\\s]+(?!her\\b|him\\b|them\\b|me\\b|us\\b|at\\b|on\\b|via\\b)${PERSON}(?=\\s+(?:at|on|via|is|for|from|will)\\b|[,.;]|$)`,
       "i",
     ),
   );
   if (direct?.[1]) return clean(direct[1].split(/[.,;]/)[0] ?? direct[1]);
-  return raw.match(
-    new RegExp(
-      `\\b${PERSON}\\s+is\\s+(?:an?\\s+|the\\s+)?(?:HR|Human Resources|Talent|L&D|Learning|Training|Recruitment|Leadership|POSH|Technical|Soft Skills)\\b`,
-    ),
-  )?.[1];
+  return undefined;
 }
 
 function serviceLine(raw: string) {
@@ -508,7 +512,7 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
   if (table === "contacts") {
     const explicitName = firstLabel(labels, ["contact person", "contact name", "name"]);
     const inferredName =
-      personName(raw) ?? raw.match(new RegExp(`^${PERSON}(?=\\s+(?:is|works|from|at)\\b)`))?.[1];
+      raw.match(new RegExp(`^${PERSON}(?=\\s+(?:is|works|from|at)\\b)`))?.[1] ?? personName(raw);
     const name = splitName(explicitName ?? inferredName);
     put(result, "first_name", name.first_name, explicitName ? "high" : "review");
     put(result, "last_name", name.last_name, explicitName ? "high" : "review");
