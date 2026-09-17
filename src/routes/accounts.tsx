@@ -17,6 +17,7 @@ import {
 import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
+import { RecordDetailsSheet } from "@/components/crm/record-details-sheet";
 import { accountFields, dealFields } from "@/components/crm/field-defs";
 import { useOwnerScope } from "@/components/crm/owner-filter";
 import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "@/lib/crm";
@@ -54,6 +55,7 @@ function AccountsPage() {
   const [systemFilter, setSystemFilter] = useState("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<Account | null>(null);
+  const [viewing, setViewing] = useState<Account | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [opportunityAccount, setOpportunityAccount] = useState<Account | null>(null);
@@ -163,22 +165,25 @@ function AccountsPage() {
             {rows.map((account) => (
               <div
                 key={account.id}
-                className="rounded-lg border border-border bg-surface p-4 shadow-panel"
+                className="cursor-pointer rounded-lg border border-border bg-surface p-4 shadow-panel transition-all hover:border-brand-accent/50 hover:shadow-card-hover"
+                onClick={() => setViewing(account)}
               >
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{account.name}</p>
                     <p className="text-xs text-muted-foreground">{account.industry ?? "—"}</p>
                   </div>
-                  <RowActions
-                    table="accounts"
-                    id={account.id}
-                    label="Client"
-                    onEdit={() => {
-                      setEditing(account);
-                      setDialogOpen(true);
-                    }}
-                  />
+                  <div onClick={(event) => event.stopPropagation()}>
+                    <RowActions
+                      table="accounts"
+                      id={account.id}
+                      label="Client"
+                      onEdit={() => {
+                        setEditing(account);
+                        setDialogOpen(true);
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                   <p className="flex items-center gap-1.5">
@@ -206,7 +211,8 @@ function AccountsPage() {
               {rows.map((account) => (
                 <article
                   key={account.id}
-                  className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                  className="cursor-pointer rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                  onClick={() => setViewing(account)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -217,15 +223,17 @@ function AccountsPage() {
                         {account.industry ?? "Industry not specified"}
                       </p>
                     </div>
-                    <RowActions
-                      table="accounts"
-                      id={account.id}
-                      label="Client"
-                      onEdit={() => {
-                        setEditing(account);
-                        setDialogOpen(true);
-                      }}
-                    />
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <RowActions
+                        table="accounts"
+                        id={account.id}
+                        label="Client"
+                        onEdit={() => {
+                          setEditing(account);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-lg bg-muted/50 p-2">
@@ -244,7 +252,10 @@ function AccountsPage() {
                     size="sm"
                     variant="outline"
                     className="mt-3 w-full"
-                    onClick={() => setOpportunityAccount(account)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpportunityAccount(account);
+                    }}
                   >
                     <Handshake className="size-4" /> Create Opportunity
                   </Button>
@@ -366,6 +377,18 @@ function AccountsPage() {
         fields={accountFields}
         record={editing}
         invalidateKeys={["accounts", "contacts", "deals"]}
+      />
+      <RecordDetailsSheet
+        record={viewing}
+        fields={accountFields}
+        label="Client"
+        title={(account) => account.name}
+        onClose={() => setViewing(null)}
+        onEdit={(account) => {
+          setViewing(null);
+          setEditing(account);
+          setDialogOpen(true);
+        }}
       />
       <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} accounts={all} />
       <RecordDialog

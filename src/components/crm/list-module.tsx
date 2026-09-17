@@ -6,6 +6,7 @@ import { EmptyState, FilterPanel, ModuleHeader, type ViewMode } from "./module-c
 import { RecordDialog, type FieldDef } from "./record-dialog";
 import { RowActions } from "./row-actions";
 import { ownerMatches, useOwnerScope } from "./owner-filter";
+import { RecordDetailsSheet } from "./record-details-sheet";
 import {
   Select,
   SelectContent,
@@ -68,6 +69,7 @@ export function ListModule<T extends { id: string }>({
   const { owner } = useOwnerScope();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
+  const [viewing, setViewing] = useState<T | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
@@ -112,8 +114,13 @@ export function ListModule<T extends { id: string }>({
     setDialogOpen(true);
   };
   const openEdit = (row: T) => {
+    setViewing(null);
     setEditing(row);
     setDialogOpen(true);
+  };
+  const openDetails = (row: T) => {
+    if (onRowClick) onRowClick(row);
+    else setViewing(row);
   };
 
   return (
@@ -198,33 +205,25 @@ export function ListModule<T extends { id: string }>({
           {isLoading ? (
             <EmptyState message={`Loading ${title.toLowerCase()}…`} />
           ) : filtered.length === 0 ? (
-            <EmptyState
-              message={
-                rows.length === 0
-                  ? `No ${title.toLowerCase()} yet. Use “${createLabel}” to add the first record.`
-                  : `No ${title.toLowerCase()} match this view.`
-              }
-            />
+            <EmptyState message={`No ${title.toLowerCase()} match this view.`} />
           ) : tile && view === "tile" ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {visibleRows.map((row) => (
                 <div
                   key={row.id}
-                  className="rounded-lg border border-border bg-surface p-4 shadow-panel"
+                  className="cursor-pointer rounded-lg border border-border bg-surface p-4 shadow-panel transition-all hover:border-brand-accent/50 hover:shadow-card-hover"
+                  onClick={() => openDetails(row)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div
-                      className={onRowClick ? "min-w-0 flex-1 cursor-pointer" : "min-w-0 flex-1"}
-                      onClick={() => onRowClick?.(row)}
-                    >
-                      {tile(row)}
+                    <div className="min-w-0 flex-1">{tile(row)}</div>
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <RowActions
+                        table={table}
+                        id={row.id}
+                        label={recordLabel}
+                        onEdit={() => openEdit(row)}
+                      />
                     </div>
-                    <RowActions
-                      table={table}
-                      id={row.id}
-                      label={recordLabel}
-                      onEdit={() => openEdit(row)}
-                    />
                   </div>
                 </div>
               ))}
@@ -235,12 +234,13 @@ export function ListModule<T extends { id: string }>({
                 {visibleRows.map((row) => (
                   <article
                     key={row.id}
-                    className="overflow-hidden rounded-xl border border-border bg-surface shadow-panel transition-shadow active:shadow-none"
+                    className="cursor-pointer overflow-hidden rounded-xl border border-border bg-surface shadow-panel transition-shadow active:shadow-none"
+                    onClick={() => openDetails(row)}
                   >
                     <div className="flex items-start gap-3 p-3.5">
                       <button
                         type="button"
-                        onClick={() => onRowClick?.(row)}
+                        onClick={() => openDetails(row)}
                         className="min-w-0 flex-1 text-left"
                       >
                         <div className="mb-2.5 flex items-start justify-between gap-3">
@@ -264,12 +264,14 @@ export function ListModule<T extends { id: string }>({
                           ))}
                         </dl>
                       </button>
-                      <RowActions
-                        table={table}
-                        id={row.id}
-                        label={recordLabel}
-                        onEdit={() => openEdit(row)}
-                      />
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <RowActions
+                          table={table}
+                          id={row.id}
+                          label={recordLabel}
+                          onEdit={() => openEdit(row)}
+                        />
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -290,17 +292,14 @@ export function ListModule<T extends { id: string }>({
                     {visibleRows.map((row) => (
                       <tr
                         key={row.id}
-                        className={
-                          onRowClick
-                            ? "cursor-pointer transition-colors hover:bg-muted/40"
-                            : "transition-colors hover:bg-muted/40"
-                        }
+                        className="cursor-pointer transition-colors hover:bg-muted/40"
+                        onClick={() => openDetails(row)}
                       >
                         {columns.map((column) => (
                           <td
                             key={column.header}
                             className={column.className ?? "px-3 py-2.5 text-muted-foreground"}
-                            onClick={() => onRowClick?.(row)}
+                            onClick={() => openDetails(row)}
                           >
                             {column.render(row)}
                           </td>
@@ -360,6 +359,14 @@ export function ListModule<T extends { id: string }>({
         title={editing ? `Edit ${recordLabel}` : createLabel}
         fields={fields}
         record={editing as Record<string, unknown> | null}
+      />
+      <RecordDetailsSheet
+        record={viewing}
+        fields={fields}
+        label={recordLabel}
+        title={(row) => String(searchValues(row).find(Boolean) ?? recordLabel)}
+        onClose={() => setViewing(null)}
+        onEdit={openEdit}
       />
     </div>
   );
