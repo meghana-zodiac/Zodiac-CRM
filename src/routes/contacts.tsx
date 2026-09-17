@@ -454,12 +454,12 @@ function ContactsPage() {
                     {rows.map((contact) => (
                       <article
                         key={contact.id}
-                        className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel"
+                        className="cursor-pointer overflow-hidden rounded-2xl border border-border bg-surface shadow-panel transition-colors active:bg-muted/40"
+                        onClick={() => openProfile(contact)}
                       >
                         <div className="flex items-start gap-3 p-3.5">
                           <button
                             type="button"
-                            onClick={() => openProfile(contact)}
                             className="flex min-w-0 flex-1 items-center gap-3 text-left"
                           >
                             <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-fuchsia-600 text-sm font-bold text-primary-foreground shadow-sm">
@@ -569,10 +569,7 @@ function ContactsPage() {
                                 aria-label={`Select ${contact.last_name}`}
                               />
                             </td>
-                            <td
-                              className="px-3 py-2.5"
-                              onClick={(event) => event.stopPropagation()}
-                            >
+                            <td className="px-3 py-2.5">
                               <span className="font-medium text-foreground">
                                 {fullName(contact.first_name, contact.last_name)}
                               </span>
@@ -595,7 +592,10 @@ function ContactsPage() {
                             <td className="px-3 py-2.5 text-muted-foreground">
                               {formatDate(contact.last_activity_date)}
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td
+                              className="px-3 py-2.5"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <RowActions
                                 table="contacts"
                                 id={contact.id}
@@ -1065,7 +1065,10 @@ function ContactAction({
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
       aria-label={label}
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick?.();
+      }}
     >
       <Icon className="size-[18px]" />
       <span className="max-w-full truncate">{label}</span>
