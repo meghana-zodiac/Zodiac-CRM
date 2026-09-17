@@ -463,6 +463,7 @@ export function CrmShell({
         unreadIds={notifications.unreadIds}
         markAllRead={notifications.markAllRead}
         clearAll={notifications.clearAll}
+        dismiss={notifications.dismiss}
       />
 
       <RecordDialog

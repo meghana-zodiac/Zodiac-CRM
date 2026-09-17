@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Bell, CheckCheck, FileSignature, PhoneCall, Sparkles } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import {
+  AlertTriangle,
+  Bell,
+  CheckCheck,
+  Clock3,
+  Eye,
+  FileSignature,
+  PhoneCall,
+  Sparkles,
+  X,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,7 +24,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { activitiesQuery, dealsQuery, formatDateTime } from "@/lib/crm";
+import { activitiesQuery, dealsQuery, formatDateTime, updateRecord } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Notification = {
@@ -22,6 +34,9 @@ export type Notification = {
   detail: string;
   timestamp: string | null;
   tone: "default" | "warning" | "danger";
+  href: "/leads" | "/deals" | "/tasks" | "/calls" | "/meetings";
+  activityId?: string;
+  serviceDetails?: Record<string, unknown>;
 };
 
 const KIND_META: Record<Notification["kind"], { icon: LucideIcon; label: string }> = {
@@ -47,14 +62,21 @@ function loadIds(key: string): string[] {
   }
 }
 
-function daysUntil(date: string | null) {
+function daysUntil(date: string | null, now: number) {
   if (!date) return null;
-  const diff = new Date(date).getTime() - Date.now();
+  const diff = new Date(date).getTime() - now;
   return Math.ceil(diff / 86_400_000);
+}
+
+function activityHref(type: string): Notification["href"] {
+  if (type === "Call") return "/calls";
+  if (type === "Meeting") return "/meetings";
+  return "/tasks";
 }
 
 /** Derives the live notification feed from leads, proposals and activities. */
 export function useNotifications(enabled = true) {
+  const [now, setNow] = useState(() => Date.now());
   const currentMember = useQuery({
     queryKey: ["notification-current-member"],
     enabled,
@@ -103,6 +125,12 @@ export function useNotifications(enabled = true) {
     setCleared(loadIds(clearedKey));
   }, [currentMember.data?.userId, readKey, clearedKey]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
   const persist = (key: string, ids: string[]) => {
     try {
       window.localStorage.setItem(key, JSON.stringify(ids));
@@ -128,13 +156,14 @@ export function useNotifications(enabled = true) {
         detail: `${lead.company_name}${lead.service_interest ? ` · ${lead.service_interest}` : ""}`,
         timestamp: lead.created_at,
         tone: "default",
+        href: "/leads",
       });
     }
 
     for (const deal of deals.data ?? []) {
       if (deal.owner_name !== owner) continue;
       if (deal.stage === "SLA Signed") continue;
-      const left = daysUntil(deal.closing_date);
+      const left = daysUntil(deal.closing_date, now);
       if (left === null || left > 7) continue;
       out.push({
         id: `sla-${deal.id}`,
@@ -148,29 +177,63 @@ export function useNotifications(enabled = true) {
         detail: `${deal.deal_name} · ${deal.stage}${deal.service_line ? ` · ${deal.service_line}` : ""}`,
         timestamp: deal.closing_date,
         tone: left <= 0 ? "danger" : "warning",
+        href: "/deals",
       });
     }
 
     for (const activity of activities.data ?? []) {
       if (activity.owner_name !== owner) continue;
-      const notificationDate = activity.reminder_at ?? activity.due_date;
-      const left = daysUntil(notificationDate);
       if (activity.status !== "Completed") {
-        if (left === null || left > 1) continue;
+        const serviceDetails =
+          activity.service_details && typeof activity.service_details === "object"
+            ? (activity.service_details as Record<string, unknown>)
+            : {};
+        const snoozedUntil =
+          typeof serviceDetails.notification_snoozed_until === "string"
+            ? serviceDetails.notification_snoozed_until
+            : null;
+        if (snoozedUntil && new Date(snoozedUntil).getTime() > now) continue;
+        const dueTime = activity.due_date ? new Date(activity.due_date).getTime() : null;
+        const reminderTime = activity.reminder_at ? new Date(activity.reminder_at).getTime() : null;
+        const overdue = dueTime !== null && dueTime < now;
+        const meetingSoon =
+          activity.activity_type === "Meeting" &&
+          dueTime !== null &&
+          dueTime >= now &&
+          dueTime - now <= 30 * 60_000;
+        const reminderReached =
+          reminderTime !== null && reminderTime <= now && (dueTime === null || now <= dueTime);
+        const dueNow = dueTime !== null && dueTime <= now;
+        if (!overdue && !meetingSoon && !reminderReached && !dueNow) continue;
+
+        const phase = overdue
+          ? "overdue"
+          : meetingSoon
+            ? "soon"
+            : reminderReached
+              ? "reminder"
+              : "due";
+        const notificationDate = activity.reminder_at ?? activity.due_date;
+        const minutesToMeeting =
+          dueTime === null ? null : Math.max(0, Math.ceil((dueTime - now) / 60_000));
         out.push({
-          id: `act-${activity.id}`,
+          id: `act-${activity.id}-${phase}-${snoozedUntil ?? notificationDate ?? "unscheduled"}`,
           kind: "activity",
-          title:
-            activity.activity_type === "Call"
-              ? left < 0
-                ? "Follow-up call overdue"
-                : "Follow-up call due"
-              : left < 0
-                ? `${activity.activity_type} overdue`
-                : `${activity.activity_type} due`,
+          title: overdue
+            ? `${activity.activity_type} overdue`
+            : meetingSoon
+              ? minutesToMeeting === 0
+                ? "Meeting starting now"
+                : `Meeting starts in ${minutesToMeeting} min`
+              : reminderReached
+                ? `Reminder: ${activity.title}`
+                : `${activity.activity_type} due now`,
           detail: `${activity.title} · ${activity.owner_name ?? "Unassigned"}`,
           timestamp: notificationDate,
-          tone: left !== null && left < 0 ? "danger" : "warning",
+          tone: overdue ? "danger" : "warning",
+          href: activityHref(activity.activity_type),
+          activityId: activity.id,
+          serviceDetails,
         });
       } else if (
         activity.activity_type === "Meeting" &&
@@ -184,6 +247,8 @@ export function useNotifications(enabled = true) {
           detail: `${activity.title} · ${activity.owner_name ?? "Unassigned"}`,
           timestamp: activity.due_date,
           tone: "default",
+          href: "/meetings",
+          activityId: activity.id,
         });
       }
     }
@@ -191,7 +256,7 @@ export function useNotifications(enabled = true) {
     return out
       .filter((item) => !cleared.includes(item.id))
       .sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
-  }, [leads.data, deals.data, activities.data, cleared, currentMember.data?.displayName]);
+  }, [leads.data, deals.data, activities.data, cleared, currentMember.data?.displayName, now]);
 
   const unread = items.filter((item) => !read.includes(item.id));
 
@@ -211,12 +276,24 @@ export function useNotifications(enabled = true) {
     });
   }, [items, clearedKey]);
 
+  const dismiss = useCallback(
+    (id: string) => {
+      setCleared((prev) => {
+        const next = [...new Set([...prev, id])];
+        persist(clearedKey, next);
+        return next;
+      });
+    },
+    [clearedKey],
+  );
+
   return {
     items,
     unreadIds: unread.map((i) => i.id),
     unreadCount: unread.length,
     markAllRead,
     clearAll,
+    dismiss,
   };
 }
 
@@ -227,6 +304,7 @@ export function NotificationsDrawer({
   unreadIds,
   markAllRead,
   clearAll,
+  dismiss,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -234,7 +312,38 @@ export function NotificationsDrawer({
   unreadIds: string[];
   markAllRead: () => void;
   clearAll: () => void;
+  dismiss: (id: string) => void;
 }) {
+  const queryClient = useQueryClient();
+  const completeActivity = useMutation({
+    mutationFn: (id: string) =>
+      updateRecord("activities", id, {
+        status: "Completed",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast.success("Follow-up marked complete");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const snoozeActivity = useMutation({
+    mutationFn: (item: Notification) =>
+      updateRecord("activities", item.activityId!, {
+        service_details: {
+          ...(item.serviceDetails ?? {}),
+          notification_snoozed_until: new Date(Date.now() + 15 * 60_000).toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast.success("Reminder snoozed for 15 minutes");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -303,6 +412,48 @@ export function NotificationsDrawer({
                       <p className="pt-0.5 text-[11px] text-muted-foreground">
                         {meta.label} · {formatDateTime(item.timestamp)}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          asChild
+                        >
+                          <Link to={item.href} onClick={() => onOpenChange(false)}>
+                            <Eye className="size-3" /> Open
+                          </Link>
+                        </Button>
+                        {item.activityId && item.title !== "Meeting logged" ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-[11px]"
+                              disabled={completeActivity.isPending}
+                              onClick={() => completeActivity.mutate(item.activityId!)}
+                            >
+                              <CheckCheck className="size-3" /> Complete
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-[11px]"
+                              disabled={snoozeActivity.isPending}
+                              onClick={() => snoozeActivity.mutate(item)}
+                            >
+                              <Clock3 className="size-3" /> Snooze 15m
+                            </Button>
+                          </>
+                        ) : null}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-[11px] text-muted-foreground"
+                          onClick={() => dismiss(item.id)}
+                        >
+                          <X className="size-3" /> Dismiss
+                        </Button>
+                      </div>
                     </div>
                     {unread && (
                       <span className="mt-2 size-2 shrink-0 rounded-full bg-destructive" />
