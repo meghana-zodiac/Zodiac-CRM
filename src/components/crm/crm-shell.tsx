@@ -61,14 +61,12 @@ function userInitials(name: string | undefined, email: string | undefined) {
     "User";
   const words = source.split(/\s+/).filter(Boolean);
   if (words.length > 1) {
-    const first = words[0] ?? "";
-    const last = words.at(-1) ?? "";
-    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+    return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
   }
   return source.slice(0, 2).toUpperCase();
 }
 
-export const mobileNavItems = [
+const mobileNavItems = [
   { label: "Home", to: "/", icon: Home },
   { label: "Leads", to: "/leads", icon: Sparkles },
   { label: "Clients", to: "/accounts", icon: Building2 },
@@ -241,7 +239,7 @@ export function CrmShell({
     enabled: quickCreate === "contact" || quickCreate === "deal",
   });
   const contacts = useQuery({ ...contactsQuery(), enabled: quickCreate === "deal" });
-  const notifications = useNotifications(notificationsOpen);
+  const notifications = useNotifications(true);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
@@ -249,10 +247,10 @@ export function CrmShell({
     void supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       const name =
-        typeof user?.user_metadata?.["full_name"] === "string"
-          ? user.user_metadata["full_name"]
-          : typeof user?.user_metadata?.["name"] === "string"
-            ? user.user_metadata["name"]
+        typeof user?.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : typeof user?.user_metadata?.name === "string"
+            ? user.user_metadata.name
             : undefined;
       setAccountInitials(userInitials(name, user?.email));
     });
@@ -456,10 +454,7 @@ export function CrmShell({
 
       <NotificationsDrawer
         open={notificationsOpen}
-        onOpenChange={(open) => {
-          setNotificationsOpen(open);
-          if (!open) notifications.markAllRead();
-        }}
+        onOpenChange={setNotificationsOpen}
         items={notifications.items}
         unreadIds={notifications.unreadIds}
         markAllRead={notifications.markAllRead}

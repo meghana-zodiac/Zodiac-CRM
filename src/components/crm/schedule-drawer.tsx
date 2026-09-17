@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, MapPin, Plus, Video } from "lucide-react";
+import { CalendarDays, CheckSquare, MapPin, PhoneCall, Plus, Users, Video } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,10 @@ import { RecordDialog } from "./record-dialog";
 import { activityFields } from "./field-defs";
 import { BD_OWNERS } from "./nav-data";
 import { activitiesQuery, formatDateTime, type Activity } from "@/lib/crm";
+import { supabase } from "@/integrations/supabase/client";
 
-type RepFilter = "all" | (typeof BD_OWNERS)[number];
-type TypeFilter = "all" | "vc" | "f2f";
+type RepFilter = "mine" | "all" | (typeof BD_OWNERS)[number];
+type TypeFilter = "all" | "task" | "call" | "meeting" | "vc" | "f2f";
 
 /** Mirrors the POA aggregation heuristic for classifying a meeting as virtual. */
 function isVirtual(activity: Activity) {
@@ -39,6 +40,7 @@ function dayLabel(value: string | null) {
   const date = new Date(value);
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 86_400_000);
+  if (date.getTime() < today.setHours(0, 0, 0, 0)) return "Overdue";
   if (date.toDateString() === today.toDateString()) return "Today";
   if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
   return date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
@@ -51,21 +53,45 @@ export function ScheduleDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [rep, setRep] = useState<RepFilter>("all");
+  const [rep, setRep] = useState<RepFilter>("mine");
   const [type, setType] = useState<TypeFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
   const activities = useQuery({ ...activitiesQuery(), enabled: open });
+  const currentMember = useQuery({
+    queryKey: ["schedule-current-member"],
+    enabled: open,
+    queryFn: async () => {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError ?? new Error("Not signed in");
+      const { data, error } = await supabase
+        .from("bd_team_members")
+        .select("display_name,access_role")
+        .eq("id", auth.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const upcoming = useMemo(() => {
-    const cutoff = Date.now() - 3_600_000;
     return (activities.data ?? [])
-      .filter((a) => a.activity_type === "Meeting" || a.activity_type === "Interview")
       .filter((a) => a.status !== "Completed")
-      .filter((a) => (a.due_date ? new Date(a.due_date).getTime() >= cutoff : false))
-      .filter((a) => rep === "all" || a.owner_name === rep)
-      .filter((a) => type === "all" || (type === "vc") === isVirtual(a))
+      .filter((a) => Boolean(a.due_date))
+      .filter((a) =>
+        rep === "mine"
+          ? Boolean(currentMember.data?.display_name) &&
+            a.owner_name === currentMember.data?.display_name
+          : rep === "all" || a.owner_name === rep,
+      )
+      .filter((a) => {
+        if (type === "all") return true;
+        if (type === "task") return a.activity_type === "Task";
+        if (type === "call") return a.activity_type === "Call";
+        if (type === "meeting") return a.activity_type === "Meeting";
+        return a.activity_type === "Meeting" && (type === "vc") === isVirtual(a);
+      })
       .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
-  }, [activities.data, rep, type]);
+  }, [activities.data, currentMember.data?.display_name, rep, type]);
 
   const groups = useMemo(() => {
     const map = new Map<string, typeof upcoming>();
@@ -91,25 +117,42 @@ export function ScheduleDrawer({
           <SheetHeader className="border-b border-border px-5 py-4">
             <SheetTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="size-4 text-brand-accent" />
-              Upcoming Schedule
+              Follow-ups &amp; Schedule
             </SheetTitle>
-            <SheetDescription>Client meetings for the BD team.</SheetDescription>
+            <SheetDescription>
+              Your pending tasks, calls and meetings in one daily plan.
+            </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-2 border-b border-border px-5 py-3">
             <div className="flex flex-wrap gap-1.5">
-              <button className={chip(rep === "all")} onClick={() => setRep("all")}>
-                All reps
+              <button className={chip(rep === "mine")} onClick={() => setRep("mine")}>
+                My follow-ups
               </button>
-              {BD_OWNERS.map((owner) => (
-                <button key={owner} className={chip(rep === owner)} onClick={() => setRep(owner)}>
-                  {owner}
+              {currentMember.data?.access_role === "primary_admin" && (
+                <button className={chip(rep === "all")} onClick={() => setRep("all")}>
+                  <Users className="mr-1 inline size-3" /> Team schedule
                 </button>
-              ))}
+              )}
+              {currentMember.data?.access_role === "primary_admin" &&
+                BD_OWNERS.map((owner) => (
+                  <button key={owner} className={chip(rep === owner)} onClick={() => setRep(owner)}>
+                    {owner}
+                  </button>
+                ))}
             </div>
             <div className="flex flex-wrap gap-1.5">
               <button className={chip(type === "all")} onClick={() => setType("all")}>
-                All types
+                All
+              </button>
+              <button className={chip(type === "task")} onClick={() => setType("task")}>
+                Tasks
+              </button>
+              <button className={chip(type === "call")} onClick={() => setType("call")}>
+                Calls
+              </button>
+              <button className={chip(type === "meeting")} onClick={() => setType("meeting")}>
+                Meetings
               </button>
               <button className={chip(type === "vc")} onClick={() => setType("vc")}>
                 Virtual (VC)
@@ -123,7 +166,7 @@ export function ScheduleDrawer({
           <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
             {groups.length === 0 && (
               <p className="py-10 text-center text-sm text-muted-foreground">
-                No upcoming meetings match these filters.
+                No pending follow-ups match these filters.
               </p>
             )}
             {groups.map(([label, items]) => (
@@ -133,7 +176,15 @@ export function ScheduleDrawer({
                 </p>
                 <ul className="space-y-2">
                   {items.map((item) => {
-                    const virtual = isVirtual(item);
+                    const virtual = item.activity_type === "Meeting" && isVirtual(item);
+                    const Icon =
+                      item.activity_type === "Task"
+                        ? CheckSquare
+                        : item.activity_type === "Call"
+                          ? PhoneCall
+                          : virtual
+                            ? Video
+                            : MapPin;
                     return (
                       <li
                         key={item.id}
@@ -141,11 +192,7 @@ export function ScheduleDrawer({
                       >
                         <div className="flex items-start gap-2">
                           <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-accent text-accent-foreground">
-                            {virtual ? (
-                              <Video className="size-3.5" />
-                            ) : (
-                              <MapPin className="size-3.5" />
-                            )}
+                            <Icon className="size-3.5" />
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{item.title}</p>
@@ -154,7 +201,11 @@ export function ScheduleDrawer({
                             </p>
                           </div>
                           <Badge variant="secondary" className="shrink-0 text-[10px]">
-                            {virtual ? "VC" : "F2F"}
+                            {item.activity_type === "Meeting"
+                              ? virtual
+                                ? "VC"
+                                : "F2F"
+                              : item.activity_type}
                           </Badge>
                         </div>
                       </li>
@@ -168,7 +219,7 @@ export function ScheduleDrawer({
           <div className="border-t border-border px-5 py-3">
             <Button className="w-full gap-1.5" onClick={() => setAddOpen(true)}>
               <Plus className="size-4" />
-              Add Reminder / Event
+              Add Follow-up
             </Button>
           </div>
         </SheetContent>
@@ -178,10 +229,14 @@ export function ScheduleDrawer({
         open={addOpen}
         onOpenChange={setAddOpen}
         table="activities"
-        title="Add Reminder / Event"
-        description="Schedule a follow-up linked to a corporate lead or client."
+        title="Add Follow-up"
+        description="Schedule a task, call or meeting linked to a CRM record."
         fields={activityFields()}
-        record={{ related_to_type: "Corporate Lead", activity_type: "Meeting" }}
+        record={{
+          related_to_type: "Corporate Lead",
+          activity_type: "Task",
+          owner_name: currentMember.data?.display_name ?? null,
+        }}
         invalidateKeys={["activities"]}
       />
     </>
