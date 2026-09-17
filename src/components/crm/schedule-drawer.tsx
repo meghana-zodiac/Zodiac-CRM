@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, CheckSquare, MapPin, PhoneCall, Plus, Users, Video } from "lucide-react";
 
@@ -14,11 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RecordDialog } from "./record-dialog";
 import { activityFields } from "./field-defs";
-import { BD_OWNERS } from "./nav-data";
+import { bdTeamMembersQuery } from "@/lib/poa";
 import { activitiesQuery, formatDateTime, type Activity } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
 
-type RepFilter = "mine" | "all" | (typeof BD_OWNERS)[number];
+type RepFilter = "mine" | "all" | string;
 type TypeFilter = "all" | "task" | "call" | "meeting" | "vc" | "f2f";
 
 /** Mirrors the POA aggregation heuristic for classifying a meeting as virtual. */
@@ -56,7 +56,9 @@ export function ScheduleDrawer({
   const [rep, setRep] = useState<RepFilter>("mine");
   const [type, setType] = useState<TypeFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
+  const initializedRep = useRef(false);
   const activities = useQuery({ ...activitiesQuery(), enabled: open });
+  const teamMembers = useQuery({ ...bdTeamMembersQuery(), enabled: open });
   const currentMember = useQuery({
     queryKey: ["schedule-current-member"],
     enabled: open,
@@ -65,13 +67,34 @@ export function ScheduleDrawer({
       if (authError || !auth.user) throw authError ?? new Error("Not signed in");
       const { data, error } = await supabase
         .from("bd_team_members")
-        .select("display_name,access_role")
+        .select("display_name,access_role,access_status,active")
         .eq("id", auth.user.id)
         .single();
       if (error) throw error;
       return data;
     },
   });
+  const isAdmin =
+    currentMember.data?.access_role === "primary_admin" &&
+    currentMember.data.access_status === "approved" &&
+    currentMember.data.active;
+  const approvedNames = useMemo(
+    () =>
+      (teamMembers.data ?? [])
+        .filter((member) => member.active && member.access_status === "approved")
+        .map((member) => member.display_name),
+    [teamMembers.data],
+  );
+
+  useEffect(() => {
+    if (!open) {
+      initializedRep.current = false;
+      return;
+    }
+    if (!currentMember.data || initializedRep.current) return;
+    setRep(isAdmin ? "all" : "mine");
+    initializedRep.current = true;
+  }, [currentMember.data, isAdmin, open]);
 
   const upcoming = useMemo(() => {
     return (activities.data ?? [])
@@ -129,13 +152,13 @@ export function ScheduleDrawer({
               <button className={chip(rep === "mine")} onClick={() => setRep("mine")}>
                 My follow-ups
               </button>
-              {currentMember.data?.access_role === "primary_admin" && (
+              {isAdmin && (
                 <button className={chip(rep === "all")} onClick={() => setRep("all")}>
                   <Users className="mr-1 inline size-3" /> Team schedule
                 </button>
               )}
-              {currentMember.data?.access_role === "primary_admin" &&
-                BD_OWNERS.map((owner) => (
+              {isAdmin &&
+                approvedNames.map((owner) => (
                   <button key={owner} className={chip(rep === owner)} onClick={() => setRep(owner)}>
                     {owner}
                   </button>

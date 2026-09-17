@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ContactRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
 import { parseSmartPasteDetailed, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
+import { bdTeamMembersQuery } from "@/lib/poa";
 
 export type FieldType =
   "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
@@ -101,7 +102,7 @@ function decodeVCardValue(value: string) {
     .trim();
 }
 
-export function parseVCard(text: string): AddressBookContact | null {
+function parseVCard(text: string): AddressBookContact | null {
   const lines = text.replace(/\r?\n[ \t]/g, "").split(/\r?\n/);
   let name = "";
   let structuredName = "";
@@ -164,6 +165,16 @@ export function RecordDialog({
   fixedValues?: Record<string, unknown>;
 }) {
   const queryClient = useQueryClient();
+  const teamMembers = useQuery({ ...bdTeamMembersQuery(), enabled: open });
+  const effectiveFields = useMemo(() => {
+    const ownerOptions = (teamMembers.data ?? [])
+      .filter((member) => member.active && member.access_status === "approved")
+      .map((member) => ({ value: member.display_name, label: member.display_name }));
+    if (!ownerOptions.length) return fields;
+    return fields.map((field) =>
+      field.name === "owner_name" ? { ...field, options: ownerOptions } : field,
+    );
+  }, [fields, teamMembers.data]);
   const [values, setValues] = useState<Values>({});
   const [pasteText, setPasteText] = useState("");
   const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
@@ -174,7 +185,7 @@ export function RecordDialog({
   useEffect(() => {
     if (!open) return;
     const next: Values = {};
-    for (const field of fields) {
+    for (const field of effectiveFields) {
       const value = toInputValue(field.type ?? "text", readPath(record, field.name));
       next[field.name] = value;
     }
@@ -183,13 +194,13 @@ export function RecordDialog({
     setPasteConflicts([]);
     setPasteReport(null);
     setSupportsContactPicker(Boolean((navigator as ContactPickerNavigator).contacts?.select));
-  }, [open, record, fields]);
+  }, [open, record, effectiveFields]);
 
   const sortPastedDetails = () => {
     const parsedResult = parseSmartPasteDetailed(table, pasteText);
     const parsed = { ...parsedResult.values };
     const needsReview: PasteReport["review"] = [];
-    for (const field of fields) {
+    for (const field of effectiveFields) {
       const parsedValue = parsed[field.name];
       if (!parsedValue || !field.options?.length) continue;
       const normalized = parsedValue.toLowerCase();
@@ -215,7 +226,7 @@ export function RecordDialog({
       const filled: string[] = [];
       for (const [fieldName, incoming] of Object.entries(parsed)) {
         if (!incoming) continue;
-        const field = fields.find((candidate) => candidate.name === fieldName);
+        const field = effectiveFields.find((candidate) => candidate.name === fieldName);
         const label = field?.label ?? fieldName;
         const existing = current[fieldName]?.trim() ?? "";
         if (!existing) {
@@ -267,19 +278,19 @@ export function RecordDialog({
     setValues((current) => {
       const next = { ...current };
       if (table === "leads") {
-        if (organization) next["company_name"] = organization;
-        if (fullName) next["contact_name"] = fullName;
+        if (organization) next.company_name = organization;
+        if (fullName) next.contact_name = fullName;
       }
       if (table === "contacts" && fullName) {
         const nameParts = fullName.split(/\s+/).filter(Boolean);
-        next["last_name"] = nameParts.pop() ?? "";
-        next["first_name"] = nameParts.join(" ");
+        next.last_name = nameParts.pop() ?? "";
+        next.first_name = nameParts.join(" ");
       }
       if (table === "accounts" && (organization || fullName)) {
-        next["name"] = organization || fullName;
+        next.name = organization || fullName;
       }
-      if (email) next["email"] = email.toLowerCase();
-      if (phone) next["phone"] = phone;
+      if (email) next.email = email.toLowerCase();
+      if (phone) next.phone = phone;
       return next;
     });
 
@@ -344,7 +355,7 @@ export function RecordDialog({
     }
   };
 
-  const visibleFields = fields.filter(
+  const visibleFields = effectiveFields.filter(
     (field) =>
       !field.dependsOn ||
       (field.showWhen ?? []).some(
@@ -425,7 +436,7 @@ export function RecordDialog({
                       ? "Choose one contact to fill the client name and phone number. Company details from a contact file are used when available."
                       : table === "leads"
                         ? "Choose one contact to fill the contact person, phone and email. Company details from a contact file are used when available."
-                        : "Choose one contact to fill their name, phone number and email. If Android shows ‘No contacts found’, use the contact-card option below."}
+                        : "Choose one contact to fill their name, phone number and email."}
                 </p>
               </div>
             </div>
@@ -439,17 +450,6 @@ export function RecordDialog({
               <ContactRound className="mr-2 h-4 w-4" />
               {supportsContactPicker ? "Choose phone contact" : "Choose .vcf file"}
             </Button>
-            {supportsContactPicker ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="mt-1 w-full text-violet-800 hover:bg-violet-100"
-                onClick={() => addressBookFileRef.current?.click()}
-              >
-                Upload contact card instead (.vcf)
-              </Button>
-            ) : null}
             <input
               ref={addressBookFileRef}
               type="file"
@@ -576,7 +576,7 @@ export function RecordDialog({
                 </Label>
                 {type === "select" ? (
                   <Select
-                    value={values[field.name] ?? ""}
+                    value={values[field.name] || undefined}
                     onValueChange={(value) =>
                       setValues((prev) => ({ ...prev, [field.name]: value }))
                     }

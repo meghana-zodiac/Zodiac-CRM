@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Linkedin, Loader2, Mail, Phone, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusPill } from "@/components/crm/status-pill";
-import { BD_OWNERS } from "@/components/crm/nav-data";
+import { bdTeamMembersQuery } from "@/lib/poa";
 import { createRecord } from "@/lib/crm";
 import { cn } from "@/lib/utils";
 import { searchApolloContacts, type ApolloProspect } from "@/lib/apollo.functions";
@@ -17,16 +17,24 @@ type Target = "contacts" | "leads";
 export function ApolloProspector({ target }: { target: Target }) {
   const runSearch = useServerFn(searchApolloContacts);
   const queryClient = useQueryClient();
+  const teamMembers = useQuery(bdTeamMembersQuery());
+  const ownerNames = (teamMembers.data ?? [])
+    .filter((member) => member.active && member.access_status === "approved")
+    .map((member) => member.display_name);
 
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("");
   const [industry, setIndustry] = useState("");
-  const [owner, setOwner] = useState<string>(BD_OWNERS[0]);
+  const [owner, setOwner] = useState<string>("");
   const [prospects, setProspects] = useState<ApolloProspect[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    if (ownerNames.length > 0 && !ownerNames.includes(owner)) setOwner(ownerNames[0]!);
+  }, [owner, ownerNames]);
 
   const search = useMutation({
     mutationFn: () => runSearch({ data: { jobTitle, companyName, location, industry } }),
@@ -91,7 +99,7 @@ export function ApolloProspector({ target }: { target: Target }) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Assign to</span>
             <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
-              {BD_OWNERS.map((rep) => (
+              {ownerNames.map((rep) => (
                 <button
                   key={rep}
                   type="button"

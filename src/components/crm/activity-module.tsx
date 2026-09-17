@@ -12,7 +12,6 @@ import { RowActions } from "@/components/crm/row-actions";
 import { StatusPill, activityTone } from "@/components/crm/status-pill";
 import { activityFields } from "@/components/crm/field-defs";
 import { OwnerFilter, ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
-import { BD_OWNERS } from "@/components/crm/nav-data";
 import {
   ACTIVITY_STATUSES,
   activityRelatedRecordsQuery,
@@ -70,7 +69,7 @@ export function ActivityModule({
   const [statusFilter, setStatusFilter] = useState("all");
   const [dueFilter, setDueFilter] = useState<DueFilter>(type === "Task" ? "open" : "all");
   const { owner: ownerFilter } = useOwnerScope();
-  const [activeRep, setActiveRep] = useState<string>(BD_OWNERS[0]);
+  const [activeRep, setActiveRep] = useState<string>("");
   const [editing, setEditing] = useState<Activity | null>(null);
   const [viewing, setViewing] = useState<Activity | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -142,7 +141,7 @@ export function ActivityModule({
               label="Logging as"
               value={activeRep}
               allowAll={false}
-              onChange={(value) => setActiveRep(value === "all" ? BD_OWNERS[0] : value)}
+              onChange={setActiveRep}
             />
             <Button
               size="sm"

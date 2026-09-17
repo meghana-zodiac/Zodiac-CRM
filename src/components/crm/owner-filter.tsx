@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import { bdTeamMembersQuery } from "@/lib/poa";
 import { cn } from "@/lib/utils";
-import { BD_OWNERS } from "./nav-data";
 
 export type OwnerFilterValue = "all" | string;
 type OwnerScopeValue = { owner: OwnerFilterValue; setOwner: (owner: OwnerFilterValue) => void };
@@ -96,7 +95,20 @@ export function OwnerFilter({
   className?: string;
   allowAll?: boolean;
 }) {
-  const options: OwnerFilterValue[] = allowAll ? ["all", ...BD_OWNERS] : [...BD_OWNERS];
+  const members = useQuery(bdTeamMembersQuery());
+  const names = useMemo(
+    () =>
+      (members.data ?? [])
+        .filter((member) => member.active && member.access_status === "approved")
+        .map((member) => member.display_name),
+    [members.data],
+  );
+  const options: OwnerFilterValue[] = allowAll ? ["all", ...names] : names;
+
+  useEffect(() => {
+    if (members.isLoading || allowAll || names.length === 0 || names.includes(value)) return;
+    onChange(names[0]!);
+  }, [allowAll, members.isLoading, names, onChange, value]);
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <span className="hidden text-xs font-medium text-muted-foreground sm:inline">{label}</span>

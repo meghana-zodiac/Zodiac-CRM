@@ -86,11 +86,16 @@ export function useNotifications(enabled = true) {
       if (authError || !auth.user) throw authError ?? new Error("Not signed in");
       const { data, error } = await supabase
         .from("bd_team_members")
-        .select("display_name")
+        .select("display_name,access_role,access_status,active")
         .eq("id", auth.user.id)
         .single();
       if (error) throw error;
-      return { userId: auth.user.id, displayName: data.display_name };
+      return {
+        userId: auth.user.id,
+        displayName: data.display_name,
+        isAdmin:
+          data.access_role === "primary_admin" && data.access_status === "approved" && data.active,
+      };
     },
   });
   const leads = useQuery({
@@ -142,11 +147,12 @@ export function useNotifications(enabled = true) {
   const items = useMemo<Notification[]>(() => {
     const owner = currentMember.data?.displayName;
     if (!owner) return [];
+    const showAllOwners = currentMember.data?.isAdmin === true;
     const out: Notification[] = [];
     const weekAgo = Date.now() - 7 * 86_400_000;
 
     for (const lead of leads.data ?? []) {
-      if (lead.owner_name !== owner) continue;
+      if (!showAllOwners && lead.owner_name !== owner) continue;
       if (new Date(lead.created_at).getTime() < weekAgo) continue;
       if (lead.status !== "New" && lead.status !== "Contacted") continue;
       out.push({
@@ -161,7 +167,7 @@ export function useNotifications(enabled = true) {
     }
 
     for (const deal of deals.data ?? []) {
-      if (deal.owner_name !== owner) continue;
+      if (!showAllOwners && deal.owner_name !== owner) continue;
       if (deal.stage === "SLA Signed") continue;
       const left = daysUntil(deal.closing_date, now);
       if (left === null || left > 7) continue;
@@ -182,7 +188,7 @@ export function useNotifications(enabled = true) {
     }
 
     for (const activity of activities.data ?? []) {
-      if (activity.owner_name !== owner) continue;
+      if (!showAllOwners && activity.owner_name !== owner) continue;
       if (activity.status !== "Completed") {
         const serviceDetails =
           activity.service_details && typeof activity.service_details === "object"
@@ -256,7 +262,7 @@ export function useNotifications(enabled = true) {
     return out
       .filter((item) => !cleared.includes(item.id))
       .sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
-  }, [leads.data, deals.data, activities.data, cleared, currentMember.data?.displayName, now]);
+  }, [leads.data, deals.data, activities.data, cleared, currentMember.data, now]);
 
   const unread = items.filter((item) => !read.includes(item.id));
 
