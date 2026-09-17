@@ -30,8 +30,12 @@ const KIND_META: Record<Notification["kind"], { icon: LucideIcon; label: string 
   activity: { icon: PhoneCall, label: "Activity alert" },
 };
 
-const READ_KEY = "zodiac-crm.read-notifications";
-const CLEARED_KEY = "zodiac-crm.cleared-notifications";
+const READ_KEY = "zodiac-crm.read-notifications.v2";
+const CLEARED_KEY = "zodiac-crm.cleared-notifications.v2";
+
+function accountKey(base: string, userId: string | undefined) {
+  return `${base}.${userId ?? "signed-out"}`;
+}
 
 function loadIds(key: string): string[] {
   if (typeof window === "undefined") return [];
@@ -51,6 +55,22 @@ function daysUntil(date: string | null) {
 
 /** Derives the live notification feed from leads, proposals and activities. */
 export function useNotifications(enabled = true) {
+  const currentMember = useQuery({
+    queryKey: ["notification-current-member"],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError ?? new Error("Not signed in");
+      const { data, error } = await supabase
+        .from("bd_team_members")
+        .select("display_name")
+        .eq("id", auth.user.id)
+        .single();
+      if (error) throw error;
+      return { userId: auth.user.id, displayName: data.display_name };
+    },
+  });
   const leads = useQuery({
     queryKey: ["notifications", "recent-leads"],
     enabled,
@@ -74,10 +94,14 @@ export function useNotifications(enabled = true) {
   const [read, setRead] = useState<string[]>([]);
   const [cleared, setCleared] = useState<string[]>([]);
 
+  const readKey = accountKey(READ_KEY, currentMember.data?.userId);
+  const clearedKey = accountKey(CLEARED_KEY, currentMember.data?.userId);
+
   useEffect(() => {
-    setRead(loadIds(READ_KEY));
-    setCleared(loadIds(CLEARED_KEY));
-  }, []);
+    if (!currentMember.data?.userId) return;
+    setRead(loadIds(readKey));
+    setCleared(loadIds(clearedKey));
+  }, [currentMember.data?.userId, readKey, clearedKey]);
 
   const persist = (key: string, ids: string[]) => {
     try {
@@ -88,10 +112,13 @@ export function useNotifications(enabled = true) {
   };
 
   const items = useMemo<Notification[]>(() => {
+    const owner = currentMember.data?.displayName;
+    if (!owner) return [];
     const out: Notification[] = [];
     const weekAgo = Date.now() - 7 * 86_400_000;
 
     for (const lead of leads.data ?? []) {
+      if (lead.owner_name !== owner) continue;
       if (new Date(lead.created_at).getTime() < weekAgo) continue;
       if (lead.status !== "New" && lead.status !== "Contacted") continue;
       out.push({
@@ -105,6 +132,7 @@ export function useNotifications(enabled = true) {
     }
 
     for (const deal of deals.data ?? []) {
+      if (deal.owner_name !== owner) continue;
       if (deal.stage === "SLA Signed") continue;
       const left = daysUntil(deal.closing_date);
       if (left === null || left > 7) continue;
@@ -124,6 +152,7 @@ export function useNotifications(enabled = true) {
     }
 
     for (const activity of activities.data ?? []) {
+      if (activity.owner_name !== owner) continue;
       const notificationDate = activity.reminder_at ?? activity.due_date;
       const left = daysUntil(notificationDate);
       if (activity.status !== "Completed") {
@@ -162,25 +191,25 @@ export function useNotifications(enabled = true) {
     return out
       .filter((item) => !cleared.includes(item.id))
       .sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
-  }, [leads.data, deals.data, activities.data, cleared]);
+  }, [leads.data, deals.data, activities.data, cleared, currentMember.data?.displayName]);
 
   const unread = items.filter((item) => !read.includes(item.id));
 
   const markAllRead = useCallback(() => {
     setRead((prev) => {
       const next = [...new Set([...prev, ...items.map((i) => i.id)])];
-      persist(READ_KEY, next);
+      persist(readKey, next);
       return next;
     });
-  }, [items]);
+  }, [items, readKey]);
 
   const clearAll = useCallback(() => {
     setCleared((prev) => {
       const next = [...new Set([...prev, ...items.map((i) => i.id)])];
-      persist(CLEARED_KEY, next);
+      persist(clearedKey, next);
       return next;
     });
-  }, [items]);
+  }, [items, clearedKey]);
 
   return {
     items,

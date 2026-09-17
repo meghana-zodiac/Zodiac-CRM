@@ -351,8 +351,8 @@ export function CrmShell({
             <Button
               variant="ghost"
               size="icon"
-              className="hidden sm:inline-flex"
-              aria-label="Calendar"
+              className="inline-flex size-9 shrink-0"
+              aria-label="Open follow-ups and schedule"
               onClick={() => setScheduleOpen(true)}
             >
               <CalendarDays className="size-4" />
@@ -360,8 +360,12 @@ export function CrmShell({
             <Button
               variant="ghost"
               size="icon"
-              className="relative hidden sm:inline-flex"
-              aria-label="Notifications"
+              className="relative inline-flex size-9 shrink-0"
+              aria-label={
+                notifications.unreadCount > 0
+                  ? `Open notifications, ${notifications.unreadCount} unread`
+                  : "Open notifications"
+              }
               onClick={() => setNotificationsOpen(true)}
             >
               <Bell className="size-4" />

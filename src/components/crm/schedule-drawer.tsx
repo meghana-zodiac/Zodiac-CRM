@@ -216,7 +216,7 @@ export function ScheduleDrawer({
             ))}
           </div>
 
-          <div className="border-t border-border px-5 py-3">
+          <div className="border-t border-border px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
             <Button className="w-full gap-1.5" onClick={() => setAddOpen(true)}>
               <Plus className="size-4" />
               Add Follow-up
