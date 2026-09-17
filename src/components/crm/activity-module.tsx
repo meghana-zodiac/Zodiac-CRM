@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState, FilterPanel, ModuleHeader } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
+import { RecordDetailsSheet } from "@/components/crm/record-details-sheet";
 import { RowActions } from "@/components/crm/row-actions";
 import { StatusPill, activityTone } from "@/components/crm/status-pill";
 import { activityFields } from "@/components/crm/field-defs";
@@ -71,9 +72,13 @@ export function ActivityModule({
   const { owner: ownerFilter } = useOwnerScope();
   const [activeRep, setActiveRep] = useState<string>(BD_OWNERS[0]);
   const [editing, setEditing] = useState<Activity | null>(null);
+  const [viewing, setViewing] = useState<Activity | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const relatedRecords = useQuery({ ...activityRelatedRecordsQuery(), enabled: dialogOpen });
+  const relatedRecords = useQuery({
+    ...activityRelatedRecordsQuery(),
+    enabled: dialogOpen || Boolean(viewing),
+  });
 
   const all = (activities.data ?? []).filter((activity) => activity.activity_type === type);
 
@@ -214,19 +219,22 @@ export function ActivityModule({
                 return (
                   <li
                     key={activity.id}
-                    className="flex items-start gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-panel sm:gap-3 sm:p-3.5"
+                    className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-panel transition-colors hover:bg-muted/40 sm:gap-3 sm:p-3.5"
+                    onClick={() => setViewing(activity)}
                   >
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={activity.status === "Completed"}
-                      onCheckedChange={(checked) =>
-                        toggleComplete.mutate({
-                          id: activity.id,
-                          status: checked ? "Completed" : "Pending",
-                        })
-                      }
-                      aria-label="Toggle completed"
-                    />
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={activity.status === "Completed"}
+                        onCheckedChange={(checked) =>
+                          toggleComplete.mutate({
+                            id: activity.id,
+                            status: checked ? "Completed" : "Pending",
+                          })
+                        }
+                        aria-label="Toggle completed"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p
@@ -272,38 +280,40 @@ export function ActivityModule({
                       ) : null}
                       {details ? (
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                          {typeof details["outcome"] === "string" ? (
+                          {typeof details.outcome === "string" ? (
                             <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-                              {details["outcome"]}
+                              {details.outcome}
                             </span>
                           ) : null}
-                          {typeof details["elapsed_seconds"] === "number" ? (
+                          {typeof details.elapsed_seconds === "number" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              Approx. {formatElapsed(details["elapsed_seconds"])}
+                              Approx. {formatElapsed(details.elapsed_seconds)}
                             </span>
                           ) : null}
-                          {typeof details["next_action"] === "string" ? (
+                          {typeof details.next_action === "string" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              Next: {details["next_action"]}
+                              Next: {details.next_action}
                             </span>
                           ) : null}
-                          {typeof details["priority"] === "string" ? (
+                          {typeof details.priority === "string" ? (
                             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-                              {details["priority"]} priority
+                              {details.priority} priority
                             </span>
                           ) : null}
                         </div>
                       ) : null}
                     </div>
-                    <RowActions
-                      table="activities"
-                      id={activity.id}
-                      label={type}
-                      onEdit={() => {
-                        setEditing(activity);
-                        setDialogOpen(true);
-                      }}
-                    />
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <RowActions
+                        table="activities"
+                        id={activity.id}
+                        label={type}
+                        onEdit={() => {
+                          setEditing(activity);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </li>
                 );
               })}
@@ -327,6 +337,18 @@ export function ActivityModule({
           }
         }
         fixedValues={{ updated_at: new Date().toISOString() }}
+      />
+      <RecordDetailsSheet
+        record={viewing}
+        fields={activityFields(type, relatedRecords.data ?? [])}
+        label={type}
+        title={(activity) => activity.title}
+        onClose={() => setViewing(null)}
+        onEdit={(activity) => {
+          setViewing(null);
+          setEditing(activity);
+          setDialogOpen(true);
+        }}
       />
     </div>
   );

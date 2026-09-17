@@ -302,8 +302,12 @@ function AccountsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((account) => (
-                    <tr key={account.id} className="transition-colors hover:bg-muted/40">
-                      <td className="px-3 py-2.5">
+                    <tr
+                      key={account.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                      onClick={() => setViewing(account)}
+                    >
+                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <Checkbox
                           checked={selected.includes(account.id)}
                           onCheckedChange={(checked) =>
@@ -340,7 +344,7 @@ function AccountsPage() {
                       <td className="px-3 py-2.5 text-muted-foreground">
                         {formatDate(account.created_at)}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="outline"
@@ -349,7 +353,7 @@ function AccountsPage() {
                           <Handshake className="size-4" /> Create
                         </Button>
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <RowActions
                           table="accounts"
                           id={account.id}

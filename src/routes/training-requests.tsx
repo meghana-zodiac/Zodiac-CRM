@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
+import { RecordDetailsSheet } from "@/components/crm/record-details-sheet";
 import { RowActions } from "@/components/crm/row-actions";
 import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import { StatusPill, trainingTone, trainingTypeTone } from "@/components/crm/status-pill";
@@ -57,6 +58,7 @@ function TrainingRequestsPage() {
   const { owner } = useOwnerScope();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TrainingRequestWithRefs | null>(null);
+  const [viewing, setViewing] = useState<TrainingRequestWithRefs | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const moveStage = useMutation({
@@ -122,7 +124,8 @@ function TrainingRequestsPage() {
               {rows.map((row) => (
                 <article
                   key={row.id}
-                  className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                  className="cursor-pointer rounded-xl border border-border bg-surface p-3.5 shadow-panel transition-colors hover:bg-muted/40"
+                  onClick={() => setViewing(row)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -133,15 +136,17 @@ function TrainingRequestsPage() {
                         {row.accounts?.name ?? row.client_name ?? "No client"}
                       </p>
                     </div>
-                    <RowActions
-                      table="training_requests"
-                      id={row.id}
-                      label="Training Request"
-                      onEdit={() => {
-                        setEditing(row);
-                        setDialogOpen(true);
-                      }}
-                    />
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <RowActions
+                        table="training_requests"
+                        id={row.id}
+                        label="Training Request"
+                        onEdit={() => {
+                          setEditing(row);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <StatusPill tone={trainingTone(row.status)}>{row.status}</StatusPill>
@@ -188,7 +193,11 @@ function TrainingRequestsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((row) => (
-                    <tr key={row.id} className="transition-colors hover:bg-muted/40">
+                    <tr
+                      key={row.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                      onClick={() => setViewing(row)}
+                    >
                       <td className="px-3 py-2.5 font-medium text-foreground">
                         {row.accounts?.name ?? row.client_name ?? "—"}
                       </td>
@@ -214,7 +223,7 @@ function TrainingRequestsPage() {
                         <StatusPill tone={trainingTone(row.status)}>{row.status}</StatusPill>
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{row.owner_name ?? "—"}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <RowActions
                           table="training_requests"
                           id={row.id}
@@ -265,10 +274,7 @@ function TrainingRequestsPage() {
                         draggable
                         onDragStart={() => setDragId(row.id)}
                         onDragEnd={() => setDragId(null)}
-                        onClick={() => {
-                          setEditing(row);
-                          setDialogOpen(true);
-                        }}
+                        onClick={() => setViewing(row)}
                         className={cn(
                           "cursor-pointer rounded-md border border-border bg-background p-3 transition-shadow hover:shadow-raised",
                           dragId === row.id && "opacity-50",
@@ -318,6 +324,18 @@ function TrainingRequestsPage() {
         title={editing ? "Edit Training Request" : "New Training Request"}
         fields={trainingRequestFields(accounts.data ?? [], trainers.data ?? [])}
         record={editing}
+      />
+      <RecordDetailsSheet
+        record={viewing}
+        fields={trainingRequestFields(accounts.data ?? [], trainers.data ?? [])}
+        label="Training Request"
+        title={(request) => request.course_topic}
+        onClose={() => setViewing(null)}
+        onEdit={(request) => {
+          setViewing(null);
+          setEditing(request);
+          setDialogOpen(true);
+        }}
       />
     </div>
   );

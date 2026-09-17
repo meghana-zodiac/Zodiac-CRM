@@ -288,8 +288,8 @@ function ContactsPage() {
       const { data } = await supabase.auth.getUser();
       const metadata = data.user?.user_metadata;
       const signedInName =
-        (typeof metadata?.["full_name"] === "string" && metadata["full_name"]) ||
-        (typeof metadata?.["name"] === "string" && metadata["name"]) ||
+        (typeof metadata?.full_name === "string" && metadata.full_name) ||
+        (typeof metadata?.name === "string" && metadata.name) ||
         pendingCall.contact.owner_name;
       const details = {
         source: "CRM Mobile",
@@ -417,7 +417,8 @@ function ContactsPage() {
                   {rows.map((contact) => (
                     <div
                       key={contact.id}
-                      className="rounded-lg border border-border bg-surface p-4 shadow-panel"
+                      className="cursor-pointer rounded-lg border border-border bg-surface p-4 shadow-panel transition-colors hover:bg-muted/40"
+                      onClick={() => openProfile(contact)}
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -426,15 +427,17 @@ function ContactsPage() {
                           </p>
                           <p className="text-xs text-muted-foreground">{contact.title ?? "—"}</p>
                         </div>
-                        <RowActions
-                          table="contacts"
-                          id={contact.id}
-                          label="Contact"
-                          onEdit={() => {
-                            setEditing(contact);
-                            setDialogOpen(true);
-                          }}
-                        />
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <RowActions
+                            table="contacts"
+                            id={contact.id}
+                            label="Contact"
+                            onEdit={() => {
+                              setEditing(contact);
+                              setDialogOpen(true);
+                            }}
+                          />
+                        </div>
                       </div>
                       <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
                         <div>{contact.accounts?.name ?? "No account"}</div>
@@ -545,8 +548,15 @@ function ContactsPage() {
                       </thead>
                       <tbody className="divide-y divide-border">
                         {rows.map((contact) => (
-                          <tr key={contact.id} className="transition-colors hover:bg-muted/40">
-                            <td className="px-3 py-2.5">
+                          <tr
+                            key={contact.id}
+                            className="cursor-pointer transition-colors hover:bg-muted/40"
+                            onClick={() => openProfile(contact)}
+                          >
+                            <td
+                              className="px-3 py-2.5"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <Checkbox
                                 checked={selected.includes(contact.id)}
                                 onCheckedChange={(checked) =>
@@ -559,7 +569,10 @@ function ContactsPage() {
                                 aria-label={`Select ${contact.last_name}`}
                               />
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td
+                              className="px-3 py-2.5"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <span className="font-medium text-foreground">
                                 {fullName(contact.first_name, contact.last_name)}
                               </span>
@@ -620,10 +633,7 @@ function ContactsPage() {
         accounts={accounts.data ?? []}
       />
       <Sheet open={Boolean(openContact)} onOpenChange={(open) => !open && setOpenContact(null)}>
-        <SheetContent
-          side="right"
-          className="w-full overflow-y-auto border-0 p-0 sm:max-w-md md:hidden"
-        >
+        <SheetContent side="right" className="w-full overflow-y-auto border-0 p-0 sm:max-w-md">
           {openContact ? (
             <>
               <div className="bg-gradient-to-br from-slate-950 via-violet-950 to-fuchsia-900 px-5 pb-6 pt-12 text-white">
@@ -713,7 +723,7 @@ function ContactsPage() {
                       <ContactDetail
                         icon={Building2}
                         label="Company"
-                        value={openContact.accounts?.name ?? null}
+                        value={openContact.accounts?.name}
                       />
                       <ContactDetail
                         icon={UserRound}
@@ -888,14 +898,11 @@ function ContactsPage() {
           owner_name: openContact?.owner_name ?? null,
           related_to_type: "Client Contact",
         }}
-        {...(openContact
-          ? {
-              fixedValues: {
-                related_to_type: "Client Contact",
-                related_to_id: openContact.id,
-              },
-            }
-          : {})}
+        fixedValues={
+          openContact
+            ? { related_to_type: "Client Contact", related_to_id: openContact.id }
+            : undefined
+        }
         invalidateKeys={["activities"]}
       />
       <Dialog
@@ -1074,12 +1081,12 @@ function ContactAction({
 function CallActivityDetails({ details }: { details: unknown }) {
   const values = callDetails(details);
   if (!values) return null;
-  const elapsed = typeof values["elapsed_seconds"] === "number" ? values["elapsed_seconds"] : null;
+  const elapsed = typeof values.elapsed_seconds === "number" ? values.elapsed_seconds : null;
   return (
     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-      {typeof values["outcome"] === "string" ? (
+      {typeof values.outcome === "string" ? (
         <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-          {values["outcome"]}
+          {values.outcome}
         </span>
       ) : null}
       {elapsed !== null ? (
@@ -1087,9 +1094,9 @@ function CallActivityDetails({ details }: { details: unknown }) {
           Approx. {formatElapsed(elapsed)}
         </span>
       ) : null}
-      {typeof values["next_action"] === "string" ? (
+      {typeof values.next_action === "string" ? (
         <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-          Next: {values["next_action"]}
+          Next: {values.next_action}
         </span>
       ) : null}
     </div>

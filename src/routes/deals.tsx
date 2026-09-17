@@ -176,7 +176,8 @@ function DealsPage() {
               {rows.map((deal) => (
                 <article
                   key={deal.id}
-                  className="rounded-xl border border-border bg-surface p-3.5 shadow-panel"
+                  className="cursor-pointer rounded-xl border border-border bg-surface p-3.5 shadow-panel transition-colors hover:bg-muted/40"
+                  onClick={() => setOpenDeal(deal)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <button
@@ -191,15 +192,17 @@ function DealsPage() {
                         {deal.accounts?.name ?? "No client"}
                       </p>
                     </button>
-                    <RowActions
-                      table="deals"
-                      id={deal.id}
-                      label="Proposal"
-                      onEdit={() => {
-                        setEditing(deal);
-                        setDialogOpen(true);
-                      }}
-                    />
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <RowActions
+                        table="deals"
+                        id={deal.id}
+                        label="Proposal"
+                        onEdit={() => {
+                          setEditing(deal);
+                          setDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <StatusPill tone={bdTone(deal.stage)}>{bdStageLabel(deal.stage)}</StatusPill>
@@ -232,13 +235,9 @@ function DealsPage() {
                     <tr
                       key={deal.id}
                       className="cursor-pointer transition-colors hover:bg-muted/40"
+                      onClick={() => setOpenDeal(deal)}
                     >
-                      <td
-                        className="px-3 py-2.5 font-medium text-foreground"
-                        onClick={() => setOpenDeal(deal)}
-                      >
-                        {deal.deal_name}
-                      </td>
+                      <td className="px-3 py-2.5 font-medium text-foreground">{deal.deal_name}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">
                         {deal.accounts?.name ?? "—"}
                       </td>
@@ -253,7 +252,7 @@ function DealsPage() {
                       <td className="px-3 py-2.5 tabular-nums text-foreground">
                         {currency(deal.amount)}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <StatusPill tone={bdTone(deal.stage)}>
                           {bdStageLabel(deal.stage)}
                         </StatusPill>
@@ -328,7 +327,8 @@ function DealsPage() {
                   .map((deal) => (
                     <article
                       key={deal.id}
-                      className="rounded-xl border border-border bg-card p-3.5 shadow-card"
+                      className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-card transition-colors hover:bg-muted/40"
+                      onClick={() => setOpenDeal(deal)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <button
@@ -343,15 +343,17 @@ function DealsPage() {
                             {deal.accounts?.name ?? "No client"}
                           </p>
                         </button>
-                        <RowActions
-                          table="deals"
-                          id={deal.id}
-                          label="Proposal"
-                          onEdit={() => {
-                            setEditing(deal);
-                            setDialogOpen(true);
-                          }}
-                        />
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <RowActions
+                            table="deals"
+                            id={deal.id}
+                            label="Proposal"
+                            onEdit={() => {
+                              setEditing(deal);
+                              setDialogOpen(true);
+                            }}
+                          />
+                        </div>
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <StatusPill tone={bdTone(deal.stage)}>
