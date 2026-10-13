@@ -15,6 +15,7 @@ export type Database = {
           active: boolean;
           created_at: string;
           display_name: string;
+          device_access_required: boolean;
           email: string;
           id: string;
           reviewed_at: string | null;
@@ -27,6 +28,7 @@ export type Database = {
           active?: boolean;
           created_at?: string;
           display_name: string;
+          device_access_required?: boolean;
           email: string;
           id: string;
           reviewed_at?: string | null;
@@ -39,11 +41,99 @@ export type Database = {
           active?: boolean;
           created_at?: string;
           display_name?: string;
+          device_access_required?: boolean;
           email?: string;
           id?: string;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      crm_devices: {
+        Row: {
+          id: string;
+          user_id: string;
+          device_label: string;
+          device_type: string;
+          browser: string | null;
+          operating_system: string | null;
+          token_hash: string;
+          approved_by: string;
+          approved_at: string;
+          expires_at: string;
+          last_seen_at: string | null;
+          last_ip: string | null;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          device_label: string;
+          device_type: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          token_hash: string;
+          approved_by: string;
+          approved_at?: string;
+          expires_at?: string;
+          last_seen_at?: string | null;
+          last_ip?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          device_label?: string;
+          device_type?: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          token_hash?: string;
+          approved_by?: string;
+          approved_at?: string;
+          expires_at?: string;
+          last_seen_at?: string | null;
+          last_ip?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      crm_device_enrollment_codes: {
+        Row: {
+          id: string;
+          user_id: string;
+          code_hash: string;
+          created_by: string;
+          expires_at: string;
+          used_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          code_hash: string;
+          created_by: string;
+          expires_at: string;
+          used_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          code_hash?: string;
+          created_by?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
