@@ -16,8 +16,12 @@ import { CrmShell } from "@/components/crm/crm-shell";
 import { OwnerScopeProvider } from "@/components/crm/owner-filter";
 import { Toaster } from "@/components/ui/sonner";
 import { GoogleLogin } from "@/components/auth/google-login";
+import { DeviceRegistration } from "@/components/auth/device-registration";
 import { supabase } from "@/integrations/supabase/client";
 import { ORGANIZATION_EMAIL_DOMAIN, isOrganizationGoogleUser } from "@/lib/organization-auth";
+import { checkCrmDevice } from "@/lib/device-access.functions";
+import { getCrmDeviceToken } from "@/lib/device-access";
+import { useServerFn } from "@tanstack/react-start";
 
 function NotFoundComponent() {
   return (
@@ -158,6 +162,9 @@ function RootComponent() {
   >(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [deviceApproved, setDeviceApproved] = useState(false);
+  const [deviceRequired, setDeviceRequired] = useState(false);
+  const checkDevice = useServerFn(checkCrmDevice);
 
   useEffect(() => {
     let mounted = true;
@@ -187,7 +194,7 @@ function RootComponent() {
 
       const { data, error } = await supabase
         .from("bd_team_members")
-        .select("access_status,access_role")
+        .select("access_status,access_role,device_access_required")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -198,6 +205,20 @@ function RootComponent() {
       } else {
         setAccessStatus((data?.access_status as typeof accessStatus) ?? "pending");
         setIsAdmin(data?.access_role === "primary_admin" && data?.access_status === "approved");
+        if (data?.access_status === "approved") {
+          try {
+            const device = await checkDevice({ data: { token: getCrmDeviceToken() } });
+            if (mounted) {
+              setDeviceRequired(device.required);
+              setDeviceApproved(device.approved);
+            }
+          } catch {
+            if (mounted) {
+              setDeviceRequired(Boolean(data.device_access_required));
+              setDeviceApproved(!data.device_access_required);
+            }
+          }
+        }
       }
       setIsLoading(false);
     };
@@ -226,7 +247,7 @@ function RootComponent() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [checkDevice]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -234,13 +255,15 @@ function RootComponent() {
         <main className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">
           Checking your session…
         </main>
-      ) : isSignedIn && accessStatus === "approved" ? (
+      ) : isSignedIn && accessStatus === "approved" && deviceApproved ? (
         <OwnerScopeProvider>
           <CrmShell isAdmin={isAdmin}>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </CrmShell>
         </OwnerScopeProvider>
+      ) : isSignedIn && accessStatus === "approved" && deviceRequired ? (
+        <DeviceRegistration onApproved={() => setDeviceApproved(true)} />
       ) : isSignedIn && accessStatus ? (
         <AccessWaiting status={accessStatus} />
       ) : (
