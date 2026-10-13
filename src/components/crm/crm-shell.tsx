@@ -78,10 +78,12 @@ function NavList({
   collapsed,
   isAdmin,
   onNavigate,
+  onOpenAccessManagement,
 }: {
   collapsed: boolean;
   isAdmin: boolean;
   onNavigate?: () => void;
+  onOpenAccessManagement?: () => void;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
@@ -122,6 +124,29 @@ function NavList({
           </ul>
         </div>
       ))}
+      {isAdmin ? (
+        <div>
+          {!collapsed ? (
+            <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-nav-muted">
+              Administration
+            </p>
+          ) : (
+            <div className="mx-2 mb-2 h-px bg-nav-border" />
+          )}
+          <button
+            type="button"
+            title="Access Management"
+            onClick={onOpenAccessManagement}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-nav-foreground/85 transition-colors hover:bg-nav-accent hover:text-nav-foreground",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <ShieldCheck className="size-4 shrink-0" />
+            {!collapsed && <span className="truncate">Access Management</span>}
+          </button>
+        </div>
+      ) : null}
     </nav>
   );
 }
@@ -279,7 +304,11 @@ export function CrmShell({
         )}
       >
         <SidebarBrand collapsed={collapsed} />
-        <NavList collapsed={collapsed} isAdmin={isAdmin} />
+        <NavList
+          collapsed={collapsed}
+          isAdmin={isAdmin}
+          onOpenAccessManagement={() => setAccessManagementOpen(true)}
+        />
         <button
           onClick={toggleSidebar}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -306,6 +335,10 @@ export function CrmShell({
                 collapsed={false}
                 isAdmin={isAdmin}
                 onNavigate={() => setMobileNavOpen(false)}
+                onOpenAccessManagement={() => {
+                  setMobileNavOpen(false);
+                  setAccessManagementOpen(true);
+                }}
               />
             </SheetContent>
           </Sheet>
