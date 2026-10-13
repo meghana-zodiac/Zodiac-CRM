@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock3, ShieldCheck, UserX } from "lucide-react";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  Check,
+  Clock3,
+  KeyRound,
+  Laptop,
+  ShieldCheck,
+  Smartphone,
+  UserX,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +23,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  generateDeviceEnrollmentCode,
+  listCrmDevices,
+  revokeCrmDevice,
+  setDeviceEnforcement,
+} from "@/lib/device-access.functions";
 
 type AccessStatus = "pending" | "approved" | "rejected" | "suspended";
 type Member = {
@@ -21,6 +38,7 @@ type Member = {
   access_status: AccessStatus;
   access_role: "primary_admin" | "bd_member";
   active: boolean;
+  device_access_required: boolean;
   created_at: string;
 };
 
@@ -39,17 +57,59 @@ export function AccessManagement({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const generateCode = useServerFn(generateDeviceEnrollmentCode);
+  const listDevices = useServerFn(listCrmDevices);
+  const revokeDevice = useServerFn(revokeCrmDevice);
+  const setEnforcement = useServerFn(setDeviceEnforcement);
+  const [activeCode, setActiveCode] = useState<{
+    name: string;
+    code: string;
+    expiresAt: string;
+  } | null>(null);
   const members = useQuery({
     queryKey: ["bd-team-access"],
     enabled: open,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bd_team_members")
-        .select("id,email,display_name,access_status,access_role,active,created_at")
+        .select(
+          "id,email,display_name,access_status,access_role,active,device_access_required,created_at",
+        )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Member[];
     },
+  });
+  const devices = useQuery({
+    queryKey: ["crm-devices"],
+    enabled: open,
+    queryFn: () => listDevices(),
+  });
+
+  const deviceAction = useMutation({
+    mutationFn: async (
+      action:
+        | { kind: "code"; member: Member }
+        | { kind: "enforce"; member: Member }
+        | { kind: "revoke"; deviceId: string },
+    ) => {
+      if (action.kind === "code") {
+        const result = await generateCode({ data: { memberId: action.member.id } });
+        setActiveCode({ name: action.member.display_name, ...result });
+      } else if (action.kind === "enforce") {
+        await setEnforcement({
+          data: { memberId: action.member.id, required: !action.member.device_access_required },
+        });
+      } else {
+        await revokeDevice({ data: { deviceId: action.deviceId } });
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["bd-team-access"] });
+      void queryClient.invalidateQueries({ queryKey: ["crm-devices"] });
+      toast.success("Device access updated");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const updateAccess = useMutation({
@@ -79,6 +139,9 @@ export function AccessManagement({
 
   const MemberRow = ({ member }: { member: Member }) => {
     const protectedAdmin = member.access_role === "primary_admin";
+    const memberDevices = (devices.data ?? []).filter(
+      (device) => device.user_id === member.id && !device.revoked_at,
+    );
     return (
       <article className="rounded-xl border bg-card p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
@@ -130,6 +193,63 @@ export function AccessManagement({
             )}
           </div>
         )}
+        {member.access_status === "approved" ? (
+          <div className="mt-4 border-t pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold">Approved work devices</p>
+                <p className="text-xs text-muted-foreground">
+                  {member.device_access_required
+                    ? "Required for every login"
+                    : "Restriction not enabled"}{" "}
+                  · {memberDevices.length}/2 active
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => deviceAction.mutate({ kind: "code", member })}
+                >
+                  <KeyRound className="mr-1 size-3.5" /> New code
+                </Button>
+                <Button
+                  size="sm"
+                  variant={member.device_access_required ? "destructive" : "default"}
+                  onClick={() => deviceAction.mutate({ kind: "enforce", member })}
+                >
+                  {member.device_access_required ? "Disable restriction" : "Require devices"}
+                </Button>
+              </div>
+            </div>
+            {memberDevices.length ? (
+              <div className="mt-3 space-y-2">
+                {memberDevices.map((device) => (
+                  <div
+                    key={device.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 p-2 text-xs"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      {device.device_type === "mobile" ? (
+                        <Smartphone className="size-4 shrink-0" />
+                      ) : (
+                        <Laptop className="size-4 shrink-0" />
+                      )}
+                      <span className="truncate">{device.device_label}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deviceAction.mutate({ kind: "revoke", deviceId: device.id })}
+                    >
+                      <XCircle className="mr-1 size-3.5" /> Revoke
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </article>
     );
   };
@@ -147,6 +267,17 @@ export function AccessManagement({
           </SheetDescription>
         </SheetHeader>
         <div className="mt-6 space-y-6">
+          {activeCode ? (
+            <section className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+              <p className="text-sm font-semibold">One-time code for {activeCode.name}</p>
+              <p className="my-2 text-3xl font-bold tracking-[0.3em] text-primary">
+                {activeCode.code}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Enter this directly on the company device. It expires in 10 minutes and works once.
+              </p>
+            </section>
+          ) : null}
           {members.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading access requests…</p>
           ) : null}
