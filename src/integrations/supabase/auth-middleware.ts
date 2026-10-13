@@ -54,6 +54,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     }
 
     const authHeader = request.headers.get("authorization");
+    const deviceToken = request.headers.get("x-zodiac-device-token");
 
     if (!authHeader) {
       throw new Error("Unauthorized: No authorization header provided");
@@ -77,6 +78,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
         fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY!),
         headers: {
           Authorization: `Bearer ${token}`,
+          ...(deviceToken ? { "x-zodiac-device-token": deviceToken } : {}),
         },
       },
       auth: {
