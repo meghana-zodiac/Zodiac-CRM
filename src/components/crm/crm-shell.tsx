@@ -125,7 +125,7 @@ function NavList({
         </div>
       ))}
       {isAdmin ? (
-        <div className="sticky bottom-0 border-t border-nav-border bg-nav pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="border-t border-nav-border pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3">
           {!collapsed ? (
             <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-nav-muted">
               Administration
