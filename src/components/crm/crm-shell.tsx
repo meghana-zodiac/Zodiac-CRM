@@ -88,7 +88,7 @@ function NavList({
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 scrollbar-thin">
+    <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4 scrollbar-thin">
       {navGroups.map((group) => (
         <div key={group.label}>
           {!collapsed ? (
@@ -125,7 +125,7 @@ function NavList({
         </div>
       ))}
       {isAdmin ? (
-        <div>
+        <div className="sticky bottom-0 border-t border-nav-border bg-nav pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3">
           {!collapsed ? (
             <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-nav-muted">
               Administration
@@ -328,7 +328,10 @@ export function CrmShell({
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 border-nav-border bg-nav p-0">
+            <SheetContent
+              side="left"
+              className="flex w-72 max-w-[85vw] flex-col overflow-hidden border-nav-border bg-nav p-0"
+            >
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <SidebarBrand collapsed={false} />
               <NavList
