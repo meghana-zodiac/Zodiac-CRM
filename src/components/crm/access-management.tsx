@@ -6,6 +6,7 @@ import {
   Clock3,
   KeyRound,
   Laptop,
+  RefreshCw,
   ShieldCheck,
   Smartphone,
   UserX,
@@ -84,6 +85,9 @@ export function AccessManagement({
     queryKey: ["crm-devices"],
     enabled: open,
     queryFn: () => listDevices(),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const deviceAction = useMutation({
@@ -205,49 +209,78 @@ export function AccessManagement({
                   · {memberDevices.length}/2 active
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => deviceAction.mutate({ kind: "code", member })}
-                >
-                  <KeyRound className="mr-1 size-3.5" /> New code
-                </Button>
-                <Button
-                  size="sm"
-                  variant={member.device_access_required ? "destructive" : "default"}
-                  onClick={() => deviceAction.mutate({ kind: "enforce", member })}
-                >
-                  {member.device_access_required ? "Disable restriction" : "Require devices"}
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void devices.refetch()}
+                disabled={devices.isFetching}
+              >
+                <RefreshCw
+                  className={`mr-1 size-3.5 ${devices.isFetching ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
             </div>
-            {memberDevices.length ? (
+            {devices.isLoading ? (
+              <p className="mt-3 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
+                Loading approved devices…
+              </p>
+            ) : devices.isError ? (
+              <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                Approved devices could not be loaded. Tap Refresh to try again.
+              </p>
+            ) : memberDevices.length ? (
               <div className="mt-3 space-y-2">
                 {memberDevices.map((device) => (
                   <div
                     key={device.id}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 p-2 text-xs"
+                    className="rounded-lg border bg-muted/40 p-3 text-xs"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      {device.device_type === "mobile" ? (
-                        <Smartphone className="size-4 shrink-0" />
-                      ) : (
-                        <Laptop className="size-4 shrink-0" />
-                      )}
-                      <span className="truncate">{device.device_label}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2 font-medium">
+                        {device.device_type === "mobile" ? (
+                          <Smartphone className="size-4 shrink-0" />
+                        ) : (
+                          <Laptop className="size-4 shrink-0" />
+                        )}
+                        <span className="truncate">{device.device_label}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deviceAction.mutate({ kind: "revoke", deviceId: device.id })}
+                      >
+                        <XCircle className="mr-1 size-3.5" /> Revoke
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deviceAction.mutate({ kind: "revoke", deviceId: device.id })}
-                    >
-                      <XCircle className="mr-1 size-3.5" /> Revoke
-                    </Button>
+                    <p className="mt-1 pl-6 text-muted-foreground">
+                      {[device.browser, device.operating_system].filter(Boolean).join(" · ") ||
+                        "Device details unavailable"}
+                    </p>
                   </div>
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="mt-3 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
+                No approved devices are registered for this user.
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => deviceAction.mutate({ kind: "code", member })}
+              >
+                <KeyRound className="mr-1 size-3.5" /> New code
+              </Button>
+              <Button
+                size="sm"
+                variant={member.device_access_required ? "destructive" : "default"}
+                onClick={() => deviceAction.mutate({ kind: "enforce", member })}
+              >
+                {member.device_access_required ? "Disable restriction" : "Require devices"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </article>
