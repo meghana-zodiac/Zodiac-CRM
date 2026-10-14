@@ -178,10 +178,11 @@ function numberValue(value: string | undefined) {
 }
 
 function moneyValue(raw: string, labelled?: string) {
-  if (labelled) return numberValue(labelled);
-  const match = raw.match(
-    /(?:budget|worth|value|fee|rate|cost|amount|contract(?:\s+value)?)(?:\s+(?:is|of|at))?\s*(?:₹|rs\.?|inr)?\s*([\d,.]+)\s*(crores?|cr|lakhs?|lacs?|k)?/i,
-  );
+  const match = labelled
+    ? labelled.match(/(?:₹|rs\.?|inr)?\s*([\d,.]+)\s*(crores?|cr|lakhs?|lacs?|k)?/i)
+    : raw.match(
+        /(?:budget|worth|value|fee|rate|cost|amount|contract(?:\s+value)?)(?:\s+(?:is|of|at))?\s*(?:₹|rs\.?|inr)?\s*([\d,.]+)\s*(crores?|cr|lakhs?|lacs?|k)?/i,
+      );
   if (!match) return "";
   const base = Number(match[1]!.replace(/,/g, ""));
   if (!Number.isFinite(base)) return "";
@@ -442,7 +443,7 @@ export function parseLeadPasteDetailed(raw: string): SmartPasteResult {
   put(
     result,
     "estimated_value",
-    moneyValue(raw, firstLabel(labels, ["estimated value", "value", "budget"])),
+    moneyValue(raw, firstLabel(labels, ["estimated value", "value", "budget", "amount"])),
   );
   put(result, "notes", firstLabel(labels, ["notes", "remarks"]) ?? raw.trim(), "review");
   result.unclassified = labelled.unknown;
@@ -482,13 +483,13 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
         "company",
         "organisation",
         "organization",
-      ]) ?? lead.values["company_name"],
+      ]) ?? lead.values.company_name,
     );
     put(
       result,
       "industry",
-      firstLabel(labels, ["industry", "sector"]) ?? lead.values["industry"],
-      lead.confidence["industry"],
+      firstLabel(labels, ["industry", "sector"]) ?? lead.values.industry,
+      lead.confidence.industry,
     );
     const inferredType = /\bmultiple|multi[- ]service\b/i.test(raw)
       ? "Multi-service"
@@ -498,7 +499,7 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
       "client_type",
       firstLabel(labels, ["engagement type", "client type"]) ?? inferredType,
     );
-    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values["city"]);
+    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values.city);
     put(
       result,
       "website",
