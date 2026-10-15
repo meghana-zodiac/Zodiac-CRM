@@ -25,6 +25,22 @@ type LeadField =
   | "phone"
   | "phone_2"
   | "landline"
+  | "resume_title"
+  | "work_experience"
+  | "annual_salary"
+  | "preferred_location"
+  | "designation"
+  | "ug_course"
+  | "pg_course"
+  | "post_pg_course"
+  | "age_or_dob"
+  | "postal_address"
+  | "last_active"
+  | "comment_1"
+  | "comment_2"
+  | "comment_3"
+  | "comment_4"
+  | "comment_5"
   | "industry"
   | "city"
   | "service_interest"
@@ -42,6 +58,22 @@ type ImportRow = {
   phone: string | null;
   phone_2: string | null;
   landline: string | null;
+  resume_title: string | null;
+  work_experience: string | null;
+  annual_salary: string | null;
+  preferred_location: string | null;
+  designation: string | null;
+  ug_course: string | null;
+  pg_course: string | null;
+  post_pg_course: string | null;
+  age_or_dob: string | null;
+  postal_address: string | null;
+  last_active: string | null;
+  comment_1: string | null;
+  comment_2: string | null;
+  comment_3: string | null;
+  comment_4: string | null;
+  comment_5: string | null;
   industry: string | null;
   city: string | null;
   service_interest: string | null;
@@ -87,6 +119,22 @@ const aliases: Record<LeadField, string[]> = {
   ],
   phone_2: ["phone 2", "secondary phone", "alternate phone", "alternate mobile", "mobile 2"],
   landline: ["landline", "landline number", "office landline", "telephone landline"],
+  resume_title: ["resume title"],
+  work_experience: ["work exp", "work experience"],
+  annual_salary: ["annual salary", "salary"],
+  preferred_location: ["preferred location"],
+  designation: ["designation", "job title"],
+  ug_course: ["u.g. course", "ug course"],
+  pg_course: ["p. g. course", "p.g. course", "pg course"],
+  post_pg_course: ["post p. g. course", "post p.g. course", "post pg course"],
+  age_or_dob: ["age/date of birth", "age / date of birth", "age", "date of birth"],
+  postal_address: ["postal address", "address"],
+  last_active: ["last active"],
+  comment_1: ["comment 1"],
+  comment_2: ["comment 2"],
+  comment_3: ["comment 3"],
+  comment_4: ["comment 4"],
+  comment_5: ["comment 5"],
   industry: ["industry", "sector", "industry sector"],
   city: ["city", "location", "office location", "current location"],
   service_interest: [
@@ -239,28 +287,6 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       owner.error,
     ].filter(Boolean);
 
-    const profileDetails: Array<[string, string]> = [
-      ["Resume title", valueForHeaders(row, ["resume title"])],
-      ["Work experience", valueForHeaders(row, ["work exp", "work experience"])],
-      ["Annual salary", valueForHeaders(row, ["annual salary", "salary"])],
-      ["Preferred location", valueForHeaders(row, ["preferred location"])],
-      ["Designation", valueForHeaders(row, ["designation", "job title"])],
-      ["UG course", valueForHeaders(row, ["u.g. course", "ug course"])],
-      ["PG course", valueForHeaders(row, ["p. g. course", "p.g. course", "pg course"])],
-      ["Post-PG course", valueForHeaders(row, ["post p. g. course", "post p.g. course"])],
-      ["Age / DOB", valueForHeaders(row, ["age/date of birth", "age / date of birth"])],
-      ["Postal address", valueForHeaders(row, ["postal address", "address"])],
-      ["Last active", valueForHeaders(row, ["last active"])],
-      ["Comment 1", valueForHeaders(row, ["comment 1"])],
-      ["Comment 2", valueForHeaders(row, ["comment 2"])],
-      ["Comment 3", valueForHeaders(row, ["comment 3"])],
-      ["Comment 4", valueForHeaders(row, ["comment 4"])],
-      ["Comment 5", valueForHeaders(row, ["comment 5"])],
-    ];
-    const generatedNotes = profileDetails
-      .filter(([, value]) => value)
-      .map(([label, value]) => `${label}: ${value}`)
-      .join("\n");
     const suppliedNotes = valueFor(row, "notes");
 
     return {
@@ -271,6 +297,22 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       phone,
       phone_2: phone2,
       landline,
+      resume_title: nullable(valueFor(row, "resume_title")),
+      work_experience: nullable(valueFor(row, "work_experience")),
+      annual_salary: nullable(valueFor(row, "annual_salary")),
+      preferred_location: nullable(valueFor(row, "preferred_location")),
+      designation: nullable(valueFor(row, "designation")),
+      ug_course: nullable(valueFor(row, "ug_course")),
+      pg_course: nullable(valueFor(row, "pg_course")),
+      post_pg_course: nullable(valueFor(row, "post_pg_course")),
+      age_or_dob: nullable(valueFor(row, "age_or_dob")),
+      postal_address: nullable(valueFor(row, "postal_address")),
+      last_active: nullable(valueFor(row, "last_active")),
+      comment_1: nullable(valueFor(row, "comment_1")),
+      comment_2: nullable(valueFor(row, "comment_2")),
+      comment_3: nullable(valueFor(row, "comment_3")),
+      comment_4: nullable(valueFor(row, "comment_4")),
+      comment_5: nullable(valueFor(row, "comment_5")),
       industry: nullable(valueFor(row, "industry")),
       city: nullable(valueFor(row, "city")),
       service_interest: service,
@@ -278,7 +320,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       status: status ?? "New",
       estimated_value: estimatedValue,
       owner_name: owner.value,
-      notes: nullable([suppliedNotes, generatedNotes].filter(Boolean).join("\n")),
+      notes: nullable(suppliedNotes),
       error: errors.length ? errors.join("; ") : undefined,
     };
   });
@@ -446,6 +488,22 @@ export function LeadImportDialog({
           phone: row.phone,
           phone_2: row.phone_2,
           landline: row.landline,
+          resume_title: row.resume_title,
+          work_experience: row.work_experience,
+          annual_salary: row.annual_salary,
+          preferred_location: row.preferred_location,
+          designation: row.designation,
+          ug_course: row.ug_course,
+          pg_course: row.pg_course,
+          post_pg_course: row.post_pg_course,
+          age_or_dob: row.age_or_dob,
+          postal_address: row.postal_address,
+          last_active: row.last_active,
+          comment_1: row.comment_1,
+          comment_2: row.comment_2,
+          comment_3: row.comment_3,
+          comment_4: row.comment_4,
+          comment_5: row.comment_5,
           industry: row.industry,
           city: row.city,
           service_interest: row.service_interest,

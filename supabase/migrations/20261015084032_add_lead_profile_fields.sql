@@ -1,0 +1,17 @@
+alter table public.leads
+  add column if not exists resume_title text,
+  add column if not exists work_experience text,
+  add column if not exists annual_salary text,
+  add column if not exists preferred_location text,
+  add column if not exists designation text,
+  add column if not exists ug_course text,
+  add column if not exists pg_course text,
+  add column if not exists post_pg_course text,
+  add column if not exists age_or_dob text,
+  add column if not exists postal_address text,
+  add column if not exists last_active text,
+  add column if not exists comment_1 text,
+  add column if not exists comment_2 text,
+  add column if not exists comment_3 text,
+  add column if not exists comment_4 text,
+  add column if not exists comment_5 text;
