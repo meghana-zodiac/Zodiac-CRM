@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICE_LINES, type Lead } from "@/lib/crm";
 import { bdTeamMembersQuery } from "@/lib/poa";
@@ -324,15 +325,47 @@ export function LeadImportDialog({
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [previewFilter, setPreviewFilter] = useState<"all" | "invalid">("all");
   const validCount = rows.filter((row) => !row.error).length;
   const errorCount = rows.length - validCount;
-  const preview = useMemo(() => rows.slice(0, 12), [rows]);
+  const previewRows = useMemo(
+    () => (previewFilter === "invalid" ? rows.filter((row) => row.error) : rows),
+    [previewFilter, rows],
+  );
+  const preview = useMemo(() => previewRows.slice(0, 25), [previewRows]);
 
   const reset = () => {
     setFileName("");
     setRows([]);
     setHeaders([]);
+    setPreviewFilter("all");
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const updateCompanyName = (rowNumber: number, value: string) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.rowNumber === rowNumber ? { ...row, company_name: value.trimStart() } : row,
+      ),
+    );
+  };
+
+  const validateCompanyName = (rowNumber: number) => {
+    setRows((current) =>
+      current.map((row) => {
+        if (row.rowNumber !== rowNumber) return row;
+        const otherErrors = (row.error ?? "")
+          .split("; ")
+          .filter((error) => error && error !== "Company name is required");
+        const companyName = row.company_name.trim();
+        const errors = companyName ? otherErrors : ["Company name is required", ...otherErrors];
+        return {
+          ...row,
+          company_name: companyName,
+          error: errors.length ? errors.join("; ") : undefined,
+        };
+      }),
+    );
   };
 
   const readFile = async (file?: File) => {
@@ -556,6 +589,31 @@ export function LeadImportDialog({
                   Detected {headers.length} columns
                 </span>
               </div>
+              {errorCount ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewFilter === "all" ? "default" : "outline"}
+                    onClick={() => setPreviewFilter("all")}
+                  >
+                    Preview all
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewFilter === "invalid" ? "destructive" : "outline"}
+                    onClick={() => setPreviewFilter("invalid")}
+                  >
+                    Fix {errorCount} invalid rows
+                  </Button>
+                  {previewFilter === "invalid" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Enter the missing company. Corrected rows become valid automatically.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
@@ -587,7 +645,22 @@ export function LeadImportDialog({
                     {preview.map((row) => (
                       <tr key={row.rowNumber}>
                         <td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td>
-                        <td className="px-3 py-2 font-medium">{row.company_name || "—"}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {row.error?.includes("Company name is required") ? (
+                            <Input
+                              className="h-8 min-w-52 bg-background"
+                              placeholder="Enter company name"
+                              aria-label={`Company name for row ${row.rowNumber}`}
+                              value={row.company_name}
+                              onChange={(event) =>
+                                updateCompanyName(row.rowNumber, event.target.value)
+                              }
+                              onBlur={() => validateCompanyName(row.rowNumber)}
+                            />
+                          ) : (
+                            row.company_name || "—"
+                          )}
+                        </td>
                         <td className="px-3 py-2">{row.contact_name ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
@@ -614,9 +687,10 @@ export function LeadImportDialog({
                   </tbody>
                 </table>
               </div>
-              {rows.length > preview.length ? (
+              {previewRows.length > preview.length ? (
                 <p className="text-xs text-muted-foreground">
-                  Previewing 12 of {rows.length} rows.
+                  Previewing {preview.length} of {previewRows.length}{" "}
+                  {previewFilter === "invalid" ? "invalid" : "total"} rows.
                 </p>
               ) : null}
             </>
