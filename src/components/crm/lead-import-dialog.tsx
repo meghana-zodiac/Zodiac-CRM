@@ -170,17 +170,19 @@ function workbookRows(buffer: ArrayBuffer) {
     raw: false,
   });
   const knownHeaders = new Set(Object.values(aliases).flat());
-  const headerIndex = matrix.findIndex((row) => {
+  const relativeHeaderIndex = matrix.findIndex((row) => {
     const cells = row.map((value) => cleanHeader(clean(value))).filter(Boolean);
     return (
       cells.some((cell) => knownHeaders.has(cell)) &&
       cells.some((cell) => ["company name", "current employer"].includes(cell))
     );
   });
-  if (headerIndex < 0) {
+  if (relativeHeaderIndex < 0) {
     throw new Error("Could not find a Company Name or Current Employer header row.");
   }
-  const headers = (matrix[headerIndex] ?? []).map(clean).filter(Boolean);
+  const headers = (matrix[relativeHeaderIndex] ?? []).map(clean).filter(Boolean);
+  const usedRange = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1");
+  const headerIndex = usedRange.s.r + relativeHeaderIndex;
   const source = XLSX.utils.sheet_to_json<RawRow>(sheet, {
     defval: "",
     raw: false,
