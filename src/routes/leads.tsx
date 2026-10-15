@@ -71,18 +71,35 @@ function LeadsPage() {
   });
 
   const columns: Column<Lead>[] = [
+    { header: "Candidate name", render: (row) => row.contact_name ?? "—" },
+    { header: "Resume title", render: (row) => row.resume_title ?? "—" },
+    { header: "Phone 1", render: (row) => row.phone ?? "—" },
+    { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
+    { header: "Landline", render: (row) => row.landline ?? "—" },
+    { header: "Email", render: (row) => row.email ?? "—" },
+    { header: "Work exp", render: (row) => row.work_experience ?? "—" },
+    { header: "Annual salary", render: (row) => row.annual_salary ?? "—" },
+    { header: "Current location", render: (row) => row.city ?? "—" },
+    { header: "Preferred location", render: (row) => row.preferred_location ?? "—" },
     {
-      header: "Company",
+      header: "Current employer",
       className: "px-3 py-2.5 font-medium text-foreground",
       render: (row) => row.company_name,
     },
-    { header: "Contact person", render: (row) => row.contact_name ?? "—" },
-    { header: "Phone", render: (row) => row.phone ?? "—" },
-    { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
-    { header: "Landline", render: (row) => row.landline ?? "—" },
-    { header: "Service interest", render: (row) => row.service_interest ?? "—" },
+    { header: "Designation", render: (row) => row.designation ?? "—" },
+    { header: "U.G. course", render: (row) => row.ug_course ?? "—" },
+    { header: "P.G. course", render: (row) => row.pg_course ?? "—" },
+    { header: "Post P.G. course", render: (row) => row.post_pg_course ?? "—" },
+    { header: "Age / DOB", render: (row) => row.age_or_dob ?? "—" },
+    { header: "Postal address", render: (row) => row.postal_address ?? "—" },
+    { header: "Last active", render: (row) => row.last_active ?? "—" },
+    { header: "Comment 1", render: (row) => row.comment_1 ?? "—" },
+    { header: "Comment 2", render: (row) => row.comment_2 ?? "—" },
+    { header: "Comment 3", render: (row) => row.comment_3 ?? "—" },
+    { header: "Comment 4", render: (row) => row.comment_4 ?? "—" },
+    { header: "Comment 5", render: (row) => row.comment_5 ?? "—" },
     { header: "Industry", render: (row) => row.industry ?? "—" },
-    { header: "City", render: (row) => row.city ?? "—" },
+    { header: "Service interest", render: (row) => row.service_interest ?? "—" },
     { header: "Source", render: (row) => row.source ?? "—" },
     {
       header: "Status",
@@ -90,6 +107,7 @@ function LeadsPage() {
     },
     { header: "Est. value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
+    { header: "Notes", render: (row) => row.notes ?? "—" },
     { header: "Created", render: (row) => formatDate(row.created_at) },
   ];
 
@@ -109,7 +127,7 @@ function LeadsPage() {
             rows={leads.data ?? []}
             isLoading={leads.isLoading}
             columns={columns}
-            minWidth={1420}
+            minWidth={4600}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
             filterValue={(row) => row.status}
