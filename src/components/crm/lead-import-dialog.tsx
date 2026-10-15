@@ -508,15 +508,15 @@ export function LeadImportDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[88vh] max-w-6xl overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[92dvh] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[88vh]">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6">
           <DialogTitle>Import Corporate Leads</DialogTitle>
           <DialogDescription>
             Upload Excel or CSV. Headers are detected automatically. Matching email—or company and
             contact—updates an existing lead.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             <input
               ref={inputRef}
@@ -622,7 +622,7 @@ export function LeadImportDialog({
             </>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t border-border bg-background px-4 py-4 sm:px-6">
           <Button
             type="button"
             variant="outline"
