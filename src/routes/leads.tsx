@@ -161,6 +161,16 @@ function LeadsPage() {
             rows={tab === "ceipal" ? ceipalLeads : uploadedLeads}
             isLoading={leads.isLoading}
             columns={columns}
+            mobileColumns={[
+              { header: "HR / Contact", render: (row) => row.contact_name ?? "—" },
+              {
+                header: "Company",
+                className: "font-medium text-foreground",
+                render: (row) => row.company_name,
+              },
+              { header: "Designation", render: (row) => row.designation ?? "—" },
+              { header: "Location", render: (row) => row.city ?? "—" },
+            ]}
             minWidth={3900}
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"

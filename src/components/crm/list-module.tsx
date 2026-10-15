@@ -33,6 +33,7 @@ export function ListModule<T extends { id: string }>({
   rows,
   isLoading,
   columns,
+  mobileColumns,
   minWidth = 900,
   searchValues,
   filterAllLabel,
@@ -54,6 +55,7 @@ export function ListModule<T extends { id: string }>({
   rows: T[];
   isLoading: boolean;
   columns: Column<T>[];
+  mobileColumns?: Column<T>[];
   minWidth?: number;
   searchValues: (row: T) => (string | number | null | undefined)[];
   filterAllLabel?: string;
@@ -77,6 +79,7 @@ export function ListModule<T extends { id: string }>({
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
+  const compactColumns = mobileColumns ?? columns;
 
   const filtered = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
@@ -259,11 +262,11 @@ export function ListModule<T extends { id: string }>({
                       >
                         <div className="mb-2.5 flex items-start justify-between gap-3">
                           <div className="min-w-0 text-[15px] font-semibold leading-5 text-foreground">
-                            {columns[0]?.render(row)}
+                            {compactColumns[0]?.render(row)}
                           </div>
                         </div>
                         <dl className="grid gap-2">
-                          {columns.slice(1, 4).map((column) => (
+                          {compactColumns.slice(1, 4).map((column) => (
                             <div
                               key={column.header}
                               className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2"
