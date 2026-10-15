@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -44,6 +44,15 @@ function LeadsPage() {
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
+  const { uploadedLeads, ceipalLeads } = useMemo(() => {
+    const uploaded: Lead[] = [];
+    const ceipal: Lead[] = [];
+    for (const lead of leads.data ?? []) {
+      if (lead.ceipal_id || lead.source?.toLowerCase() === "ceipal") ceipal.push(lead);
+      else uploaded.push(lead);
+    }
+    return { uploadedLeads: uploaded, ceipalLeads: ceipal };
+  }, [leads.data]);
   const ceipalLeadSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async (result) => {
@@ -113,21 +122,31 @@ function LeadsPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-      <ModuleTabs value={tab} onChange={setTab} recordsLabel="Corporate Leads" />
+      <ModuleTabs
+        value={tab}
+        onChange={setTab}
+        recordsLabel="Uploaded Leads"
+        tabs={[
+          { id: "records", label: `Uploaded Leads (${uploadedLeads.length})` },
+          { id: "ceipal", label: `CEIPAL Sync (${ceipalLeads.length})` },
+          { id: "apollo", label: "Find Contacts via Apollo" },
+        ]}
+      />
       {tab === "apollo" ? (
         <ApolloProspector target="leads" />
       ) : (
         <>
           <ListModule<Lead>
-            title="Corporate Leads"
+            title={tab === "ceipal" ? "CEIPAL Leads" : "Uploaded Leads"}
             createLabel="Add Lead"
             recordLabel="Lead"
             table="leads"
             fields={leadFields}
-            rows={leads.data ?? []}
+            rows={tab === "ceipal" ? ceipalLeads : uploadedLeads}
             isLoading={leads.isLoading}
             columns={columns}
             minWidth={4600}
+            allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
             filterValue={(row) => row.status}
@@ -135,31 +154,39 @@ function LeadsPage() {
             ownerOf={(row) => row.owner_name}
             headerAction={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-                  <FileSpreadsheet className="size-4" /> Import Excel
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
-                  onClick={() => ceipalLeadSync.mutate()}
-                >
-                  <RefreshCw
-                    className={ceipalLeadSync.isPending ? "size-4 animate-spin" : "size-4"}
-                  />
-                  {ceipalLeadSync.isPending ? "Syncing 500 leads…" : "Sync CEIPAL leads"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
-                  onClick={() => ceipalContactSync.mutate()}
-                >
-                  <RefreshCw
-                    className={ceipalContactSync.isPending ? "size-4 animate-spin" : "size-4"}
-                  />
-                  {ceipalContactSync.isPending ? "Checking 25 contacts…" : "Resume contact details"}
-                </Button>
+                {tab === "records" ? (
+                  <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                    <FileSpreadsheet className="size-4" /> Import Excel
+                  </Button>
+                ) : null}
+                {tab === "ceipal" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
+                      onClick={() => ceipalLeadSync.mutate()}
+                    >
+                      <RefreshCw
+                        className={ceipalLeadSync.isPending ? "size-4 animate-spin" : "size-4"}
+                      />
+                      {ceipalLeadSync.isPending ? "Syncing 500 leads…" : "Sync CEIPAL leads"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={ceipalLeadSync.isPending || ceipalContactSync.isPending}
+                      onClick={() => ceipalContactSync.mutate()}
+                    >
+                      <RefreshCw
+                        className={ceipalContactSync.isPending ? "size-4 animate-spin" : "size-4"}
+                      />
+                      {ceipalContactSync.isPending
+                        ? "Checking 25 contacts…"
+                        : "Resume contact details"}
+                    </Button>
+                  </>
+                ) : null}
               </div>
             }
             searchValues={(row) => [

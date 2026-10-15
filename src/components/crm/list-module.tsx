@@ -42,6 +42,7 @@ export function ListModule<T extends { id: string }>({
   onRowClick,
   ownerOf,
   headerAction,
+  allowCreate = true,
   filterPlacement = "sidebar",
 }: {
   title: string;
@@ -61,6 +62,7 @@ export function ListModule<T extends { id: string }>({
   onRowClick?: (row: T) => void;
   ownerOf?: (row: T) => string | null | undefined;
   headerAction?: React.ReactNode;
+  allowCreate?: boolean;
   filterPlacement?: "sidebar" | "toolbar";
 }) {
   const [search, setSearch] = useState("");
@@ -144,9 +146,11 @@ export function ListModule<T extends { id: string }>({
         action={
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
             {headerAction}
-            <Button size="sm" className="ml-auto sm:ml-0" onClick={openCreate}>
-              <Plus className="size-4" /> {createLabel}
-            </Button>
+            {allowCreate ? (
+              <Button size="sm" className="ml-auto sm:ml-0" onClick={openCreate}>
+                <Plus className="size-4" /> {createLabel}
+              </Button>
+            ) : null}
           </div>
         }
       />

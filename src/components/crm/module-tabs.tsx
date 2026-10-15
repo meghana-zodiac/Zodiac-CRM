@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 
-export type ModuleTab = "records" | "apollo";
+export type ModuleTab = "records" | "ceipal" | "apollo";
 
 export function ModuleTabs({
   value,
   onChange,
   recordsLabel,
+  tabs: suppliedTabs,
 }: {
   value: ModuleTab;
   onChange: (value: ModuleTab) => void;
   recordsLabel: string;
+  tabs?: { id: ModuleTab; label: string }[];
 }) {
-  const tabs: { id: ModuleTab; label: string }[] = [
-    { id: "records", label: recordsLabel },
-    { id: "apollo", label: "Find Contacts via Apollo" },
-  ];
+  const tabs =
+    suppliedTabs ??
+    ([
+      { id: "records", label: recordsLabel },
+      { id: "apollo", label: "Find Contacts via Apollo" },
+    ] satisfies { id: ModuleTab; label: string }[]);
 
   return (
     <div className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain border-b border-border bg-surface px-3 pt-2 sm:px-6">
