@@ -149,7 +149,9 @@ export type Database = {
           industry: string | null;
           name: string;
           owner_name: string | null;
+          landline: string | null;
           phone: string | null;
+          phone_2: string | null;
           website: string | null;
         };
         Insert: {
@@ -163,7 +165,9 @@ export type Database = {
           industry?: string | null;
           name: string;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           website?: string | null;
         };
         Update: {
@@ -177,7 +181,9 @@ export type Database = {
           industry?: string | null;
           name?: string;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           website?: string | null;
         };
         Relationships: [];
@@ -395,7 +401,9 @@ export type Database = {
           last_activity_date: string | null;
           last_name: string;
           owner_name: string | null;
+          landline: string | null;
           phone: string | null;
+          phone_2: string | null;
           title: string | null;
         };
         Insert: {
@@ -409,7 +417,9 @@ export type Database = {
           last_activity_date?: string | null;
           last_name: string;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           title?: string | null;
         };
         Update: {
@@ -423,7 +433,9 @@ export type Database = {
           last_activity_date?: string | null;
           last_name?: string;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           title?: string | null;
         };
         Relationships: [
@@ -613,7 +625,9 @@ export type Database = {
           industry: string | null;
           notes: string | null;
           owner_name: string | null;
+          landline: string | null;
           phone: string | null;
+          phone_2: string | null;
           service_interest: string | null;
           source: string | null;
           status: string;
@@ -633,7 +647,9 @@ export type Database = {
           industry?: string | null;
           notes?: string | null;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           service_interest?: string | null;
           source?: string | null;
           status?: string;
@@ -653,7 +669,9 @@ export type Database = {
           industry?: string | null;
           notes?: string | null;
           owner_name?: string | null;
+          landline?: string | null;
           phone?: string | null;
+          phone_2?: string | null;
           service_interest?: string | null;
           source?: string | null;
           status?: string;

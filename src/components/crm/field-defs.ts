@@ -155,7 +155,9 @@ export const accountFields: FieldDef[] = [
   { name: "client_type", label: "Engagement type", type: "select", options: opts(CLIENT_TYPES) },
   { name: "city", label: "City" },
   { name: "website", label: "Website" },
-  { name: "phone", label: "Phone", type: "tel" },
+  { name: "phone", label: "Phone 1", type: "tel" },
+  { name: "phone_2", label: "Phone 2", type: "tel" },
+  { name: "landline", label: "Landline", type: "tel" },
   ownerField,
 ];
 
@@ -168,7 +170,9 @@ export const leadFields: FieldDef[] = [
   },
   { name: "contact_name", label: "Contact person" },
   { name: "email", label: "Email", type: "email" },
-  { name: "phone", label: "Phone", type: "tel" },
+  { name: "phone", label: "Phone 1", type: "tel" },
+  { name: "phone_2", label: "Phone 2", type: "tel" },
+  { name: "landline", label: "Landline", type: "tel" },
   { name: "industry", label: "Industry" },
   { name: "city", label: "City" },
   {
@@ -188,7 +192,9 @@ export const contactFields = (accounts: Account[]): FieldDef[] => [
   { name: "first_name", label: "First name" },
   { name: "last_name", label: "Last name", required: true },
   { name: "email", label: "Email", type: "email" },
-  { name: "phone", label: "Phone", type: "tel" },
+  { name: "phone", label: "Phone 1", type: "tel" },
+  { name: "phone_2", label: "Phone 2", type: "tel" },
+  { name: "landline", label: "Landline", type: "tel" },
   { name: "title", label: "Designation" },
   { name: "department", label: "Department" },
   {

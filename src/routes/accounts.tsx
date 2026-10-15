@@ -95,7 +95,14 @@ function AccountsPage() {
       if (systemFilter === "with-deals" && pipeline(account.id) === 0) return false;
       if (systemFilter === "no-contacts" && contactCount(account.id) > 0) return false;
       if (!term) return true;
-      return [account.name, account.industry, account.website, account.phone]
+      return [
+        account.name,
+        account.industry,
+        account.website,
+        account.phone,
+        account.phone_2,
+        account.landline,
+      ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });

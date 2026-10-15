@@ -174,6 +174,8 @@ function ContactsPage() {
         fullName(contact.first_name, contact.last_name),
         contact.email,
         contact.phone,
+        contact.phone_2,
+        contact.landline,
         contact.accounts?.name,
         contact.title,
       ]
@@ -718,7 +720,9 @@ function ContactsPage() {
                 {profileTab === "details" ? (
                   <>
                     <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel">
-                      <ContactDetail icon={Phone} label="Phone" value={openContact.phone} />
+                      <ContactDetail icon={Phone} label="Phone 1" value={openContact.phone} />
+                      <ContactDetail icon={Phone} label="Phone 2" value={openContact.phone_2} />
+                      <ContactDetail icon={Phone} label="Landline" value={openContact.landline} />
                       <ContactDetail icon={Mail} label="Email" value={openContact.email} />
                       <ContactDetail
                         icon={Building2}

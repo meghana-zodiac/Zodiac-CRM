@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -14,10 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 import { LEAD_SOURCES, LEAD_STATUSES, SERVICE_LINES, type Lead } from "@/lib/crm";
-
-type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
+import { bdTeamMembersQuery } from "@/lib/poa";
 
 type RawRow = Record<string, unknown>;
 type LeadField =
@@ -25,6 +23,8 @@ type LeadField =
   | "contact_name"
   | "email"
   | "phone"
+  | "phone_2"
+  | "landline"
   | "industry"
   | "city"
   | "service_interest"
@@ -40,6 +40,8 @@ type ImportRow = {
   contact_name: string | null;
   email: string | null;
   phone: string | null;
+  phone_2: string | null;
+  landline: string | null;
   industry: string | null;
   city: string | null;
   service_interest: string | null;
@@ -59,12 +61,34 @@ const aliases: Record<LeadField, string[]> = {
     "organization",
     "client",
     "client name",
+    "current employer",
   ],
-  contact_name: ["contact", "contact name", "contact person", "decision maker", "poc", "poc name"],
+  contact_name: [
+    "contact",
+    "contact name",
+    "contact person",
+    "decision maker",
+    "poc",
+    "poc name",
+    "candidate name",
+  ],
   email: ["email", "email address", "work email", "official email", "email id"],
-  phone: ["phone", "phone number", "mobile", "mobile number", "contact number", "telephone"],
+  phone: [
+    "phone",
+    "phone 1",
+    "phone number",
+    "mobile",
+    "mobile 1",
+    "mobile number",
+    "contact number",
+    "contact no.",
+    "contact no",
+    "telephone",
+  ],
+  phone_2: ["phone 2", "secondary phone", "alternate phone", "alternate mobile", "mobile 2"],
+  landline: ["landline", "landline number", "office landline", "telephone landline"],
   industry: ["industry", "sector", "industry sector"],
-  city: ["city", "location", "office location"],
+  city: ["city", "location", "office location", "current location"],
   service_interest: [
     "service interest",
     "service",
@@ -97,6 +121,84 @@ function valueFor(row: RawRow, field: LeadField): string {
   return header ? clean(row[header]) : "";
 }
 
+function valueForHeaders(row: RawRow, headers: string[]): string {
+  const match = Object.keys(row).find((header) => headers.includes(cleanHeader(header)));
+  return match ? clean(row[match]) : "";
+}
+
+function workbookRows(buffer: ArrayBuffer) {
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const firstSheet = workbook.SheetNames[0];
+  if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
+  const sheet = workbook.Sheets[firstSheet];
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  });
+  const knownHeaders = new Set(Object.values(aliases).flat());
+  const headerIndex = matrix.findIndex((row) => {
+    const cells = row.map((value) => cleanHeader(clean(value))).filter(Boolean);
+    return (
+      cells.some((cell) => knownHeaders.has(cell)) &&
+      cells.some((cell) => ["company name", "current employer"].includes(cell))
+    );
+  });
+  if (headerIndex < 0) {
+    throw new Error("Could not find a Company Name or Current Employer header row.");
+  }
+  const headers = (matrix[headerIndex] ?? []).map(clean).filter(Boolean);
+  const source = XLSX.utils.sheet_to_json<RawRow>(sheet, {
+    defval: "",
+    raw: false,
+    range: headerIndex,
+  });
+  return { source, headers, headerIndex };
+}
+
+function comparablePhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function looksLikeIndianMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const local = digits.startsWith("91") && digits.length === 12 ? digits.slice(2) : digits;
+  return local.length === 10 && /^[6-9]/.test(local);
+}
+
+function splitContactNumbers(raw: string) {
+  const values = raw
+    .split(/[\n,;|/]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const unique = values.filter(
+    (value, index) =>
+      values.findIndex((candidate) => comparablePhone(candidate) === comparablePhone(value)) ===
+      index,
+  );
+  const mobiles = unique.filter(looksLikeIndianMobile);
+  const landlines = unique.filter((value) => !looksLikeIndianMobile(value));
+  return {
+    phone: mobiles[0] ?? unique[0] ?? null,
+    phone_2: mobiles.slice(1).find((value) => value !== mobiles[0]) ?? null,
+    landline: landlines[0] ?? null,
+  };
+}
+
+function resolvedOwner(value: string, ownerNames: string[]) {
+  if (!value) return { value: null, error: "" };
+  const normalized = clean(value).toLowerCase();
+  const exact = ownerNames.find((name) => name.toLowerCase() === normalized);
+  if (exact) return { value: exact, error: "" };
+  const partial = ownerNames.filter((name) => {
+    const candidate = name.toLowerCase();
+    return candidate.split(/\s+/)[0] === normalized || candidate.startsWith(`${normalized} `);
+  });
+  if (partial.length === 1) return { value: partial[0]!, error: "" };
+  return { value: null, error: `Unknown owner: ${value}` };
+}
+
 function numberValue(value: string): number | null {
   if (!value) return null;
   const parsed = Number(value.replace(/[₹,\s]/g, ""));
@@ -108,16 +210,8 @@ function enumValue(value: string, values: readonly string[]): string | null {
   return values.find((item) => item.toLowerCase() === value.toLowerCase()) ?? null;
 }
 
-function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-  const firstSheet = workbook.SheetNames[0];
-  if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const worksheet = workbook.Sheets[firstSheet];
-  if (!worksheet) throw new Error("The first worksheet could not be read.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
-    defval: "",
-    raw: false,
-  });
+function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
+  const { source, headerIndex } = workbookRows(buffer);
 
   return source.map((row, index) => {
     const companyName = valueFor(row, "company_name");
@@ -126,6 +220,12 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
     const serviceRaw = valueFor(row, "service_interest");
     const valueRaw = valueFor(row, "estimated_value");
     const estimatedValue = numberValue(valueRaw);
+    const rawPhone = valueFor(row, "phone");
+    const detectedPhones = splitContactNumbers(rawPhone);
+    const phone = nullable(valueForHeaders(row, ["phone 1", "mobile 1"])) ?? detectedPhones.phone;
+    const phone2 = nullable(valueFor(row, "phone_2")) ?? detectedPhones.phone_2;
+    const landline = nullable(valueFor(row, "landline")) ?? detectedPhones.landline;
+    const owner = resolvedOwner(valueFor(row, "owner_name"), ownerNames);
     const status = statusRaw ? enumValue(statusRaw, LEAD_STATUSES) : "New";
     const sourceValue = sourceRaw ? enumValue(sourceRaw, LEAD_SOURCES) : null;
     const service = serviceRaw ? enumValue(serviceRaw, SERVICE_LINES) : null;
@@ -136,24 +236,50 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       serviceRaw && !service ? `Unknown service: ${serviceRaw}` : "",
       valueRaw && estimatedValue === null ? "Estimated value must be a number" : "",
       estimatedValue !== null && estimatedValue < 0 ? "Estimated value cannot be negative" : "",
+      owner.error,
     ].filter(Boolean);
 
-    const error = errors.length ? errors.join("; ") : null;
+    const profileDetails: Array<[string, string]> = [
+      ["Resume title", valueForHeaders(row, ["resume title"])],
+      ["Work experience", valueForHeaders(row, ["work exp", "work experience"])],
+      ["Annual salary", valueForHeaders(row, ["annual salary", "salary"])],
+      ["Preferred location", valueForHeaders(row, ["preferred location"])],
+      ["Designation", valueForHeaders(row, ["designation", "job title"])],
+      ["UG course", valueForHeaders(row, ["u.g. course", "ug course"])],
+      ["PG course", valueForHeaders(row, ["p. g. course", "p.g. course", "pg course"])],
+      ["Post-PG course", valueForHeaders(row, ["post p. g. course", "post p.g. course"])],
+      ["Age / DOB", valueForHeaders(row, ["age/date of birth", "age / date of birth"])],
+      ["Postal address", valueForHeaders(row, ["postal address", "address"])],
+      ["Last active", valueForHeaders(row, ["last active"])],
+      ["Comment 1", valueForHeaders(row, ["comment 1"])],
+      ["Comment 2", valueForHeaders(row, ["comment 2"])],
+      ["Comment 3", valueForHeaders(row, ["comment 3"])],
+      ["Comment 4", valueForHeaders(row, ["comment 4"])],
+      ["Comment 5", valueForHeaders(row, ["comment 5"])],
+    ];
+    const generatedNotes = profileDetails
+      .filter(([, value]) => value)
+      .map(([label, value]) => `${label}: ${value}`)
+      .join("\n");
+    const suppliedNotes = valueFor(row, "notes");
+
     return {
-      rowNumber: index + 2,
+      rowNumber: headerIndex + index + 2,
       company_name: companyName,
       contact_name: nullable(valueFor(row, "contact_name")),
       email: nullable(valueFor(row, "email")),
-      phone: nullable(valueFor(row, "phone")),
+      phone,
+      phone_2: phone2,
+      landline,
       industry: nullable(valueFor(row, "industry")),
       city: nullable(valueFor(row, "city")),
       service_interest: service,
-      source: sourceValue,
+      source: sourceValue ?? (valueForHeaders(row, ["candidate name"]) ? "Naukri Resdex" : null),
       status: status ?? "New",
       estimated_value: estimatedValue,
-      owner_name: nullable(valueFor(row, "owner_name")),
-      notes: nullable(valueFor(row, "notes")),
-      ...(error ? { error } : {}),
+      owner_name: owner.value,
+      notes: nullable([suppliedNotes, generatedNotes].filter(Boolean).join("\n")),
+      error: errors.length ? errors.join("; ") : undefined,
     };
   });
 }
@@ -168,6 +294,7 @@ export function LeadImportDialog({
   leads: Lead[];
 }) {
   const queryClient = useQueryClient();
+  const teamMembers = useQuery(bdTeamMembersQuery());
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -188,18 +315,12 @@ export function LeadImportDialog({
     if (!file) return;
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const firstSheet = workbook.SheetNames[0];
-      if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-      const sheet = workbook.Sheets[firstSheet];
-      if (!sheet) throw new Error("The first worksheet could not be read.");
-      const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: false,
-      });
-      setHeaders((matrix[0] ?? []).map(clean).filter(Boolean));
-      const parsed = parseWorkbook(buffer);
+      const ownerNames = (teamMembers.data ?? [])
+        .filter((member) => member.active && member.access_status === "approved")
+        .map((member) => member.display_name);
+      const workbook = workbookRows(buffer);
+      setHeaders(workbook.headers);
+      const parsed = parseWorkbook(buffer, ownerNames);
       if (!parsed.length) throw new Error("The first worksheet has no data rows.");
       setRows(parsed);
       setFileName(file.name);
@@ -212,12 +333,30 @@ export function LeadImportDialog({
   const downloadTemplate = () => {
     const sheet = XLSX.utils.aoa_to_sheet([
       [
-        "Company Name",
-        "Contact Person",
+        "Candidate Name",
+        "Resume Title",
+        "Phone 1",
+        "Phone 2",
+        "Landline",
         "Email",
-        "Phone",
+        "Work Exp",
+        "Annual Salary",
+        "Current Location",
+        "Preferred Location",
+        "Current Employer",
+        "Designation",
+        "U.G. Course",
+        "P. G. Course",
+        "Post P. G. Course",
+        "Age/Date of Birth",
+        "Postal Address",
+        "Last Active",
+        "Comment 1",
+        "Comment 2",
+        "Comment 3",
+        "Comment 4",
+        "Comment 5",
         "Industry",
-        "City",
         "Service Interest",
         "Lead Source",
         "Lead Status",
@@ -226,21 +365,41 @@ export function LeadImportDialog({
         "Notes",
       ],
       [
-        "Vertex Global Services",
         "Rahul Menon",
-        "rahul@vertexglobal.in",
+        "HR leader supporting technology hiring and people operations.",
         "+91 98450 11223",
-        "IT Services",
+        "+91 98765 44321",
+        "080 4000 0000",
+        "rahul@vertexglobal.in",
+        "8Y 0M",
+        "INR 18.0 L",
         "Bengaluru",
+        "Bengaluru, Mumbai",
+        "Vertex Global Services",
+        "HR Manager",
+        "B.Com",
+        "MBA/PGDM",
+        "",
+        "35 y",
+        "Bengaluru, Karnataka",
+        "Active in last 30 days",
+        "Decision-maker for recruitment requirements.",
+        "",
+        "",
+        "",
+        "",
+        "IT Services",
         "Recruitment & Staffing",
-        "LinkedIn Outreach",
+        "Naukri Resdex",
         "New",
         "1200000",
-        "Nuzhat",
+        "Nuzhat K",
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = [24, 22, 30, 20, 20, 18, 34, 22, 18, 18, 18, 52].map((wch) => ({ wch }));
+    sheet["!cols"] = Array.from({ length: 30 }, (_, index) => ({
+      wch: [1, 15, 16, 23, 29].includes(index) ? 42 : 20,
+    }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
     XLSX.writeFile(workbook, "zodiac-crm-corporate-leads-template.xlsx");
@@ -259,7 +418,7 @@ export function LeadImportDialog({
         ]),
       );
       const seen = new Set<string>();
-      const payload: LeadInsert[] = [];
+      const payload: Array<Record<string, unknown>> = [];
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;
@@ -285,6 +444,8 @@ export function LeadImportDialog({
           contact_name: row.contact_name,
           email: row.email,
           phone: row.phone,
+          phone_2: row.phone_2,
+          landline: row.landline,
           industry: row.industry,
           city: row.city,
           service_interest: row.service_interest,
@@ -379,7 +540,9 @@ export function LeadImportDialog({
                         "Company",
                         "Contact",
                         "Email",
-                        "Phone",
+                        "Phone 1",
+                        "Phone 2",
+                        "Landline",
                         "Industry",
                         "City",
                         "Service",
@@ -403,6 +566,8 @@ export function LeadImportDialog({
                         <td className="px-3 py-2">{row.contact_name ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
+                        <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{row.industry ?? "—"}</td>
                         <td className="px-3 py-2">{row.city ?? "—"}</td>
                         <td className="max-w-56 truncate px-3 py-2">

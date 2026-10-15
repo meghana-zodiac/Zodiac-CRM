@@ -101,6 +101,7 @@ export const LEAD_SOURCES = [
   "LinkedIn Outreach",
   "Cold Call",
   "Event",
+  "Naukri Resdex",
 ] as const;
 
 export const TRAINING_TYPES = ["Technical", "Soft Skills"] as const;

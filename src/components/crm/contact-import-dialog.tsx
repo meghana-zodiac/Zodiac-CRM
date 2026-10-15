@@ -14,10 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 import type { Account, ContactWithAccount } from "@/lib/crm";
-
-type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
 
 type RawRow = Record<string, unknown>;
 type ContactField =
@@ -29,6 +26,8 @@ type ContactField =
   | "department"
   | "email"
   | "phone"
+  | "phone_2"
+  | "landline"
   | "owner_name"
   | "last_activity_date";
 type ImportRow = {
@@ -41,6 +40,8 @@ type ImportRow = {
   department: string | null;
   email: string | null;
   phone: string | null;
+  phone_2: string | null;
+  landline: string | null;
   owner_name: string | null;
   last_activity_date: string | null;
   additional_fields: Record<string, string>;
@@ -64,7 +65,17 @@ const aliases: Record<ContactField, string[]> = {
   title: ["title", "designation", "job title", "position", "role"],
   department: ["department", "function", "team"],
   email: ["email", "email address", "work email", "official email"],
-  phone: ["phone", "phone number", "mobile", "mobile number", "telephone", "contact number"],
+  phone: [
+    "phone",
+    "phone 1",
+    "phone number",
+    "mobile",
+    "mobile 1",
+    "mobile number",
+    "contact number",
+  ],
+  phone_2: ["phone 2", "secondary phone", "alternate phone", "mobile 2"],
+  landline: ["landline", "landline number", "office landline", "telephone"],
   owner_name: ["owner", "owner name", "contact owner", "record owner"],
   last_activity_date: [
     "last activity",
@@ -106,9 +117,7 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const worksheet = workbook.Sheets[firstSheet];
-  if (!worksheet) throw new Error("The first worksheet could not be read.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
+  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
     defval: "",
     raw: false,
   });
@@ -134,7 +143,6 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
       !lastName ? "Contact name is required" : "",
       accountName && !accountId ? `Company “${accountName}” was not found` : "",
     ].filter(Boolean);
-    const error = errors.length ? errors.join("; ") : null;
     return {
       rowNumber: index + 2,
       first_name: nullable(firstName),
@@ -145,10 +153,12 @@ function parseWorkbook(buffer: ArrayBuffer, accounts: Account[]): ImportRow[] {
       department: nullable(valueFor(row, "department")),
       email: nullable(valueFor(row, "email")),
       phone: nullable(valueFor(row, "phone")),
+      phone_2: nullable(valueFor(row, "phone_2")),
+      landline: nullable(valueFor(row, "landline")),
       owner_name: nullable(valueFor(row, "owner_name")),
       last_activity_date: excelDate(valueFor(row, "last_activity_date")),
       additional_fields: additionalFields,
-      ...(error ? { error } : {}),
+      error: errors.length ? errors.join("; ") : undefined,
     };
   });
 }
@@ -186,10 +196,7 @@ export function ContactImportDialog({
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const firstSheet = workbook.SheetNames[0];
-      if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-      const sheet = workbook.Sheets[firstSheet];
-      if (!sheet) throw new Error("The first worksheet could not be read.");
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
@@ -214,7 +221,9 @@ export function ContactImportDialog({
         "Designation",
         "Department",
         "Email",
-        "Phone",
+        "Phone 1",
+        "Phone 2",
+        "Landline",
         "Owner Name",
         "Last Activity Date",
       ],
@@ -225,6 +234,8 @@ export function ContactImportDialog({
         "Human Resources",
         "ananya@example.com",
         "+91 98765 43210",
+        "+91 98765 43211",
+        "022 4000 1001",
         "",
         "2026-08-18",
       ],
@@ -235,6 +246,8 @@ export function ContactImportDialog({
       { wch: 24 },
       { wch: 20 },
       { wch: 30 },
+      { wch: 20 },
+      { wch: 20 },
       { wch: 20 },
       { wch: 20 },
       { wch: 20 },
@@ -254,7 +267,7 @@ export function ContactImportDialog({
       let skipped = errorCount;
       let inserted = 0;
       let updated = 0;
-      const payload: ContactInsert[] = [];
+      const payload: Array<Record<string, unknown>> = [];
       for (const row of rows) {
         if (row.error) continue;
         const match = row.email ? byEmail.get(key(row.email)) : undefined;
@@ -275,6 +288,8 @@ export function ContactImportDialog({
           department: row.department,
           email: row.email,
           phone: row.phone,
+          phone_2: row.phone_2,
+          landline: row.landline,
           owner_name: row.owner_name,
           last_activity_date: row.last_activity_date,
           additional_fields: row.additional_fields,
@@ -364,7 +379,9 @@ export function ContactImportDialog({
                         "Company",
                         "Designation",
                         "Email",
-                        "Phone",
+                        "Phone 1",
+                        "Phone 2",
+                        "Landline",
                         "Extra fields",
                         "Status",
                       ].map((header) => (
@@ -385,6 +402,8 @@ export function ContactImportDialog({
                         <td className="px-3 py-2">{row.title ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
+                        <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{Object.keys(row.additional_fields).length}</td>
                         <td
                           className={

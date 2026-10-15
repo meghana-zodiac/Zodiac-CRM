@@ -14,11 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 import type { Account } from "@/lib/crm";
-
-type AccountInsert = Database["public"]["Tables"]["accounts"]["Insert"];
-type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
 
 type ImportRow = {
   rowNumber: number;
@@ -27,12 +23,16 @@ type ImportRow = {
   industry: string | null;
   website: string | null;
   phone: string | null;
+  phone_2: string | null;
+  landline: string | null;
   city: string | null;
   owner_name: string | null;
   contact_first_name: string | null;
   contact_last_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  contact_phone_2: string | null;
+  contact_landline: string | null;
   contact_title: string | null;
   contact_department: string | null;
   error?: string;
@@ -46,13 +46,32 @@ const headerAliases: Record<ImportField, string[]> = {
   client_type: ["client type", "type", "category"],
   industry: ["industry", "sector"],
   website: ["website", "website url", "url"],
-  phone: ["phone", "phone number", "company phone", "company phone number", "telephone", "mobile"],
+  phone: [
+    "phone",
+    "phone 1",
+    "phone number",
+    "company phone",
+    "company phone 1",
+    "company phone number",
+    "mobile",
+    "mobile 1",
+  ],
+  phone_2: ["phone 2", "company phone 2", "secondary phone", "alternate phone", "mobile 2"],
+  landline: ["landline", "company landline", "office landline", "telephone"],
   city: ["city", "location"],
   owner_name: ["owner", "owner name", "account owner"],
   contact_first_name: ["contact first name", "client contact first name", "first name"],
   contact_last_name: ["contact last name", "client contact last name", "last name"],
   contact_email: ["contact email", "client contact email", "email", "email address"],
-  contact_phone: ["contact phone", "client contact phone", "contact mobile", "mobile number"],
+  contact_phone: [
+    "contact phone",
+    "contact phone 1",
+    "client contact phone",
+    "contact mobile",
+    "mobile number",
+  ],
+  contact_phone_2: ["contact phone 2", "client contact phone 2", "alternate contact phone"],
+  contact_landline: ["contact landline", "client contact landline"],
   contact_title: ["contact designation", "contact title", "designation", "job title"],
   contact_department: ["contact department", "department", "function"],
 };
@@ -80,16 +99,13 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("The workbook does not contain a worksheet.");
-  const worksheet = workbook.Sheets[firstSheet];
-  if (!worksheet) throw new Error("The first worksheet could not be read.");
-  const source = XLSX.utils.sheet_to_json<RawRow>(worksheet, {
+  const source = XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[firstSheet], {
     defval: "",
     raw: false,
   });
 
   return source.map((row, index) => {
     const name = valueFor(row, "name");
-    const error = name ? null : "Company Name is required";
     return {
       rowNumber: index + 2,
       name,
@@ -97,15 +113,19 @@ function parseWorkbook(buffer: ArrayBuffer): ImportRow[] {
       industry: nullable(valueFor(row, "industry")),
       website: nullable(valueFor(row, "website")),
       phone: nullable(valueFor(row, "phone")),
+      phone_2: nullable(valueFor(row, "phone_2")),
+      landline: nullable(valueFor(row, "landline")),
       city: nullable(valueFor(row, "city")),
       owner_name: nullable(valueFor(row, "owner_name")),
       contact_first_name: nullable(valueFor(row, "contact_first_name")),
       contact_last_name: nullable(valueFor(row, "contact_last_name")),
       contact_email: nullable(valueFor(row, "contact_email")),
       contact_phone: nullable(valueFor(row, "contact_phone")),
+      contact_phone_2: nullable(valueFor(row, "contact_phone_2")),
+      contact_landline: nullable(valueFor(row, "contact_landline")),
       contact_title: nullable(valueFor(row, "contact_title")),
       contact_department: nullable(valueFor(row, "contact_department")),
-      ...(error ? { error } : {}),
+      error: name ? undefined : "Company Name is required",
     };
   });
 }
@@ -161,13 +181,17 @@ export function AccountImportDialog({
         "Client Type",
         "Industry",
         "Website",
-        "Company Phone",
+        "Company Phone 1",
+        "Company Phone 2",
+        "Company Landline",
         "City",
         "Owner Name",
         "Contact First Name",
         "Contact Last Name",
         "Contact Email",
-        "Contact Phone",
+        "Contact Phone 1",
+        "Contact Phone 2",
+        "Contact Landline",
         "Contact Designation",
         "Contact Department",
       ],
@@ -177,18 +201,22 @@ export function AccountImportDialog({
         "Technology",
         "https://example.com",
         "+91 22 4000 0000",
+        "+91 98765 40000",
+        "022 4000 1000",
         "Mumbai",
         "",
         "Ananya",
         "Sharma",
         "ananya@example.com",
         "+91 98765 43210",
+        "+91 98765 43211",
+        "022 4000 1001",
         "Head of L&D",
         "Human Resources",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 13 }, (_, index) => ({
-      wch: index === 0 || index === 3 || index === 9 ? 28 : 20,
+    sheet["!cols"] = Array.from({ length: 17 }, (_, index) => ({
+      wch: index === 0 || index === 3 || index === 11 ? 28 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Clients");
@@ -210,7 +238,7 @@ export function AccountImportDialog({
       let updated = 0;
       let contactsAdded = 0;
       let contactsUpdated = 0;
-      const payload: AccountInsert[] = [];
+      const payload: Array<Record<string, string | null>> = [];
 
       for (const row of rows) {
         if (row.error) continue;
@@ -229,6 +257,8 @@ export function AccountImportDialog({
           industry: row.industry,
           website: row.website,
           phone: row.phone,
+          phone_2: row.phone_2,
+          landline: row.landline,
           city: row.city,
           owner_name: row.owner_name,
         });
@@ -262,12 +292,17 @@ export function AccountImportDialog({
           .filter((contact) => contact.email)
           .map((contact) => [matchKey(contact.email), contact]),
       );
-      const contactPayload: ContactInsert[] = [];
+      const contactPayload: Array<Record<string, unknown>> = [];
       const seenContacts = new Set<string>();
       for (const row of rows) {
         if (row.error) continue;
         const hasContact = Boolean(
-          row.contact_first_name || row.contact_last_name || row.contact_email || row.contact_phone,
+          row.contact_first_name ||
+          row.contact_last_name ||
+          row.contact_email ||
+          row.contact_phone ||
+          row.contact_phone_2 ||
+          row.contact_landline,
         );
         if (!hasContact) continue;
         const accountId = savedAccountByName.get(matchKey(row.name));
@@ -287,6 +322,8 @@ export function AccountImportDialog({
           last_name: row.contact_last_name || row.contact_first_name || "Contact",
           email: row.contact_email,
           phone: row.contact_phone,
+          phone_2: row.contact_phone_2,
+          landline: row.contact_landline,
           title: row.contact_title,
           department: row.contact_department,
           owner_name: row.owner_name,
@@ -377,7 +414,9 @@ export function AccountImportDialog({
                         "Type",
                         "Industry",
                         "Website",
-                        "Phone",
+                        "Phone 1",
+                        "Phone 2",
+                        "Landline",
                         "City",
                         "Status",
                       ].map((header) => (
@@ -396,6 +435,8 @@ export function AccountImportDialog({
                         <td className="px-3 py-2">{row.industry ?? "—"}</td>
                         <td className="px-3 py-2">{row.website ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
+                        <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{row.city ?? "—"}</td>
                         <td
                           className={
