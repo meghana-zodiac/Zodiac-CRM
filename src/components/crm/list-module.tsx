@@ -39,6 +39,7 @@ export function ListModule<T extends { id: string }>({
   filterOptions,
   filterValue,
   tile,
+  mobileActions,
   onRowClick,
   ownerOf,
   headerAction,
@@ -59,6 +60,7 @@ export function ListModule<T extends { id: string }>({
   filterOptions?: readonly string[];
   filterValue?: (row: T) => string;
   tile?: (row: T) => React.ReactNode;
+  mobileActions?: (row: T) => React.ReactNode;
   onRowClick?: (row: T) => void;
   ownerOf?: (row: T) => string | null | undefined;
   headerAction?: React.ReactNode;
@@ -229,6 +231,14 @@ export function ListModule<T extends { id: string }>({
                       />
                     </div>
                   </div>
+                  {mobileActions ? (
+                    <div
+                      className="mt-3 border-t border-border pt-2 md:hidden"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {mobileActions(row)}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -277,6 +287,14 @@ export function ListModule<T extends { id: string }>({
                         />
                       </div>
                     </div>
+                    {mobileActions ? (
+                      <div
+                        className="border-t border-border bg-muted/20 px-2 py-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {mobileActions(row)}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>

@@ -196,11 +196,6 @@ export const leadFields: FieldDef[] = [
   { name: "status", label: "Lead status", type: "select", options: opts(LEAD_STATUSES) },
   { name: "estimated_value", label: "Estimated value (₹)", type: "number" },
   ownerField,
-  { name: "comment_1", label: "Comment 1", type: "textarea", span: 2 },
-  { name: "comment_2", label: "Comment 2", type: "textarea", span: 2 },
-  { name: "comment_3", label: "Comment 3", type: "textarea", span: 2 },
-  { name: "comment_4", label: "Comment 4", type: "textarea", span: 2 },
-  { name: "comment_5", label: "Comment 5", type: "textarea", span: 2 },
   { name: "notes", label: "Qualification notes", type: "textarea" },
 ];
 

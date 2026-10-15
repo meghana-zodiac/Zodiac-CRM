@@ -2,7 +2,15 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileSpreadsheet, RefreshCw } from "lucide-react";
+import {
+  Clock3,
+  FileSpreadsheet,
+  Mail,
+  MessageCircle,
+  NotebookPen,
+  Phone,
+  RefreshCw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ListModule, type Column } from "@/components/crm/list-module";
@@ -11,8 +19,17 @@ import { ApolloProspector } from "@/components/crm/apollo-prospector";
 import { StatusPill, leadTone } from "@/components/crm/status-pill";
 import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
+import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
-import { LEAD_STATUSES, currency, formatDate, leadsQuery, type Lead } from "@/lib/crm";
+import { activityFields } from "@/components/crm/field-defs";
+import {
+  LEAD_STATUSES,
+  currency,
+  formatDate,
+  leadsQuery,
+  type ActivityType,
+  type Lead,
+} from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/leads")({
@@ -44,6 +61,10 @@ function LeadsPage() {
   const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityType, setActivityType] = useState<ActivityType>("Task");
+  const [activityTitle, setActivityTitle] = useState("Follow up");
+  const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const { uploadedLeads, ceipalLeads } = useMemo(() => {
     const uploaded: Lead[] = [];
     const ceipal: Lead[] = [];
@@ -102,11 +123,6 @@ function LeadsPage() {
     { header: "Age / DOB", render: (row) => row.age_or_dob ?? "—" },
     { header: "Postal address", render: (row) => row.postal_address ?? "—" },
     { header: "Last active", render: (row) => row.last_active ?? "—" },
-    { header: "Comment 1", render: (row) => row.comment_1 ?? "—" },
-    { header: "Comment 2", render: (row) => row.comment_2 ?? "—" },
-    { header: "Comment 3", render: (row) => row.comment_3 ?? "—" },
-    { header: "Comment 4", render: (row) => row.comment_4 ?? "—" },
-    { header: "Comment 5", render: (row) => row.comment_5 ?? "—" },
     { header: "Industry", render: (row) => row.industry ?? "—" },
     { header: "Service interest", render: (row) => row.service_interest ?? "—" },
     { header: "Source", render: (row) => row.source ?? "—" },
@@ -145,7 +161,7 @@ function LeadsPage() {
             rows={tab === "ceipal" ? ceipalLeads : uploadedLeads}
             isLoading={leads.isLoading}
             columns={columns}
-            minWidth={4600}
+            minWidth={3900}
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
@@ -207,11 +223,6 @@ function LeadsPage() {
               row.age_or_dob,
               row.postal_address,
               row.last_active,
-              row.comment_1,
-              row.comment_2,
-              row.comment_3,
-              row.comment_4,
-              row.comment_5,
               row.industry,
               row.city,
               row.service_interest,
@@ -234,11 +245,94 @@ function LeadsPage() {
                 </p>
               </>
             )}
+            mobileActions={(row) => {
+              const numbers = [
+                { label: "Phone 1", value: row.phone },
+                { label: "Phone 2", value: row.phone_2 },
+                { label: "Landline", value: row.landline },
+              ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+              const whatsappNumber = row.phone ?? row.phone_2;
+              const openActivity = (type: ActivityType, title: string) => {
+                setActivityLead(row);
+                setActivityType(type);
+                setActivityTitle(title);
+                setActivityDialogOpen(true);
+              };
+
+              return (
+                <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
+                  {numbers.map(({ label, value }) => (
+                    <a
+                      key={label}
+                      href={`tel:${value}`}
+                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                      aria-label={`Call ${label}: ${value}`}
+                    >
+                      <Phone className="size-3.5" /> {label}
+                    </a>
+                  ))}
+                  {whatsappNumber ? (
+                    <a
+                      href={`https://wa.me/${whatsappNumber.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                    >
+                      <MessageCircle className="size-3.5" /> WhatsApp
+                    </a>
+                  ) : null}
+                  {row.email ? (
+                    <a
+                      href={`mailto:${row.email}`}
+                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                    >
+                      <Mail className="size-3.5" /> Email
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                    onClick={() =>
+                      openActivity("Call", `Call with ${row.contact_name ?? row.company_name}`)
+                    }
+                  >
+                    <NotebookPen className="size-3.5" /> Log call
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                    onClick={() => openActivity("Task", `Follow up: ${row.company_name}`)}
+                  >
+                    <Clock3 className="size-3.5" /> Follow-up
+                  </button>
+                </div>
+              );
+            }}
           />
           <LeadImportDialog
             open={importOpen}
             onOpenChange={setImportOpen}
             leads={leads.data ?? []}
+          />
+          <RecordDialog
+            open={activityDialogOpen}
+            onOpenChange={setActivityDialogOpen}
+            table="activities"
+            title={activityTitle}
+            fields={activityFields(activityType)}
+            record={{
+              title: activityTitle,
+              activity_type: activityType,
+              status: "Pending",
+              owner_name: activityLead?.owner_name ?? null,
+              related_to_type: "Corporate Lead",
+            }}
+            fixedValues={
+              activityLead
+                ? { related_to_type: "Corporate Lead", related_to_id: activityLead.id }
+                : undefined
+            }
+            invalidateKeys={["activities"]}
           />
         </>
       )}

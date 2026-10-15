@@ -36,11 +36,6 @@ type LeadField =
   | "age_or_dob"
   | "postal_address"
   | "last_active"
-  | "comment_1"
-  | "comment_2"
-  | "comment_3"
-  | "comment_4"
-  | "comment_5"
   | "industry"
   | "city"
   | "service_interest"
@@ -69,11 +64,6 @@ type ImportRow = {
   age_or_dob: string | null;
   postal_address: string | null;
   last_active: string | null;
-  comment_1: string | null;
-  comment_2: string | null;
-  comment_3: string | null;
-  comment_4: string | null;
-  comment_5: string | null;
   industry: string | null;
   city: string | null;
   service_interest: string | null;
@@ -130,11 +120,6 @@ const aliases: Record<LeadField, string[]> = {
   age_or_dob: ["age/date of birth", "age / date of birth", "age", "date of birth"],
   postal_address: ["postal address", "address"],
   last_active: ["last active"],
-  comment_1: ["comment 1"],
-  comment_2: ["comment 2"],
-  comment_3: ["comment 3"],
-  comment_4: ["comment 4"],
-  comment_5: ["comment 5"],
   industry: ["industry", "sector", "industry sector"],
   city: ["city", "location", "office location", "current location"],
   service_interest: [
@@ -308,11 +293,6 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       age_or_dob: nullable(valueFor(row, "age_or_dob")),
       postal_address: nullable(valueFor(row, "postal_address")),
       last_active: nullable(valueFor(row, "last_active")),
-      comment_1: nullable(valueFor(row, "comment_1")),
-      comment_2: nullable(valueFor(row, "comment_2")),
-      comment_3: nullable(valueFor(row, "comment_3")),
-      comment_4: nullable(valueFor(row, "comment_4")),
-      comment_5: nullable(valueFor(row, "comment_5")),
       industry: nullable(valueFor(row, "industry")),
       city: nullable(valueFor(row, "city")),
       service_interest: service,
@@ -393,11 +373,6 @@ export function LeadImportDialog({
         "Age/Date of Birth",
         "Postal Address",
         "Last Active",
-        "Comment 1",
-        "Comment 2",
-        "Comment 3",
-        "Comment 4",
-        "Comment 5",
         "Industry",
         "Service Interest",
         "Lead Source",
@@ -425,11 +400,6 @@ export function LeadImportDialog({
         "35 y",
         "Bengaluru, Karnataka",
         "Active in last 30 days",
-        "Decision-maker for recruitment requirements.",
-        "",
-        "",
-        "",
-        "",
         "IT Services",
         "Recruitment & Staffing",
         "Naukri Resdex",
@@ -439,8 +409,8 @@ export function LeadImportDialog({
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 30 }, (_, index) => ({
-      wch: [1, 15, 16, 23, 29].includes(index) ? 42 : 20,
+    sheet["!cols"] = Array.from({ length: 25 }, (_, index) => ({
+      wch: [1, 15, 16, 24].includes(index) ? 42 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
@@ -499,11 +469,6 @@ export function LeadImportDialog({
           age_or_dob: row.age_or_dob,
           postal_address: row.postal_address,
           last_active: row.last_active,
-          comment_1: row.comment_1,
-          comment_2: row.comment_2,
-          comment_3: row.comment_3,
-          comment_4: row.comment_4,
-          comment_5: row.comment_5,
           industry: row.industry,
           city: row.city,
           service_interest: row.service_interest,
