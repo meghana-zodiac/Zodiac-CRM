@@ -97,13 +97,17 @@ function LeadsPage() {
   const columns: Column<Lead>[] = [
     { header: "Name", render: (row) => row.contact_name ?? "—" },
     {
-      header: "Name of the current company",
+      header: "Current company",
       className: "px-3 py-2.5 font-medium text-foreground",
       render: (row) => row.company_name,
     },
     { header: "Industry", render: (row) => row.industry ?? "—" },
     { header: "Current location", render: (row) => row.city ?? "—" },
-    { header: "Designation", render: (row) => row.designation ?? "—" },
+    {
+      header: "Designation",
+      className: "w-80 max-w-80 truncate px-3 py-2.5 text-muted-foreground",
+      render: (row) => row.designation ?? "—",
+    },
     { header: "Phone 1", render: (row) => row.phone ?? "—" },
     { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
     { header: "Email ID", render: (row) => row.email ?? "—" },
@@ -147,7 +151,7 @@ function LeadsPage() {
             mobileColumns={[
               { header: "HR / Contact", render: (row) => row.contact_name ?? "—" },
               {
-                header: "Company",
+                header: "Current company",
                 className: "font-medium text-foreground",
                 render: (row) => row.company_name,
               },

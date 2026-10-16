@@ -68,6 +68,7 @@ const aliases: Record<LeadField, string[]> = {
     "current employer",
     "name of the current company",
     "name of current company",
+    "current company",
   ],
   contact_name: [
     "contact",
@@ -149,12 +150,13 @@ function workbookRows(buffer: ArrayBuffer) {
           "current employer",
           "name of the current company",
           "name of current company",
+          "current company",
         ].includes(cell),
       )
     );
   });
   if (relativeHeaderIndex < 0) {
-    throw new Error("Could not find the Name of the Current Company header row.");
+    throw new Error("Could not find the Current Company header row.");
   }
   const headers = (matrix[relativeHeaderIndex] ?? []).map(clean).filter(Boolean);
   const usedRange = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1");
@@ -405,7 +407,7 @@ export function LeadImportDialog({
     const sheet = XLSX.utils.aoa_to_sheet([
       [
         "Name",
-        "Name of the Current Company",
+        "Current Company",
         "Industry",
         "Current Location",
         "Designation",
@@ -538,7 +540,7 @@ export function LeadImportDialog({
               <FileSpreadsheet className="mx-auto size-9 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Upload .xlsx, .xls, or .csv</p>
               <p className="text-xs text-muted-foreground">
-                Name of the Current Company is required. Missing Lead Status defaults to New.
+                Current Company is required. Missing Lead Status defaults to New.
               </p>
             </div>
           ) : (

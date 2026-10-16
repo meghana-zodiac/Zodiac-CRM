@@ -165,7 +165,7 @@ export const leadFields: FieldDef[] = [
   { name: "contact_name", label: "Name" },
   {
     name: "company_name",
-    label: "Name of the current company",
+    label: "Current company",
     required: true,
   },
   { name: "industry", label: "Industry" },
