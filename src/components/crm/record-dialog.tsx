@@ -34,6 +34,7 @@ export type FieldDef = {
   label: string;
   type?: FieldType;
   required?: boolean;
+  defaultValue?: string;
   options?: { value: string; label: string }[];
   span?: 1 | 2;
   /** Only show this field when the field named here has one of `showWhen` values. */
@@ -186,7 +187,11 @@ export function RecordDialog({
     if (!open) return;
     const next: Values = {};
     for (const field of effectiveFields) {
-      const value = toInputValue(field.type ?? "text", readPath(record, field.name));
+      const storedValue = readPath(record, field.name);
+      const value = toInputValue(
+        field.type ?? "text",
+        storedValue ?? (record?.["id"] ? undefined : field.defaultValue),
+      );
       next[field.name] = value;
     }
     setValues(next);
