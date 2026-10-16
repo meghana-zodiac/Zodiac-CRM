@@ -9,6 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { FieldDef } from "./record-dialog";
+import { formatDateOnly } from "@/lib/crm";
 
 function nestedValue(record: Record<string, unknown>, name: string) {
   return name.split(".").reduce<unknown>((value, key) => {
@@ -26,7 +27,8 @@ function displayValue(value: unknown, field?: FieldDef) {
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (typeof value === "object") return JSON.stringify(value);
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (field?.type === "date" || field?.type === "datetime") {
+  if (field?.type === "date") return formatDateOnly(String(value));
+  if (field?.type === "datetime") {
     const date = new Date(String(value));
     if (!Number.isNaN(date.getTime())) return date.toLocaleString("en-IN");
   }

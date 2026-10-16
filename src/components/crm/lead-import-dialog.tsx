@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { LEAD_SOURCES, LEAD_STATUSES, type Lead } from "@/lib/crm";
+import { LEAD_SOURCES, LEAD_STATUSES, formatDateOnly, type Lead } from "@/lib/crm";
 import { bdTeamMembersQuery } from "@/lib/poa";
 
 type RawRow = Record<string, unknown>;
@@ -269,6 +269,27 @@ function enumValue(value: string, values: readonly string[]): string | null {
   return values.find((item) => item.toLowerCase() === value.toLowerCase()) ?? null;
 }
 
+function dateValue(value: string) {
+  if (!value) return { value: null, error: "" };
+  const match = value.trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (!match) return { value: null, error: "Date of Birth must use DD/MM/YYYY" };
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return { value: null, error: "Date of Birth is not a valid date" };
+  }
+  return {
+    value: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    error: "",
+  };
+}
+
 function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
   const { source, headerIndex } = workbookRows(buffer);
 
@@ -278,6 +299,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
     const sourceRaw = valueFor(row, "source");
     const valueRaw = valueFor(row, "estimated_value");
     const estimatedValue = numberValue(valueRaw);
+    const dob = dateValue(valueFor(row, "age_or_dob"));
     const rawPhone = valueFor(row, "phone");
     const detectedPhones = splitContactNumbers(rawPhone);
     const phone = nullable(valueForHeaders(row, ["phone 1", "mobile 1"])) ?? detectedPhones.phone;
@@ -292,6 +314,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       sourceRaw && !sourceValue ? `Unknown source: ${sourceRaw}` : "",
       valueRaw && estimatedValue === null ? "Estimated value must be a number" : "",
       estimatedValue !== null && estimatedValue < 0 ? "Estimated value cannot be negative" : "",
+      dob.error,
       owner.error,
     ].filter(Boolean);
 
@@ -306,7 +329,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       phone_2: phone2,
       landline,
       designation: nullable(valueFor(row, "designation")),
-      age_or_dob: nullable(valueFor(row, "age_or_dob")),
+      age_or_dob: dob.value,
       industry: nullable(valueFor(row, "industry")),
       city: nullable(valueFor(row, "city")),
       source: sourceValue,
@@ -655,7 +678,7 @@ export function LeadImportDialog({
                         <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
                         <td className="px-3 py-2">{row.landline ?? "—"}</td>
-                        <td className="px-3 py-2">{row.age_or_dob ?? "—"}</td>
+                        <td className="px-3 py-2">{formatDateOnly(row.age_or_dob)}</td>
                         <td className="px-3 py-2">{row.source ?? "—"}</td>
                         <td className="px-3 py-2">{row.status}</td>
                         <td className="px-3 py-2">{row.estimated_value ?? "—"}</td>

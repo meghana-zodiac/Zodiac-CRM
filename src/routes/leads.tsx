@@ -23,7 +23,14 @@ import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
 import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { activityFields } from "@/components/crm/field-defs";
-import { LEAD_STATUSES, currency, leadsQuery, type ActivityType, type Lead } from "@/lib/crm";
+import {
+  LEAD_STATUSES,
+  currency,
+  formatDateOnly,
+  leadsQuery,
+  type ActivityType,
+  type Lead,
+} from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/leads")({
@@ -112,7 +119,7 @@ function LeadsPage() {
     { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
     { header: "Email ID", render: (row) => row.email ?? "—" },
     { header: "Landline", render: (row) => row.landline ?? "—" },
-    { header: "Date of birth", render: (row) => row.age_or_dob ?? "—" },
+    { header: "Date of birth", render: (row) => formatDateOnly(row.age_or_dob) },
     { header: "Lead source", render: (row) => row.source ?? "—" },
     {
       header: "Lead status",
