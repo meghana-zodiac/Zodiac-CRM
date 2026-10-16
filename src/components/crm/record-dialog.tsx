@@ -375,7 +375,9 @@ export function RecordDialog({
       for (const field of visibleFields) {
         const raw = values[field.name]?.trim() ?? "";
         if (raw === "") {
-          writePath(payload, field.name, null);
+          // Omit blank values on create so database defaults can be applied.
+          // Existing records still receive null so optional fields can be cleared.
+          if (record?.["id"]) writePath(payload, field.name, null);
           continue;
         }
         if (field.type === "number") writePath(payload, field.name, Number(raw));
