@@ -15,7 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { LEAD_SOURCES, LEAD_STATUSES, formatDateOnly, type Lead } from "@/lib/crm";
+import {
+  LEAD_SOURCES,
+  LEAD_STATUSES,
+  formatDateOnly,
+  toDateInputValue,
+  type Lead,
+} from "@/lib/crm";
 import { bdTeamMembersQuery } from "@/lib/poa";
 
 type RawRow = Record<string, unknown>;
@@ -271,23 +277,10 @@ function enumValue(value: string, values: readonly string[]): string | null {
 
 function dateValue(value: string) {
   if (!value) return { value: null, error: "" };
-  const match = value.trim().match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-  if (!match) return { value: null, error: "Date of Birth must use DD/MM/YYYY" };
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return { value: null, error: "Date of Birth is not a valid date" };
-  }
-  return {
-    value: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-    error: "",
-  };
+  const normalized = toDateInputValue(value);
+  return normalized
+    ? { value: normalized, error: "" }
+    : { value: null, error: "Date of Birth must be a valid DD/MM/YYYY date" };
 }
 
 function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {

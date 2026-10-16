@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createRecord, updateRecord, type CrmTable } from "@/lib/crm";
+import { createRecord, toDateInputValue, updateRecord, type CrmTable } from "@/lib/crm";
 import { parseSmartPasteDetailed, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
 import { bdTeamMembersQuery } from "@/lib/poa";
 
@@ -139,14 +139,7 @@ function parseVCard(text: string): AddressBookContact | null {
 function toInputValue(type: FieldType, raw: unknown): string {
   if (raw === null || raw === undefined) return "";
   if (type === "datetime") return new Date(String(raw)).toISOString().slice(0, 16);
-  if (type === "date") {
-    const value = String(raw).trim();
-    const dmy = value.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-    if (dmy) {
-      return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
-    }
-    return value.slice(0, 10);
-  }
+  if (type === "date") return toDateInputValue(String(raw));
   return String(raw);
 }
 

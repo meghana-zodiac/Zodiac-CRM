@@ -503,16 +503,53 @@ export function formatDate(value: string | null | undefined) {
   });
 }
 
-export function formatDateOnly(value: string | null | undefined) {
-  if (!value) return "—";
+const DATE_MONTHS: Record<string, number> = {
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+};
+
+function dateOnlyParts(value: string) {
   const raw = value.trim();
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  if (iso) return { day: Number(iso[3]), month: Number(iso[2]), year: Number(iso[1]) };
   const dmy = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-  if (dmy) {
-    return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
+  if (dmy) return { day: Number(dmy[1]), month: Number(dmy[2]), year: Number(dmy[3]) };
+  const legacy = raw.match(/(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/);
+  const month = legacy ? DATE_MONTHS[legacy[2].slice(0, 3).toLowerCase()] : undefined;
+  if (legacy && month) return { day: Number(legacy[1]), month, year: Number(legacy[3]) };
+  return null;
+}
+
+export function toDateInputValue(value: string | null | undefined) {
+  if (!value) return "";
+  const parts = dateOnlyParts(value);
+  if (!parts) return "";
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (
+    date.getUTCFullYear() !== parts.year ||
+    date.getUTCMonth() !== parts.month - 1 ||
+    date.getUTCDate() !== parts.day
+  ) {
+    return "";
   }
-  return raw;
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function formatDateOnly(value: string | null | undefined) {
+  const iso = toDateInputValue(value);
+  if (!iso) return value?.trim() || "—";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateTime(value: string | null | undefined) {
