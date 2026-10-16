@@ -24,6 +24,7 @@ import { accountsQuery, contactsQuery, currency, dealsQuery, formatDate } from "
 import type { Account } from "@/lib/crm";
 import { syncCeipalClients } from "@/lib/ceipal.functions";
 import { AccountImportDialog } from "@/components/crm/account-import-dialog";
+import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 
 export const Route = createFileRoute("/accounts")({
   head: () => ({
@@ -201,6 +202,12 @@ function AccountsPage() {
                     {contactCount(account.id)} contacts · {currency(pipeline(account.id))} open
                   </p>
                 </div>
+                <div
+                  className="mt-3 border-t border-border pt-3"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DesktopContactActions phone={account.phone ?? account.phone_2} />
+                </div>
                 <Button
                   size="sm"
                   variant="outline"
@@ -282,6 +289,7 @@ function AccountsPage() {
                   <col className="w-[8%]" />
                   <col className="w-[8%]" />
                   <col className="w-[8%]" />
+                  <col className="w-[8%]" />
                   <col className="w-[3%]" />
                 </colgroup>
                 <thead>
@@ -304,6 +312,7 @@ function AccountsPage() {
                     <th className="px-3 py-2.5">Owner</th>
                     <th className="px-3 py-2.5">Created</th>
                     <th className="px-3 py-2.5">Opportunity</th>
+                    <th className="px-3 py-2.5">Contact</th>
                     <th className="w-12 px-3 py-2.5" />
                   </tr>
                 </thead>
@@ -359,6 +368,12 @@ function AccountsPage() {
                         >
                           <Handshake className="size-4" /> Create
                         </Button>
+                      </td>
+                      <td
+                        className="whitespace-nowrap px-3 py-2.5"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <DesktopContactActions phone={account.phone ?? account.phone_2} compact />
                       </td>
                       <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
                         <RowActions

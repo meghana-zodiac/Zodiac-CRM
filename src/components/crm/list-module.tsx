@@ -41,6 +41,7 @@ export function ListModule<T extends { id: string }>({
   filterValue,
   tile,
   mobileActions,
+  desktopActions,
   onRowClick,
   ownerOf,
   headerAction,
@@ -63,6 +64,7 @@ export function ListModule<T extends { id: string }>({
   filterValue?: (row: T) => string;
   tile?: (row: T) => React.ReactNode;
   mobileActions?: (row: T) => React.ReactNode;
+  desktopActions?: (row: T) => React.ReactNode;
   onRowClick?: (row: T) => void;
   ownerOf?: (row: T) => string | null | undefined;
   headerAction?: React.ReactNode;
@@ -242,6 +244,14 @@ export function ListModule<T extends { id: string }>({
                       {mobileActions(row)}
                     </div>
                   ) : null}
+                  {desktopActions ? (
+                    <div
+                      className="mt-3 hidden border-t border-border pt-3 md:block"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {desktopActions(row)}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -310,6 +320,7 @@ export function ListModule<T extends { id: string }>({
                           {column.header}
                         </th>
                       ))}
+                      {desktopActions ? <th className="px-3 py-2.5">Contact</th> : null}
                       <th className="w-12 px-3 py-2.5" />
                     </tr>
                   </thead>
@@ -329,6 +340,14 @@ export function ListModule<T extends { id: string }>({
                             {column.render(row)}
                           </td>
                         ))}
+                        {desktopActions ? (
+                          <td
+                            className="whitespace-nowrap px-3 py-2.5"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {desktopActions(row)}
+                          </td>
+                        ) : null}
                         <td className="px-3 py-2.5">
                           <RowActions
                             table={table}

@@ -21,6 +21,7 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
+import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { activityFields } from "@/components/crm/field-defs";
 import {
   LEAD_STATUSES,
@@ -318,6 +319,9 @@ function LeadsPage() {
                 </div>
               );
             }}
+            desktopActions={(row) => (
+              <DesktopContactActions phone={row.phone ?? row.phone_2} email={row.email} compact />
+            )}
           />
           <LeadImportDialog
             open={importOpen}

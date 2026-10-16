@@ -44,6 +44,7 @@ import {
 } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
+import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
 import { ApolloProspector } from "@/components/crm/apollo-prospector";
 import {
@@ -447,6 +448,12 @@ function ContactsPage() {
                         <div>{contact.phone ?? "—"}</div>
                         <div>Last activity {formatDate(contact.last_activity_date)}</div>
                       </dl>
+                      <div
+                        className="mt-3 border-t border-border pt-3"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <DesktopContactActions phone={contact.phone} email={contact.email} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -545,6 +552,7 @@ function ContactsPage() {
                           <th className="px-3 py-2.5">Phone</th>
                           <th className="px-3 py-2.5">Owner</th>
                           <th className="px-3 py-2.5">Last activity</th>
+                          <th className="px-3 py-2.5">Contact</th>
                           <th className="w-12 px-3 py-2.5" />
                         </tr>
                       </thead>
@@ -593,6 +601,16 @@ function ContactsPage() {
                             </td>
                             <td className="px-3 py-2.5 text-muted-foreground">
                               {formatDate(contact.last_activity_date)}
+                            </td>
+                            <td
+                              className="whitespace-nowrap px-3 py-2.5"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <DesktopContactActions
+                                phone={contact.phone}
+                                email={contact.email}
+                                compact
+                              />
                             </td>
                             <td
                               className="px-3 py-2.5"
