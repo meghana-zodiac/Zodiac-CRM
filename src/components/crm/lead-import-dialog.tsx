@@ -26,7 +26,6 @@ type LeadField =
   | "phone"
   | "phone_2"
   | "landline"
-  | "resume_title"
   | "work_experience"
   | "annual_salary"
   | "preferred_location"
@@ -54,7 +53,6 @@ type ImportRow = {
   phone: string | null;
   phone_2: string | null;
   landline: string | null;
-  resume_title: string | null;
   work_experience: string | null;
   annual_salary: string | null;
   preferred_location: string | null;
@@ -110,7 +108,6 @@ const aliases: Record<LeadField, string[]> = {
   ],
   phone_2: ["phone 2", "secondary phone", "alternate phone", "alternate mobile", "mobile 2"],
   landline: ["landline", "landline number", "office landline", "telephone landline"],
-  resume_title: ["resume title"],
   work_experience: ["work exp", "work experience"],
   annual_salary: ["annual salary", "salary"],
   preferred_location: ["preferred location"],
@@ -285,7 +282,6 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       phone,
       phone_2: phone2,
       landline,
-      resume_title: nullable(valueFor(row, "resume_title")),
       work_experience: nullable(valueFor(row, "work_experience")),
       annual_salary: nullable(valueFor(row, "annual_salary")),
       preferred_location: nullable(valueFor(row, "preferred_location")),
@@ -391,7 +387,6 @@ export function LeadImportDialog({
     const sheet = XLSX.utils.aoa_to_sheet([
       [
         "Candidate Name",
-        "Resume Title",
         "Phone 1",
         "Phone 2",
         "Landline",
@@ -418,7 +413,6 @@ export function LeadImportDialog({
       ],
       [
         "Rahul Menon",
-        "HR leader supporting technology hiring and people operations.",
         "+91 98450 11223",
         "+91 98765 44321",
         "080 4000 0000",
@@ -444,8 +438,8 @@ export function LeadImportDialog({
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 25 }, (_, index) => ({
-      wch: [1, 15, 16, 24].includes(index) ? 42 : 20,
+    sheet["!cols"] = Array.from({ length: 24 }, (_, index) => ({
+      wch: [14, 15, 23].includes(index) ? 42 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
@@ -493,7 +487,6 @@ export function LeadImportDialog({
           phone: row.phone,
           phone_2: row.phone_2,
           landline: row.landline,
-          resume_title: row.resume_title,
           work_experience: row.work_experience,
           annual_salary: row.annual_salary,
           preferred_location: row.preferred_location,

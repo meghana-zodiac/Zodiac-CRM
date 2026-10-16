@@ -173,7 +173,6 @@ export const leadFields: FieldDef[] = [
   { name: "phone", label: "Phone 1", type: "tel" },
   { name: "phone_2", label: "Phone 2", type: "tel" },
   { name: "landline", label: "Landline", type: "tel" },
-  { name: "resume_title", label: "Resume title", span: 2 },
   { name: "designation", label: "Designation" },
   { name: "work_experience", label: "Work experience" },
   { name: "annual_salary", label: "Annual salary" },

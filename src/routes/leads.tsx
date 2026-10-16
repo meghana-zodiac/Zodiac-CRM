@@ -103,7 +103,6 @@ function LeadsPage() {
 
   const columns: Column<Lead>[] = [
     { header: "Candidate name", render: (row) => row.contact_name ?? "—" },
-    { header: "Resume title", render: (row) => row.resume_title ?? "—" },
     { header: "Phone 1", render: (row) => row.phone ?? "—" },
     { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
     { header: "Landline", render: (row) => row.landline ?? "—" },
@@ -223,7 +222,6 @@ function LeadsPage() {
               row.phone,
               row.phone_2,
               row.landline,
-              row.resume_title,
               row.work_experience,
               row.annual_salary,
               row.preferred_location,
