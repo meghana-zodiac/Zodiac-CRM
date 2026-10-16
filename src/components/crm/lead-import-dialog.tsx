@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { LEAD_SOURCES, LEAD_STATUSES, SERVICE_LINES, type Lead } from "@/lib/crm";
+import { LEAD_SOURCES, LEAD_STATUSES, type Lead } from "@/lib/crm";
 import { bdTeamMembersQuery } from "@/lib/poa";
 
 type RawRow = Record<string, unknown>;
@@ -26,19 +26,10 @@ type LeadField =
   | "phone"
   | "phone_2"
   | "landline"
-  | "work_experience"
-  | "annual_salary"
-  | "preferred_location"
   | "designation"
-  | "ug_course"
-  | "pg_course"
-  | "post_pg_course"
   | "age_or_dob"
-  | "postal_address"
-  | "last_active"
   | "industry"
   | "city"
-  | "service_interest"
   | "source"
   | "status"
   | "estimated_value"
@@ -53,25 +44,17 @@ type ImportRow = {
   phone: string | null;
   phone_2: string | null;
   landline: string | null;
-  work_experience: string | null;
-  annual_salary: string | null;
-  preferred_location: string | null;
   designation: string | null;
-  ug_course: string | null;
-  pg_course: string | null;
-  post_pg_course: string | null;
   age_or_dob: string | null;
-  postal_address: string | null;
-  last_active: string | null;
   industry: string | null;
   city: string | null;
-  service_interest: string | null;
   source: string | null;
   status: string;
   estimated_value: number | null;
   owner_name: string | null;
   notes: string | null;
   error?: string;
+  duplicate?: string;
 };
 
 const aliases: Record<LeadField, string[]> = {
@@ -83,6 +66,8 @@ const aliases: Record<LeadField, string[]> = {
     "client",
     "client name",
     "current employer",
+    "name of the current company",
+    "name of current company",
   ],
   contact_name: [
     "contact",
@@ -92,6 +77,7 @@ const aliases: Record<LeadField, string[]> = {
     "poc",
     "poc name",
     "candidate name",
+    "name",
   ],
   email: ["email", "email address", "work email", "official email", "email id"],
   phone: [
@@ -108,25 +94,10 @@ const aliases: Record<LeadField, string[]> = {
   ],
   phone_2: ["phone 2", "secondary phone", "alternate phone", "alternate mobile", "mobile 2"],
   landline: ["landline", "landline number", "office landline", "telephone landline"],
-  work_experience: ["work exp", "work experience"],
-  annual_salary: ["annual salary", "salary"],
-  preferred_location: ["preferred location"],
   designation: ["designation", "job title"],
-  ug_course: ["u.g. course", "ug course"],
-  pg_course: ["p. g. course", "p.g. course", "pg course"],
-  post_pg_course: ["post p. g. course", "post p.g. course", "post pg course"],
   age_or_dob: ["age/date of birth", "age / date of birth", "age", "date of birth"],
-  postal_address: ["postal address", "address"],
-  last_active: ["last active"],
   industry: ["industry", "sector", "industry sector"],
   city: ["city", "location", "office location", "current location"],
-  service_interest: [
-    "service interest",
-    "service",
-    "service line",
-    "requirement",
-    "interested service",
-  ],
   source: ["source", "lead source", "channel", "origin"],
   status: ["status", "lead status", "stage"],
   estimated_value: [
@@ -172,11 +143,18 @@ function workbookRows(buffer: ArrayBuffer) {
     const cells = row.map((value) => cleanHeader(clean(value))).filter(Boolean);
     return (
       cells.some((cell) => knownHeaders.has(cell)) &&
-      cells.some((cell) => ["company name", "current employer"].includes(cell))
+      cells.some((cell) =>
+        [
+          "company name",
+          "current employer",
+          "name of the current company",
+          "name of current company",
+        ].includes(cell),
+      )
     );
   });
   if (relativeHeaderIndex < 0) {
-    throw new Error("Could not find a Company Name or Current Employer header row.");
+    throw new Error("Could not find the Name of the Current Company header row.");
   }
   const headers = (matrix[relativeHeaderIndex] ?? []).map(clean).filter(Boolean);
   const usedRange = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1");
@@ -192,6 +170,52 @@ function workbookRows(buffer: ArrayBuffer) {
 function comparablePhone(value: string) {
   const digits = value.replace(/\D/g, "");
   return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function phoneKeys(record: {
+  phone: string | null;
+  phone_2: string | null;
+  landline: string | null;
+}) {
+  return [record.phone, record.phone_2, record.landline]
+    .filter((value): value is string => Boolean(value))
+    .map(comparablePhone)
+    .filter((value) => value.length >= 7);
+}
+
+function companyContactKey(company: string, contact: string | null) {
+  const normalizedContact = identityKey(contact);
+  return normalizedContact ? `${identityKey(company)}:${normalizedContact}` : "";
+}
+
+function markDuplicates(rows: ImportRow[], leads: Lead[]) {
+  const emails = new Set(leads.map((lead) => identityKey(lead.email)).filter(Boolean));
+  const phones = new Set(leads.flatMap(phoneKeys));
+  const companyContacts = new Set(
+    leads.map((lead) => companyContactKey(lead.company_name, lead.contact_name)).filter(Boolean),
+  );
+
+  return rows.map((row) => {
+    if (row.error) return { ...row, duplicate: undefined };
+    const email = identityKey(row.email);
+    const rowPhones = phoneKeys(row);
+    const companyContact = companyContactKey(row.company_name, row.contact_name);
+    let duplicate = "";
+
+    if (email && emails.has(email)) duplicate = "Duplicate email already exists";
+    else if (rowPhones.some((phone) => phones.has(phone))) {
+      duplicate = "Duplicate phone number already exists";
+    } else if (companyContact && companyContacts.has(companyContact)) {
+      duplicate = "This name and company combination already exists";
+    }
+
+    if (!duplicate) {
+      if (email) emails.add(email);
+      rowPhones.forEach((phone) => phones.add(phone));
+      if (companyContact) companyContacts.add(companyContact);
+    }
+    return { ...row, duplicate: duplicate || undefined };
+  });
 }
 
 function looksLikeIndianMobile(value: string) {
@@ -250,7 +274,6 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
     const companyName = valueFor(row, "company_name");
     const statusRaw = valueFor(row, "status");
     const sourceRaw = valueFor(row, "source");
-    const serviceRaw = valueFor(row, "service_interest");
     const valueRaw = valueFor(row, "estimated_value");
     const estimatedValue = numberValue(valueRaw);
     const rawPhone = valueFor(row, "phone");
@@ -261,12 +284,10 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
     const owner = resolvedOwner(valueFor(row, "owner_name"), ownerNames);
     const status = statusRaw ? enumValue(statusRaw, LEAD_STATUSES) : "New";
     const sourceValue = sourceRaw ? enumValue(sourceRaw, LEAD_SOURCES) : null;
-    const service = serviceRaw ? enumValue(serviceRaw, SERVICE_LINES) : null;
     const errors = [
       !companyName ? "Company name is required" : "",
       statusRaw && !status ? `Unknown status: ${statusRaw}` : "",
       sourceRaw && !sourceValue ? `Unknown source: ${sourceRaw}` : "",
-      serviceRaw && !service ? `Unknown service: ${serviceRaw}` : "",
       valueRaw && estimatedValue === null ? "Estimated value must be a number" : "",
       estimatedValue !== null && estimatedValue < 0 ? "Estimated value cannot be negative" : "",
       owner.error,
@@ -282,20 +303,11 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       phone,
       phone_2: phone2,
       landline,
-      work_experience: nullable(valueFor(row, "work_experience")),
-      annual_salary: nullable(valueFor(row, "annual_salary")),
-      preferred_location: nullable(valueFor(row, "preferred_location")),
       designation: nullable(valueFor(row, "designation")),
-      ug_course: nullable(valueFor(row, "ug_course")),
-      pg_course: nullable(valueFor(row, "pg_course")),
-      post_pg_course: nullable(valueFor(row, "post_pg_course")),
       age_or_dob: nullable(valueFor(row, "age_or_dob")),
-      postal_address: nullable(valueFor(row, "postal_address")),
-      last_active: nullable(valueFor(row, "last_active")),
       industry: nullable(valueFor(row, "industry")),
       city: nullable(valueFor(row, "city")),
-      service_interest: service,
-      source: sourceValue ?? (valueForHeaders(row, ["candidate name"]) ? "Naukri Resdex" : null),
+      source: sourceValue,
       status: status ?? "New",
       estimated_value: estimatedValue,
       owner_name: owner.value,
@@ -321,11 +333,17 @@ export function LeadImportDialog({
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
-  const [previewFilter, setPreviewFilter] = useState<"all" | "invalid">("all");
-  const validCount = rows.filter((row) => !row.error).length;
-  const errorCount = rows.length - validCount;
+  const [previewFilter, setPreviewFilter] = useState<"all" | "invalid" | "duplicates">("all");
+  const validCount = rows.filter((row) => !row.error && !row.duplicate).length;
+  const errorCount = rows.filter((row) => row.error).length;
+  const duplicateCount = rows.filter((row) => row.duplicate).length;
   const previewRows = useMemo(
-    () => (previewFilter === "invalid" ? rows.filter((row) => row.error) : rows),
+    () =>
+      previewFilter === "invalid"
+        ? rows.filter((row) => row.error)
+        : previewFilter === "duplicates"
+          ? rows.filter((row) => row.duplicate)
+          : rows,
     [previewFilter, rows],
   );
   const preview = useMemo(() => previewRows.slice(0, 25), [previewRows]);
@@ -373,7 +391,7 @@ export function LeadImportDialog({
         .map((member) => member.display_name);
       const workbook = workbookRows(buffer);
       setHeaders(workbook.headers);
-      const parsed = parseWorkbook(buffer, ownerNames);
+      const parsed = markDuplicates(parseWorkbook(buffer, ownerNames), leads);
       if (!parsed.length) throw new Error("The first worksheet has no data rows.");
       setRows(parsed);
       setFileName(file.name);
@@ -386,25 +404,16 @@ export function LeadImportDialog({
   const downloadTemplate = () => {
     const sheet = XLSX.utils.aoa_to_sheet([
       [
-        "Candidate Name",
+        "Name",
+        "Name of the Current Company",
+        "Industry",
+        "Current Location",
+        "Designation",
         "Phone 1",
         "Phone 2",
+        "Email ID",
         "Landline",
-        "Email",
-        "Work Exp",
-        "Annual Salary",
-        "Current Location",
-        "Preferred Location",
-        "Current Employer",
-        "Designation",
-        "U.G. Course",
-        "P. G. Course",
-        "Post P. G. Course",
-        "Age/Date of Birth",
-        "Postal Address",
-        "Last Active",
-        "Industry",
-        "Service Interest",
+        "Date of Birth",
         "Lead Source",
         "Lead Status",
         "Estimated Value",
@@ -413,24 +422,15 @@ export function LeadImportDialog({
       ],
       [
         "Rahul Menon",
+        "Vertex Global Services",
+        "IT Services",
+        "Bengaluru",
+        "HR Manager",
         "+91 98450 11223",
         "+91 98765 44321",
-        "080 4000 0000",
         "rahul@vertexglobal.in",
-        "8Y 0M",
-        "INR 18.0 L",
-        "Bengaluru",
-        "Bengaluru, Mumbai",
-        "Vertex Global Services",
-        "HR Manager",
-        "B.Com",
-        "MBA/PGDM",
-        "",
-        "35 y",
-        "Bengaluru, Karnataka",
-        "Active in last 30 days",
-        "IT Services",
-        "Recruitment & Staffing",
+        "080 4000 0000",
+        "15/08/1991",
         "Naukri Resdex",
         "New",
         "1200000",
@@ -438,8 +438,8 @@ export function LeadImportDialog({
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 24 }, (_, index) => ({
-      wch: [14, 15, 23].includes(index) ? 42 : 20,
+    sheet["!cols"] = Array.from({ length: 15 }, (_, index) => ({
+      wch: [0, 1, 14].includes(index) ? 36 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
@@ -449,74 +449,48 @@ export function LeadImportDialog({
   const importRows = async () => {
     setImporting(true);
     try {
-      const byEmail = new Map(
-        leads.filter((lead) => lead.email).map((lead) => [identityKey(lead.email), lead]),
+      const checkedRows = markDuplicates(
+        rows.map((row) => ({ ...row, duplicate: undefined })),
+        leads,
       );
-      const byCompanyContact = new Map(
-        leads.map((lead) => [
-          `${identityKey(lead.company_name)}:${identityKey(lead.contact_name)}`,
-          lead,
-        ]),
-      );
-      const seen = new Set<string>();
       const payload: Array<Record<string, unknown>> = [];
-      let skipped = errorCount;
-      let inserted = 0;
-      let updated = 0;
+      let skipped = 0;
 
-      for (const row of rows) {
-        if (row.error) continue;
-        const duplicateKey = row.email
-          ? `email:${identityKey(row.email)}`
-          : `lead:${identityKey(row.company_name)}:${identityKey(row.contact_name)}`;
-        if (seen.has(duplicateKey)) {
+      for (const row of checkedRows) {
+        if (row.error || row.duplicate) {
           skipped += 1;
           continue;
         }
-        seen.add(duplicateKey);
-        const match = row.email
-          ? byEmail.get(identityKey(row.email))
-          : byCompanyContact.get(
-              `${identityKey(row.company_name)}:${identityKey(row.contact_name)}`,
-            );
         payload.push({
-          ...(match ? { id: match.id } : {}),
           company_name: row.company_name,
           contact_name: row.contact_name,
+          industry: row.industry,
+          city: row.city,
+          designation: row.designation,
           email: row.email,
           phone: row.phone,
           phone_2: row.phone_2,
           landline: row.landline,
-          work_experience: row.work_experience,
-          annual_salary: row.annual_salary,
-          preferred_location: row.preferred_location,
-          designation: row.designation,
-          ug_course: row.ug_course,
-          pg_course: row.pg_course,
-          post_pg_course: row.post_pg_course,
           age_or_dob: row.age_or_dob,
-          postal_address: row.postal_address,
-          last_active: row.last_active,
-          industry: row.industry,
-          city: row.city,
-          service_interest: row.service_interest,
           source: row.source,
           status: row.status,
           estimated_value: row.estimated_value,
           owner_name: row.owner_name,
           notes: row.notes,
         });
-        if (match) updated += 1;
-        else inserted += 1;
       }
 
-      if (!payload.length) throw new Error("There are no valid rows to import.");
+      if (!payload.length) {
+        throw new Error(
+          "No new valid leads were found. Existing and duplicate leads were skipped.",
+        );
+      }
       for (let index = 0; index < payload.length; index += 200) {
-        const { error } = await supabase.from("leads").upsert(payload.slice(index, index + 200));
+        const { error } = await supabase.from("leads").insert(payload.slice(index, index + 200));
         if (error) throw error;
       }
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success(`Import complete: ${inserted} added, ${updated} updated, ${skipped} skipped.`);
+      toast.success(`Import complete: ${payload.length} added, ${skipped} skipped.`);
       reset();
       onOpenChange(false);
     } catch (error) {
@@ -538,8 +512,8 @@ export function LeadImportDialog({
         <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6">
           <DialogTitle>Import Corporate Leads</DialogTitle>
           <DialogDescription>
-            Upload Excel or CSV. Headers are detected automatically. Matching email—or company and
-            contact—updates an existing lead.
+            Upload Excel or CSV. Existing leads are detected by email, phone number, or name and
+            company, and are skipped automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
@@ -564,7 +538,7 @@ export function LeadImportDialog({
               <FileSpreadsheet className="mx-auto size-9 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Upload .xlsx, .xls, or .csv</p>
               <p className="text-xs text-muted-foreground">
-                Only Company Name is required. Missing status defaults to New.
+                Name of the Current Company is required. Missing Lead Status defaults to New.
               </p>
             </div>
           ) : (
@@ -576,6 +550,11 @@ export function LeadImportDialog({
                 {errorCount ? (
                   <span className="rounded-full bg-red-100 px-3 py-1 text-red-800">
                     {errorCount} invalid
+                  </span>
+                ) : null}
+                {duplicateCount ? (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+                    {duplicateCount} duplicates skipped
                   </span>
                 ) : null}
                 <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
@@ -607,25 +586,37 @@ export function LeadImportDialog({
                   ) : null}
                 </div>
               ) : null}
+              {duplicateCount ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={previewFilter === "duplicates" ? "default" : "outline"}
+                  onClick={() => setPreviewFilter("duplicates")}
+                >
+                  View {duplicateCount} duplicates
+                </Button>
+              ) : null}
               <div className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       {[
                         "Row",
-                        "Company",
-                        "Contact",
-                        "Email",
+                        "Name",
+                        "Current company",
+                        "Industry",
+                        "Current location",
+                        "Designation",
                         "Phone 1",
                         "Phone 2",
+                        "Email ID",
                         "Landline",
-                        "Industry",
-                        "City",
-                        "Service",
-                        "Source",
-                        "Status",
-                        "Value",
+                        "Date of birth",
+                        "Lead source",
+                        "Lead status",
+                        "Estimated value",
                         "Owner",
+                        "Notes",
                         "Result",
                       ].map((header) => (
                         <th key={header} className="px-3 py-2">
@@ -638,6 +629,7 @@ export function LeadImportDialog({
                     {preview.map((row) => (
                       <tr key={row.rowNumber}>
                         <td className="px-3 py-2 text-muted-foreground">{row.rowNumber}</td>
+                        <td className="px-3 py-2">{row.contact_name ?? "—"}</td>
                         <td className="px-3 py-2 font-medium">
                           {row.error?.includes("Company name is required") ? (
                             <Input
@@ -654,26 +646,29 @@ export function LeadImportDialog({
                             row.company_name || "—"
                           )}
                         </td>
-                        <td className="px-3 py-2">{row.contact_name ?? "—"}</td>
-                        <td className="px-3 py-2">{row.email ?? "—"}</td>
-                        <td className="px-3 py-2">{row.phone ?? "—"}</td>
-                        <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
-                        <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{row.industry ?? "—"}</td>
                         <td className="px-3 py-2">{row.city ?? "—"}</td>
-                        <td className="max-w-56 truncate px-3 py-2">
-                          {row.service_interest ?? "—"}
-                        </td>
+                        <td className="px-3 py-2">{row.designation ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone ?? "—"}</td>
+                        <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
+                        <td className="px-3 py-2">{row.email ?? "—"}</td>
+                        <td className="px-3 py-2">{row.landline ?? "—"}</td>
+                        <td className="px-3 py-2">{row.age_or_dob ?? "—"}</td>
                         <td className="px-3 py-2">{row.source ?? "—"}</td>
                         <td className="px-3 py-2">{row.status}</td>
                         <td className="px-3 py-2">{row.estimated_value ?? "—"}</td>
                         <td className="px-3 py-2">{row.owner_name ?? "—"}</td>
+                        <td className="max-w-56 truncate px-3 py-2">{row.notes ?? "—"}</td>
                         <td
                           className={
-                            row.error ? "px-3 py-2 text-red-600" : "px-3 py-2 text-emerald-700"
+                            row.error
+                              ? "px-3 py-2 text-red-600"
+                              : row.duplicate
+                                ? "px-3 py-2 text-amber-700"
+                                : "px-3 py-2 text-emerald-700"
                           }
                         >
-                          {row.error ?? "Ready"}
+                          {row.error ?? row.duplicate ?? "Ready"}
                         </td>
                       </tr>
                     ))}
@@ -683,7 +678,12 @@ export function LeadImportDialog({
               {previewRows.length > preview.length ? (
                 <p className="text-xs text-muted-foreground">
                   Previewing {preview.length} of {previewRows.length}{" "}
-                  {previewFilter === "invalid" ? "invalid" : "total"} rows.
+                  {previewFilter === "invalid"
+                    ? "invalid"
+                    : previewFilter === "duplicates"
+                      ? "duplicate"
+                      : "total"}{" "}
+                  rows.
                 </p>
               ) : null}
             </>

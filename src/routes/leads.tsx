@@ -23,14 +23,7 @@ import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
 import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { activityFields } from "@/components/crm/field-defs";
-import {
-  LEAD_STATUSES,
-  currency,
-  formatDate,
-  leadsQuery,
-  type ActivityType,
-  type Lead,
-} from "@/lib/crm";
+import { LEAD_STATUSES, currency, leadsQuery, type ActivityType, type Lead } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 
 export const Route = createFileRoute("/leads")({
@@ -102,38 +95,28 @@ function LeadsPage() {
   });
 
   const columns: Column<Lead>[] = [
-    { header: "Candidate name", render: (row) => row.contact_name ?? "—" },
-    { header: "Phone 1", render: (row) => row.phone ?? "—" },
-    { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
-    { header: "Landline", render: (row) => row.landline ?? "—" },
-    { header: "Email", render: (row) => row.email ?? "—" },
-    { header: "Work exp", render: (row) => row.work_experience ?? "—" },
-    { header: "Annual salary", render: (row) => row.annual_salary ?? "—" },
-    { header: "Current location", render: (row) => row.city ?? "—" },
-    { header: "Preferred location", render: (row) => row.preferred_location ?? "—" },
+    { header: "Name", render: (row) => row.contact_name ?? "—" },
     {
-      header: "Current employer",
+      header: "Name of the current company",
       className: "px-3 py-2.5 font-medium text-foreground",
       render: (row) => row.company_name,
     },
-    { header: "Designation", render: (row) => row.designation ?? "—" },
-    { header: "U.G. course", render: (row) => row.ug_course ?? "—" },
-    { header: "P.G. course", render: (row) => row.pg_course ?? "—" },
-    { header: "Post P.G. course", render: (row) => row.post_pg_course ?? "—" },
-    { header: "Age / DOB", render: (row) => row.age_or_dob ?? "—" },
-    { header: "Postal address", render: (row) => row.postal_address ?? "—" },
-    { header: "Last active", render: (row) => row.last_active ?? "—" },
     { header: "Industry", render: (row) => row.industry ?? "—" },
-    { header: "Service interest", render: (row) => row.service_interest ?? "—" },
-    { header: "Source", render: (row) => row.source ?? "—" },
+    { header: "Current location", render: (row) => row.city ?? "—" },
+    { header: "Designation", render: (row) => row.designation ?? "—" },
+    { header: "Phone 1", render: (row) => row.phone ?? "—" },
+    { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
+    { header: "Email ID", render: (row) => row.email ?? "—" },
+    { header: "Landline", render: (row) => row.landline ?? "—" },
+    { header: "Date of birth", render: (row) => row.age_or_dob ?? "—" },
+    { header: "Lead source", render: (row) => row.source ?? "—" },
     {
-      header: "Status",
+      header: "Lead status",
       render: (row) => <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>,
     },
-    { header: "Est. value", render: (row) => currency(row.estimated_value) },
+    { header: "Estimated value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
     { header: "Notes", render: (row) => row.notes ?? "—" },
-    { header: "Created", render: (row) => formatDate(row.created_at) },
   ];
 
   return (
@@ -222,19 +205,10 @@ function LeadsPage() {
               row.phone,
               row.phone_2,
               row.landline,
-              row.work_experience,
-              row.annual_salary,
-              row.preferred_location,
               row.designation,
-              row.ug_course,
-              row.pg_course,
-              row.post_pg_course,
               row.age_or_dob,
-              row.postal_address,
-              row.last_active,
               row.industry,
               row.city,
-              row.service_interest,
               row.source,
               row.notes,
             ]}
@@ -247,7 +221,7 @@ function LeadsPage() {
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
-                  <StatusPill tone="info">{row.service_interest ?? "—"}</StatusPill>
+                  {row.industry ? <StatusPill tone="info">{row.industry}</StatusPill> : null}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {currency(row.estimated_value)} · {row.source ?? "—"}

@@ -162,35 +162,20 @@ export const accountFields: FieldDef[] = [
 ];
 
 export const leadFields: FieldDef[] = [
+  { name: "contact_name", label: "Name" },
   {
     name: "company_name",
-    label: "Company name",
+    label: "Name of the current company",
     required: true,
-    span: 2,
   },
-  { name: "contact_name", label: "Contact person" },
-  { name: "email", label: "Email", type: "email" },
-  { name: "phone", label: "Phone 1", type: "tel" },
-  { name: "phone_2", label: "Phone 2", type: "tel" },
-  { name: "landline", label: "Landline", type: "tel" },
-  { name: "designation", label: "Designation" },
-  { name: "work_experience", label: "Work experience" },
-  { name: "annual_salary", label: "Annual salary" },
   { name: "industry", label: "Industry" },
   { name: "city", label: "Current location" },
-  { name: "preferred_location", label: "Preferred location" },
-  { name: "ug_course", label: "U.G. course" },
-  { name: "pg_course", label: "P.G. course" },
-  { name: "post_pg_course", label: "Post P.G. course" },
-  { name: "age_or_dob", label: "Age / Date of birth" },
-  { name: "postal_address", label: "Postal address", type: "textarea", span: 2 },
-  { name: "last_active", label: "Last active" },
-  {
-    name: "service_interest",
-    label: "Service interest",
-    type: "select",
-    options: opts(SERVICE_LINES),
-  },
+  { name: "designation", label: "Designation" },
+  { name: "phone", label: "Phone 1", type: "tel" },
+  { name: "phone_2", label: "Phone 2", type: "tel" },
+  { name: "email", label: "Email ID", type: "email" },
+  { name: "landline", label: "Landline", type: "tel" },
+  { name: "age_or_dob", label: "Date of birth" },
   { name: "source", label: "Lead source", type: "select", options: opts(LEAD_SOURCES) },
   {
     name: "status",
@@ -202,7 +187,7 @@ export const leadFields: FieldDef[] = [
   },
   { name: "estimated_value", label: "Estimated value (₹)", type: "number" },
   ownerField,
-  { name: "notes", label: "Qualification notes", type: "textarea" },
+  { name: "notes", label: "Notes", type: "textarea", span: 2 },
 ];
 
 export const contactFields = (accounts: Account[]): FieldDef[] => [
