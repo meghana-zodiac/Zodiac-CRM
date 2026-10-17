@@ -24,6 +24,7 @@ import { Route as TrainersRouteImport } from './routes/trainers'
 import { Route as TrainingBatchesRouteImport } from './routes/training-batches'
 import { Route as TrainingRequestsRouteImport } from './routes/training-requests'
 import { Route as ModulesModuleRouteImport } from './routes/modules.$module'
+import { Route as ApiPushDispatchRouteImport } from './routes/api.push.dispatch'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -100,6 +101,11 @@ const ModulesModuleRoute = ModulesModuleRouteImport.update({
   path: '/modules/$module',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPushDispatchRoute = ApiPushDispatchRouteImport.update({
+  id: '/api/push/dispatch',
+  path: '/api/push/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/training-batches': typeof TrainingBatchesRoute
   '/training-requests': typeof TrainingRequestsRoute
   '/modules/$module': typeof ModulesModuleRoute
+  '/api/push/dispatch': typeof ApiPushDispatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/training-batches': typeof TrainingBatchesRoute
   '/training-requests': typeof TrainingRequestsRoute
   '/modules/$module': typeof ModulesModuleRoute
+  '/api/push/dispatch': typeof ApiPushDispatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/training-batches': typeof TrainingBatchesRoute
   '/training-requests': typeof TrainingRequestsRoute
   '/modules/$module': typeof ModulesModuleRoute
+  '/api/push/dispatch': typeof ApiPushDispatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/training-batches'
     | '/training-requests'
     | '/modules/$module'
+    | '/api/push/dispatch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/training-batches'
     | '/training-requests'
     | '/modules/$module'
+    | '/api/push/dispatch'
   id:
     | '__root__'
     | '/'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/training-batches'
     | '/training-requests'
     | '/modules/$module'
+    | '/api/push/dispatch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   TrainingBatchesRoute: typeof TrainingBatchesRoute
   TrainingRequestsRoute: typeof TrainingRequestsRoute
   ModulesModuleRoute: typeof ModulesModuleRoute
+  ApiPushDispatchRoute: typeof ApiPushDispatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -332,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ModulesModuleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/push/dispatch': {
+      id: '/api/push/dispatch'
+      path: '/api/push/dispatch'
+      fullPath: '/api/push/dispatch'
+      preLoaderRoute: typeof ApiPushDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingBatchesRoute: TrainingBatchesRoute,
   TrainingRequestsRoute: TrainingRequestsRoute,
   ModulesModuleRoute: ModulesModuleRoute,
+  ApiPushDispatchRoute: ApiPushDispatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

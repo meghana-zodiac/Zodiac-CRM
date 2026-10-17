@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install --include=dev",
-  "buildCommand": "npm install --include=dev && npm run build"
+  "buildCommand": "npm install --include=dev && npm run build",
+  "crons": [
+    {
+      "path": "/api/push/dispatch",
+      "schedule": "* * * * *"
+    }
+  ]
 }

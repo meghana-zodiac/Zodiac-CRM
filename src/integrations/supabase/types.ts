@@ -245,6 +245,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      activity_push_deliveries: {
+        Row: {
+          activity_id: string;
+          subscription_id: string;
+          reminder_key: string;
+          status: string;
+          sent_at: string | null;
+          error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          activity_id: string;
+          subscription_id: string;
+          reminder_key: string;
+          status?: string;
+          sent_at?: string | null;
+          error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          activity_id?: string;
+          subscription_id?: string;
+          reminder_key?: string;
+          status?: string;
+          sent_at?: string | null;
+          error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       cag_targets: {
         Row: {
           bookings_actual: number;
@@ -817,6 +847,51 @@ export type Database = {
           team_member?: string;
           updated_at?: string;
           vc_meetings?: number;
+        };
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth_key: string;
+          user_agent: string | null;
+          platform: string | null;
+          created_at: string;
+          updated_at: string;
+          last_success_at: string | null;
+          failure_count: number;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth_key: string;
+          user_agent?: string | null;
+          platform?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_success_at?: string | null;
+          failure_count?: number;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth_key?: string;
+          user_agent?: string | null;
+          platform?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_success_at?: string | null;
+          failure_count?: number;
+          revoked_at?: string | null;
         };
         Relationships: [];
       };

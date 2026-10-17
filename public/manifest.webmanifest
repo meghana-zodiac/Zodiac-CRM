@@ -1,0 +1,17 @@
+{
+  "name": "Zodiac CRM",
+  "short_name": "Zodiac CRM",
+  "description": "Zodiac HR Consultants CRM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f2d6b",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

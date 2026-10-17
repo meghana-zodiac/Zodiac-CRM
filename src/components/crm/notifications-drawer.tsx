@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import { activitiesQuery, dealsQuery, formatDateTime, updateRecord } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
+import { PushNotificationControl } from "@/components/crm/push-notification-control";
 
 export type Notification = {
   id: string;
@@ -365,6 +366,8 @@ export function NotificationsDrawer({
           </SheetTitle>
           <SheetDescription>Lead assignments, SLA deadlines and activity alerts.</SheetDescription>
         </SheetHeader>
+
+        <PushNotificationControl />
 
         <div className="flex items-center gap-2 border-b border-border px-5 py-2.5">
           <Button variant="ghost" size="sm" className="gap-1.5" onClick={markAllRead}>
