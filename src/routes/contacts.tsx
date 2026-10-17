@@ -74,6 +74,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 import { supabase } from "@/integrations/supabase/client";
+import { gmailComposeUrl } from "@/lib/contact-links";
 
 type PendingCall = {
   contact: ContactWithAccount;
@@ -692,6 +693,7 @@ function ContactsPage() {
                 />
                 <ContactAction
                   href={openContact.email ? `mailto:${openContact.email}` : null}
+                  desktopHref={openContact.email ? gmailComposeUrl(openContact.email) : null}
                   label="Email"
                   icon={Mail}
                 />
@@ -1066,12 +1068,14 @@ function ContactsPage() {
 
 function ContactAction({
   href,
+  desktopHref,
   label,
   icon: Icon,
   external = false,
   onClick,
 }: {
   href: string | null;
+  desktopHref?: string | null;
   label: string;
   icon: typeof Phone;
   external?: boolean;
@@ -1089,6 +1093,10 @@ function ContactAction({
       aria-label={label}
       onClick={(event) => {
         event.stopPropagation();
+        if (desktopHref && window.matchMedia("(min-width: 768px)").matches) {
+          event.preventDefault();
+          window.open(desktopHref, "_blank", "noopener,noreferrer");
+        }
         onClick?.();
       }}
     >

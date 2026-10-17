@@ -1,6 +1,7 @@
 import { Mail, MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { gmailComposeUrl } from "@/lib/contact-links";
 
 function whatsappNumber(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -36,7 +37,13 @@ export function DesktopContactActions({
       ) : null}
       {email ? (
         <Button asChild size="sm" variant="outline" className={compact ? "px-2" : undefined}>
-          <a href={`mailto:${email}`} aria-label={`Email ${email}`} title="Compose email">
+          <a
+            href={gmailComposeUrl(email)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Email ${email} in Gmail`}
+            title="Compose in Gmail"
+          >
             <Mail className="size-3.5" />
             {compact ? <span className="sr-only">Email</span> : "Email"}
           </a>
