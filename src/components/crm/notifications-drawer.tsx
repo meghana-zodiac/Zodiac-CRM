@@ -107,7 +107,7 @@ export function useNotifications(enabled = true) {
       const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
       const { data, error } = await supabase
         .from("leads")
-        .select("id, company_name, service_interest, owner_name, status, created_at")
+        .select("id, company_name, service_interest, owner_name, status, created_at, created_by")
         .in("status", ["New", "Contacted"])
         .gte("created_at", weekAgo)
         .order("created_at", { ascending: false })
@@ -153,6 +153,7 @@ export function useNotifications(enabled = true) {
     const weekAgo = Date.now() - 7 * 86_400_000;
 
     for (const lead of leads.data ?? []) {
+      if (!lead.created_by || lead.created_by === currentMember.data?.userId) continue;
       if (!showAllOwners && lead.owner_name !== owner) continue;
       if (new Date(lead.created_at).getTime() < weekAgo) continue;
       if (lead.status !== "New" && lead.status !== "Contacted") continue;

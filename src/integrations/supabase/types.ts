@@ -654,6 +654,7 @@ export type Database = {
           comment_5: string | null;
           contact_name: string | null;
           created_at: string;
+          created_by: string | null;
           email: string | null;
           estimated_value: number | null;
           id: string;
@@ -692,6 +693,8 @@ export type Database = {
           comment_5?: string | null;
           contact_name?: string | null;
           created_at?: string;
+          created_by?: string | null;
+          created_by?: string | null;
           email?: string | null;
           estimated_value?: number | null;
           id?: string;
