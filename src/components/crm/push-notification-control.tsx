@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { getWebPushPublicKey } from "@/lib/push-notifications.functions";
 import {
   currentPushSubscription,
@@ -20,11 +21,14 @@ type PushState = "checking" | "unsupported" | "needs-install" | "blocked" | "dis
 export function PushNotificationControl() {
   const [state, setState] = useState<PushState>("checking");
   const [busy, setBusy] = useState(false);
+  const [canTest, setCanTest] = useState(false);
   const getPublicKey = useServerFn(getWebPushPublicKey);
 
   useEffect(() => {
     let active = true;
     const check = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (active) setCanTest(data.user?.email?.toLowerCase() === "meghana@zodiachrc.com");
       if (isIosBrowser() && !isStandaloneWebApp()) return active && setState("needs-install");
       if (!pushSupported()) return active && setState("unsupported");
       if (Notification.permission === "denied") return active && setState("blocked");
@@ -116,7 +120,7 @@ export function PushNotificationControl() {
         </p>
       </div>
       <div className="flex shrink-0 gap-1.5">
-        {state === "enabled" ? (
+        {state === "enabled" && canTest ? (
           <Button size="sm" variant="outline" disabled={busy} onClick={test}>
             Test
           </Button>
