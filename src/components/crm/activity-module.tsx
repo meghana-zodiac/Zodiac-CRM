@@ -98,8 +98,7 @@ export function ActivityModule({
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return all
-      .filter((activity) => {
+    const filtered = all.filter((activity) => {
         if (statusFilter !== "all" && activity.status !== statusFilter) return false;
         if (type === "Task") {
           const group = dueGroup(activity);
@@ -111,8 +110,9 @@ export function ActivityModule({
         return [activity.title, activity.notes, activity.owner_name, activity.related_to_type]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term));
-      })
-      .sort(compareActivityDates);
+      });
+
+    return type === "Task" ? filtered.sort(compareActivityDates) : filtered;
   }, [all, search, statusFilter, ownerFilter, type, dueFilter]);
 
   const taskCounts = useMemo(

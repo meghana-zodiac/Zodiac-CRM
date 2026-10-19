@@ -3,7 +3,6 @@ import {
   BarChart3,
   PieChart,
   Building2,
-  Contact as ContactIcon,
   FileSignature,
   Sparkles,
   GraduationCap,
@@ -48,7 +47,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Corporate Leads", to: "/leads", icon: Sparkles },
       { label: "Corporate Clients", to: "/accounts", icon: Building2 },
-      { label: "Client Contacts", to: "/contacts", icon: ContactIcon },
       { label: "BD Proposals & SLAs", to: "/deals", icon: FileSignature },
       { label: "Daily POA & KRA", to: "/poa", icon: ClipboardList },
       { label: "My Daily EOD", to: "/eod", icon: ClipboardCheck },
