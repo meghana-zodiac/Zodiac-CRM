@@ -37,6 +37,12 @@ export function useOwnerScope() {
 export function GlobalOwnerTabs() {
   const { owner, setOwner } = useOwnerScope();
   const members = useQuery(bdTeamMembersQuery());
+  const isPrimaryAdmin = (members.data ?? []).some(
+    (member) =>
+      member.active &&
+      member.access_status === "approved" &&
+      member.access_role === "primary_admin",
+  );
   const names = useMemo(
     () =>
       (members.data ?? [])
@@ -47,8 +53,13 @@ export function GlobalOwnerTabs() {
   const options: OwnerFilterValue[] = ["all", ...names];
 
   useEffect(() => {
-    if (!members.isLoading && owner !== "all" && !names.includes(owner)) setOwner("all");
-  }, [members.isLoading, names, owner, setOwner]);
+    if (members.isLoading) return;
+    if ((!isPrimaryAdmin && owner !== "all") || (owner !== "all" && !names.includes(owner))) {
+      setOwner("all");
+    }
+  }, [isPrimaryAdmin, members.isLoading, names, owner, setOwner]);
+
+  if (members.isLoading || !isPrimaryAdmin) return null;
 
   return (
     <nav
