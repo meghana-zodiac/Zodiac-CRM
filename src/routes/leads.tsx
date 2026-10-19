@@ -32,6 +32,7 @@ import {
   type Lead,
 } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
+import { currentUserIsPrimaryAdminQuery } from "@/lib/poa";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -60,6 +61,7 @@ function LeadsPage() {
   const runCeipalSync = useServerFn(syncCeipalLeads);
   const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
   const leads = useQuery(leadsQuery());
+  const canImportLeads = useQuery(currentUserIsPrimaryAdminQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
   const [importOpen, setImportOpen] = useState(false);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
@@ -174,7 +176,7 @@ function LeadsPage() {
             ownerOf={(row) => row.owner_name}
             headerAction={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                {tab === "records" ? (
+                {tab === "records" && canImportLeads.data ? (
                   <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                     <FileSpreadsheet className="size-4" /> Import Excel
                   </Button>
@@ -306,11 +308,13 @@ function LeadsPage() {
               <DesktopContactActions phone={row.phone ?? row.phone_2} email={row.email} compact />
             )}
           />
-          <LeadImportDialog
-            open={importOpen}
-            onOpenChange={setImportOpen}
-            leads={leads.data ?? []}
-          />
+          {canImportLeads.data ? (
+            <LeadImportDialog
+              open={importOpen}
+              onOpenChange={setImportOpen}
+              leads={leads.data ?? []}
+            />
+          ) : null}
           <RecordDialog
             open={activityDialogOpen}
             onOpenChange={setActivityDialogOpen}

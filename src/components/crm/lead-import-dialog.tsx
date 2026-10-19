@@ -22,7 +22,7 @@ import {
   toDateInputValue,
   type Lead,
 } from "@/lib/crm";
-import { bdTeamMembersQuery } from "@/lib/poa";
+import { bdTeamMembersQuery, currentUserIsPrimaryAdminQuery } from "@/lib/poa";
 
 type RawRow = Record<string, unknown>;
 type LeadField =
@@ -360,6 +360,7 @@ export function LeadImportDialog({
 }) {
   const queryClient = useQueryClient();
   const teamMembers = useQuery(bdTeamMembersQuery());
+  const canImportLeads = useQuery(currentUserIsPrimaryAdminQuery());
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -416,6 +417,11 @@ export function LeadImportDialog({
 
   const readFile = async (file?: File) => {
     if (!file) return;
+    if (!canImportLeads.data) {
+      toast.error("Only primary administrators can upload corporate leads.");
+      reset();
+      return;
+    }
     try {
       const buffer = await file.arrayBuffer();
       const ownerNames = (teamMembers.data ?? [])
@@ -479,6 +485,10 @@ export function LeadImportDialog({
   };
 
   const importRows = async () => {
+    if (!canImportLeads.data) {
+      toast.error("Only primary administrators can upload corporate leads.");
+      return;
+    }
     setImporting(true);
     try {
       const checkedRows = markDuplicates(

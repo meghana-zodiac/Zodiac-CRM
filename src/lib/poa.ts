@@ -47,6 +47,26 @@ export const currentUserEmailQuery = () =>
     staleTime: Infinity,
   });
 
+export const currentUserIsPrimaryAdminQuery = () =>
+  queryOptions({
+    queryKey: ["current_user_primary_admin"],
+    queryFn: async () => {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw new Error(authError.message);
+      if (!authData.user) return false;
+
+      const { data, error } = await supabase
+        .from("bd_team_members")
+        .select("access_status,access_role")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+
+      return data?.access_status === "approved" && data?.access_role === "primary_admin";
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
 export const cagMonthlySummaryQuery = () =>
   queryOptions({
     queryKey: ["cag_monthly_summary"],
