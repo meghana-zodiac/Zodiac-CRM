@@ -15,6 +15,7 @@ import {
   BD_STAGES,
   TRAINING_STATUSES,
   activitiesQuery,
+  compareActivityDates,
   currency,
   dashboardOverviewQuery,
   dealsQuery,
@@ -109,7 +110,10 @@ function HomePage() {
     ),
   );
 
-  const upcoming = activityList.filter((activity) => activity.status !== "Completed").slice(0, 6);
+  const upcoming = activityList
+    .filter((activity) => activity.status !== "Completed")
+    .sort(compareActivityDates)
+    .slice(0, 6);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { formatDateTime } from "@/lib/crm";
@@ -15,48 +15,43 @@ function duration(seconds: number | null) {
 }
 
 export function CallLogsPanel() {
-  const [rows, setRows] = useState<CallLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    setLoading(true);
-    const { data, error } = await supabase.from("call_logs").select("*");
-    if (error) setError(error.message);
-    else {
-      setError(null);
-      setRows((data ?? []) as CallLog[]);
-    }
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
+  const logs = useQuery({
+    queryKey: ["call-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("call_logs")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as CallLog[];
+    },
+  });
+  const rows = logs.data ?? [];
 
   return (
     <section className="rounded-xl border border-border bg-card">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Phone className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Device Call Logs</h2>
+          <h2 className="text-sm font-semibold">CRM &amp; Device Call Logs</h2>
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             {rows.length}
           </span>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => void load()}>
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="ghost" size="sm" onClick={() => void logs.refetch()}>
+          <RefreshCw className={`size-4 ${logs.isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </header>
 
-      {error ? (
-        <p className="px-4 py-6 text-sm text-destructive">{error}</p>
-      ) : loading ? (
+      {logs.error ? (
+        <p className="px-4 py-6 text-sm text-destructive">{logs.error.message}</p>
+      ) : logs.isLoading ? (
         <p className="px-4 py-6 text-sm text-muted-foreground">Loading call logs…</p>
       ) : rows.length === 0 ? (
         <p className="px-4 py-6 text-sm text-muted-foreground">
-          No call logs captured yet. Incoming webhook records will appear here.
+          No call logs captured yet. Calls saved from the CRM and incoming device records will
+          appear here.
         </p>
       ) : (
         <>

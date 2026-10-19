@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { RecordDialog } from "./record-dialog";
 import { activityFields } from "./field-defs";
 import { bdTeamMembersQuery } from "@/lib/poa";
-import { activitiesQuery, formatDateTime, type Activity } from "@/lib/crm";
+import { activitiesQuery, compareActivityDates, formatDateTime, type Activity } from "@/lib/crm";
 import { supabase } from "@/integrations/supabase/client";
 
 type RepFilter = "mine" | "all" | string;
@@ -113,7 +113,7 @@ export function ScheduleDrawer({
         if (type === "meeting") return a.activity_type === "Meeting";
         return a.activity_type === "Meeting" && (type === "vc") === isVirtual(a);
       })
-      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+      .sort(compareActivityDates);
   }, [activities.data, currentMember.data?.display_name, rep, type]);
 
   const groups = useMemo(() => {

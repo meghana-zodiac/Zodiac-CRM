@@ -16,6 +16,7 @@ import {
   ACTIVITY_STATUSES,
   activityRelatedRecordsQuery,
   activitiesQuery,
+  compareActivityDates,
   dueBadge,
   formatDateTime,
   updateRecord,
@@ -97,19 +98,21 @@ export function ActivityModule({
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return all.filter((activity) => {
-      if (statusFilter !== "all" && activity.status !== statusFilter) return false;
-      if (type === "Task") {
-        const group = dueGroup(activity);
-        if (dueFilter === "open" && group === "completed") return false;
-        if (dueFilter !== "all" && dueFilter !== "open" && group !== dueFilter) return false;
-      }
-      if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
-      if (!term) return true;
-      return [activity.title, activity.notes, activity.owner_name, activity.related_to_type]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
-    });
+    return all
+      .filter((activity) => {
+        if (statusFilter !== "all" && activity.status !== statusFilter) return false;
+        if (type === "Task") {
+          const group = dueGroup(activity);
+          if (dueFilter === "open" && group === "completed") return false;
+          if (dueFilter !== "all" && dueFilter !== "open" && group !== dueFilter) return false;
+        }
+        if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
+        if (!term) return true;
+        return [activity.title, activity.notes, activity.owner_name, activity.related_to_type]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term));
+      })
+      .sort(compareActivityDates);
   }, [all, search, statusFilter, ownerFilter, type, dueFilter]);
 
   const taskCounts = useMemo(
