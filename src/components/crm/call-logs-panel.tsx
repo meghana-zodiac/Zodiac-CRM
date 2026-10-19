@@ -17,6 +17,7 @@ function duration(seconds: number | null) {
 export function CallLogsPanel() {
   const logs = useQuery({
     queryKey: ["call-logs"],
+    staleTime: 15_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("call_logs")
