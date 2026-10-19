@@ -441,7 +441,7 @@ export function CrmShell({
           </div>
         </header>
 
-        <GlobalOwnerTabs />
+        <GlobalOwnerTabs isAdmin={isAdmin} />
 
         <main key={pathname} className="crm-route-enter min-w-0 flex-1 pb-20 md:pb-0">
           {children}

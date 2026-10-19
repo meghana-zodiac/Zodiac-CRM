@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { bdTeamMembersQuery } from "@/lib/poa";
+import { bdTeamMembersQuery, currentUserEmailQuery } from "@/lib/poa";
 import { cn } from "@/lib/utils";
 
 export type OwnerFilterValue = "all" | string;
@@ -34,15 +34,10 @@ export function useOwnerScope() {
   return context;
 }
 
-export function GlobalOwnerTabs() {
+export function GlobalOwnerTabs({ isAdmin }: { isAdmin: boolean }) {
   const { owner, setOwner } = useOwnerScope();
   const members = useQuery(bdTeamMembersQuery());
-  const isPrimaryAdmin = (members.data ?? []).some(
-    (member) =>
-      member.active &&
-      member.access_status === "approved" &&
-      member.access_role === "primary_admin",
-  );
+  const currentUserEmail = useQuery(currentUserEmailQuery());
   const names = useMemo(
     () =>
       (members.data ?? [])
@@ -50,16 +45,40 @@ export function GlobalOwnerTabs() {
         .map((member) => member.display_name),
     [members.data],
   );
+  const currentMember = useMemo(
+    () =>
+      (members.data ?? []).find(
+        (member) =>
+          member.active &&
+          member.access_status === "approved" &&
+          member.email.toLowerCase() === currentUserEmail.data,
+      ),
+    [currentUserEmail.data, members.data],
+  );
   const options: OwnerFilterValue[] = ["all", ...names];
 
   useEffect(() => {
-    if (members.isLoading) return;
-    if ((!isPrimaryAdmin && owner !== "all") || (owner !== "all" && !names.includes(owner))) {
-      setOwner("all");
-    }
-  }, [isPrimaryAdmin, members.isLoading, names, owner, setOwner]);
+    if (members.isLoading || currentUserEmail.isLoading) return;
 
-  if (members.isLoading || !isPrimaryAdmin) return null;
+    if (!isAdmin) {
+      if (currentMember && owner !== currentMember.display_name) {
+        setOwner(currentMember.display_name);
+      }
+      return;
+    }
+
+    if (owner !== "all" && !names.includes(owner)) setOwner("all");
+  }, [
+    currentMember,
+    currentUserEmail.isLoading,
+    isAdmin,
+    members.isLoading,
+    names,
+    owner,
+    setOwner,
+  ]);
+
+  if (members.isLoading || currentUserEmail.isLoading || !isAdmin) return null;
 
   return (
     <nav
