@@ -251,16 +251,30 @@ function splitContactNumbers(raw: string) {
   };
 }
 
+function normalizedOwnerName(value: string) {
+  return clean(value)
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function resolvedOwner(value: string, ownerNames: string[]) {
   if (!value) return { value: null, error: "" };
-  const normalized = clean(value).toLowerCase();
-  const exact = ownerNames.find((name) => name.toLowerCase() === normalized);
+
+  const normalized = normalizedOwnerName(value);
+  const exact = ownerNames.find((name) => normalizedOwnerName(name) === normalized);
   if (exact) return { value: exact, error: "" };
-  const partial = ownerNames.filter((name) => {
-    const candidate = name.toLowerCase();
-    return candidate.split(/\s+/)[0] === normalized || candidate.startsWith(`${normalized} `);
-  });
+
+  const firstName = normalized.split(" ")[0];
+  const partial = ownerNames.filter(
+    (name) => normalizedOwnerName(name).split(" ")[0] === firstName,
+  );
   if (partial.length === 1) return { value: partial[0]!, error: "" };
+  if (partial.length > 1) {
+    return { value: null, error: `Multiple owners match: ${value}. Please select one.` };
+  }
   return { value: null, error: `Unknown owner: ${value}` };
 }
 
