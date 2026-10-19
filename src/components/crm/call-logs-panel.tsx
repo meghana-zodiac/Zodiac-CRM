@@ -51,8 +51,7 @@ export function CallLogsPanel() {
         <p className="px-4 py-6 text-sm text-muted-foreground">Loading call logs…</p>
       ) : rows.length === 0 ? (
         <p className="px-4 py-6 text-sm text-muted-foreground">
-          No call logs captured yet. Calls saved from the CRM and incoming device records will
-          appear here.
+          No call logs captured yet. Calls saved from the CRM and incoming device records will appear here.
         </p>
       ) : (
         <>

@@ -44,6 +44,7 @@ import {
 } from "@/components/crm/module-chrome";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
+import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
 import { ApolloProspector } from "@/components/crm/apollo-prospector";
 import {
@@ -73,6 +74,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 import { supabase } from "@/integrations/supabase/client";
+import { gmailComposeUrl } from "@/lib/contact-links";
 
 type PendingCall = {
   contact: ContactWithAccount;
@@ -174,6 +176,8 @@ function ContactsPage() {
         fullName(contact.first_name, contact.last_name),
         contact.email,
         contact.phone,
+        contact.phone_2,
+        contact.landline,
         contact.accounts?.name,
         contact.title,
       ]
@@ -326,10 +330,11 @@ function ContactsPage() {
         duration_seconds: elapsedSeconds,
         created_at: details.started_at,
       });
-      if (callLogError)
+      if (callLogError) {
         throw new Error(
           `The CRM activity was saved, but the Call Log failed: ${callLogError.message}`,
         );
+      }
 
       if (followUpAt) {
         await createRecord("activities", {
@@ -458,6 +463,12 @@ function ContactsPage() {
                         <div>{contact.phone ?? "—"}</div>
                         <div>Last activity {formatDate(contact.last_activity_date)}</div>
                       </dl>
+                      <div
+                        className="mt-3 border-t border-border pt-3"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <DesktopContactActions phone={contact.phone} email={contact.email} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -556,6 +567,7 @@ function ContactsPage() {
                           <th className="px-3 py-2.5">Phone</th>
                           <th className="px-3 py-2.5">Owner</th>
                           <th className="px-3 py-2.5">Last activity</th>
+                          <th className="px-3 py-2.5">Contact</th>
                           <th className="w-12 px-3 py-2.5" />
                         </tr>
                       </thead>
@@ -604,6 +616,16 @@ function ContactsPage() {
                             </td>
                             <td className="px-3 py-2.5 text-muted-foreground">
                               {formatDate(contact.last_activity_date)}
+                            </td>
+                            <td
+                              className="whitespace-nowrap px-3 py-2.5"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <DesktopContactActions
+                                phone={contact.phone}
+                                email={contact.email}
+                                compact
+                              />
                             </td>
                             <td
                               className="px-3 py-2.5"
@@ -685,6 +707,7 @@ function ContactsPage() {
                 />
                 <ContactAction
                   href={openContact.email ? `mailto:${openContact.email}` : null}
+                  desktopHref={openContact.email ? gmailComposeUrl(openContact.email) : null}
                   label="Email"
                   icon={Mail}
                 />
@@ -731,7 +754,9 @@ function ContactsPage() {
                 {profileTab === "details" ? (
                   <>
                     <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-panel">
-                      <ContactDetail icon={Phone} label="Phone" value={openContact.phone} />
+                      <ContactDetail icon={Phone} label="Phone 1" value={openContact.phone} />
+                      <ContactDetail icon={Phone} label="Phone 2" value={openContact.phone_2} />
+                      <ContactDetail icon={Phone} label="Landline" value={openContact.landline} />
                       <ContactDetail icon={Mail} label="Email" value={openContact.email} />
                       <ContactDetail
                         icon={Building2}
@@ -1057,12 +1082,14 @@ function ContactsPage() {
 
 function ContactAction({
   href,
+  desktopHref,
   label,
   icon: Icon,
   external = false,
   onClick,
 }: {
   href: string | null;
+  desktopHref?: string | null;
   label: string;
   icon: typeof Phone;
   external?: boolean;
@@ -1080,6 +1107,10 @@ function ContactAction({
       aria-label={label}
       onClick={(event) => {
         event.stopPropagation();
+        if (desktopHref && window.matchMedia("(min-width: 768px)").matches) {
+          event.preventDefault();
+          window.open(desktopHref, "_blank", "noopener,noreferrer");
+        }
         onClick?.();
       }}
     >
