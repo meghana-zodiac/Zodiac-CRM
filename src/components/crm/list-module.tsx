@@ -337,7 +337,7 @@ export function ListModule<T extends { id: string }>({
                 </div>
                 <div
                   ref={tableScrollRef}
-                  className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel"
+                  className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   onScroll={(event) => syncHorizontalScroll(event, topScrollRef)}
                 >
                 <table className="w-full text-sm" style={{ minWidth }}>
