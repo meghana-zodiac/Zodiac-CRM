@@ -40,6 +40,7 @@ type Member = {
   access_role: "primary_admin" | "bd_member";
   active: boolean;
   device_access_required: boolean;
+  device_limit: number;
   created_at: string;
 };
 
@@ -74,7 +75,7 @@ export function AccessManagement({
       const { data, error } = await supabase
         .from("bd_team_members")
         .select(
-          "id,email,display_name,access_status,access_role,active,device_access_required,created_at",
+          "id,email,display_name,access_status,access_role,active,device_access_required,device_limit,created_at",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -206,7 +207,7 @@ export function AccessManagement({
                   {member.device_access_required
                     ? "Required for every login"
                     : "Restriction not enabled"}{" "}
-                  · {memberDevices.length}/2 active
+                  · {memberDevices.length}/{member.device_limit} active
                 </p>
               </div>
               <Button

@@ -122,15 +122,24 @@ export const enrollCrmDevice = createServerFn({ method: "POST" })
       throw new Error("This enrolment code is invalid or has expired.");
     }
 
+    const { data: member, error: memberError } = await supabase
+      .from("bd_team_members")
+      .select("device_limit")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (memberError || !member) {
+      throw new Error("CRM membership could not be verified.");
+    }
+
     const { count } = await supabase
       .from("crm_devices")
       .select("id", { count: "exact", head: true })
       .eq("user_id", context.userId)
       .is("revoked_at", null)
       .gt("expires_at", now);
-    if ((count ?? 0) >= 2) {
+    if ((count ?? 0) >= member.device_limit) {
       throw new Error(
-        "This account already has two approved devices. Ask an administrator to revoke one first.",
+        `This account already has ${member.device_limit} approved devices. Ask an administrator to revoke one first.`,
       );
     }
 

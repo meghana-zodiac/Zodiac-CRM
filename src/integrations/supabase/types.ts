@@ -16,6 +16,7 @@ export type Database = {
           created_at: string;
           display_name: string;
           device_access_required: boolean;
+          device_limit: number;
           email: string;
           id: string;
           reviewed_at: string | null;
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string;
           display_name: string;
           device_access_required?: boolean;
+          device_limit?: number;
           email: string;
           id: string;
           reviewed_at?: string | null;
@@ -42,6 +44,7 @@ export type Database = {
           created_at?: string;
           display_name?: string;
           device_access_required?: boolean;
+          device_limit?: number;
           email?: string;
           id?: string;
           reviewed_at?: string | null;
