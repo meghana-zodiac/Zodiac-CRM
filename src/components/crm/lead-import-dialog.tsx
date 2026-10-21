@@ -19,6 +19,7 @@ import {
   LEAD_SOURCES,
   LEAD_STATUSES,
   formatDateOnly,
+  normalizeLeadSource,
   toDateInputValue,
   type Lead,
 } from "@/lib/crm";
@@ -314,7 +315,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
     const landline = nullable(valueFor(row, "landline")) ?? detectedPhones.landline;
     const owner = resolvedOwner(valueFor(row, "owner_name"), ownerNames);
     const status = statusRaw ? enumValue(statusRaw, LEAD_STATUSES) : "New";
-    const sourceValue = sourceRaw ? enumValue(sourceRaw, LEAD_SOURCES) : null;
+    const sourceValue = normalizeLeadSource(sourceRaw);
     const errors = [
       !companyName ? "Company name is required" : "",
       statusRaw && !status ? `Unknown status: ${statusRaw}` : "",
@@ -570,7 +571,8 @@ export function LeadImportDialog({
               <FileSpreadsheet className="mx-auto size-9 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Upload .xlsx, .xls, or .csv</p>
               <p className="text-xs text-muted-foreground">
-                Current Company is required. Missing Lead Status defaults to New.
+                Current Company is required. Lead Source is optional. Missing Lead Status defaults
+                to New.
               </p>
             </div>
           ) : (
@@ -613,7 +615,8 @@ export function LeadImportDialog({
                   </Button>
                   {previewFilter === "invalid" ? (
                     <p className="text-xs text-muted-foreground">
-                      Enter the missing company. Corrected rows become valid automatically.
+                      Review the Result column for the exact issue. Corrected rows become valid
+                      automatically.
                     </p>
                   ) : null}
                 </div>
