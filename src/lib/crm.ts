@@ -104,6 +104,17 @@ export const LEAD_SOURCES = [
   "Naukri Resdex",
 ] as const;
 
+export function normalizeLeadSource(value: string): (typeof LEAD_SOURCES)[number] | null {
+  const normalized = value.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+
+  if (!normalized) return null;
+  if (["naukri", "naukri com", "naukri resdex"].includes(normalized)) {
+    return "Naukri Resdex";
+  }
+
+  return LEAD_SOURCES.find((source) => source.toLowerCase() === normalized) ?? null;
+}
+
 export const TRAINING_TYPES = ["Technical", "Soft Skills"] as const;
 export const BATCH_STATUSES = ["Scheduled", "In Progress", "Completed", "Cancelled"] as const;
 export const ACTIVITY_STATUSES = ["Pending", "In Progress", "Completed"] as const;
