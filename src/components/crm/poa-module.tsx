@@ -938,23 +938,6 @@ export function PoaModule() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <div className="flex w-full max-w-full items-center overflow-x-auto overscroll-x-contain rounded-md border border-input bg-background p-0.5 lg:w-auto lg:flex-1">
-          {navigationMembers.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setMember(name)}
-              className={cn(
-                "whitespace-nowrap rounded px-3 py-1 text-xs font-medium",
-                member === name
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
         <Button
           variant="outline"
           size="sm"
