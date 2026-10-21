@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,21 @@ export function ListModule<T extends { id: string }>({
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
   const compactColumns = mobileColumns ?? columns;
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const syncingScrollRef = useRef(false);
+
+  const syncHorizontalScroll = (
+    source: React.UIEvent<HTMLDivElement>,
+    target: React.RefObject<HTMLDivElement | null>,
+  ) => {
+    if (syncingScrollRef.current || !target.current) return;
+    syncingScrollRef.current = true;
+    target.current.scrollLeft = source.currentTarget.scrollLeft;
+    requestAnimationFrame(() => {
+      syncingScrollRef.current = false;
+    });
+  };
 
   const filtered = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
@@ -311,7 +326,20 @@ export function ListModule<T extends { id: string }>({
                   </article>
                 ))}
               </div>
-              <div className="crm-table-scroll hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel md:block">
+              <div className="relative hidden md:block">
+                <div
+                  ref={topScrollRef}
+                  className="sticky top-[3.5rem] z-20 mb-1 h-4 overflow-x-auto overscroll-x-contain rounded border border-border bg-surface/95 shadow-sm backdrop-blur"
+                  onScroll={(event) => syncHorizontalScroll(event, tableScrollRef)}
+                  aria-label="Horizontal table scroll"
+                >
+                  <div style={{ width: minWidth, height: 1 }} />
+                </div>
+                <div
+                  ref={tableScrollRef}
+                  className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel"
+                  onScroll={(event) => syncHorizontalScroll(event, topScrollRef)}
+                >
                 <table className="w-full text-sm" style={{ minWidth }}>
                   <thead>
                     <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -360,6 +388,7 @@ export function ListModule<T extends { id: string }>({
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
