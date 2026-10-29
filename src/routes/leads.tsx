@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -27,11 +27,11 @@ import {
   LEAD_STATUSES,
   currency,
   formatDateOnly,
-  leadsQuery,
   type ActivityType,
   type Lead,
 } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -55,26 +55,55 @@ export const Route = createFileRoute("/leads")({
   component: LeadsPage,
 });
 
+const LEADS_PAGE_SIZE = 500;
+type LeadOrigin = "uploaded" | "ceipal";
+
+async function fetchLeadsByOrigin(origin: LeadOrigin) {
+  const records: Lead[] = [];
+
+  for (let from = 0; ; from += LEADS_PAGE_SIZE) {
+    let request = supabase.from("leads").select("*");
+    request =
+      origin === "ceipal"
+        ? request.or("ceipal_id.not.is.null,source.ilike.CEIPAL")
+        : request.is("ceipal_id", null).or("source.is.null,source.not.ilike.CEIPAL");
+
+    const { data, error } = await request
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + LEADS_PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as Lead[];
+    records.push(...page);
+    if (page.length < LEADS_PAGE_SIZE) break;
+  }
+
+  return records;
+}
+
 function LeadsPage() {
   const queryClient = useQueryClient();
   const runCeipalSync = useServerFn(syncCeipalLeads);
   const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
-  const leads = useQuery(leadsQuery());
   const [tab, setTab] = useState<ModuleTab>("records");
+  const uploadedLeads = useQuery({
+    queryKey: ["leads", "uploaded"],
+    queryFn: () => fetchLeadsByOrigin("uploaded"),
+    retry: 2,
+  });
+  const ceipalLeads = useQuery({
+    queryKey: ["leads", "ceipal"],
+    queryFn: () => fetchLeadsByOrigin("ceipal"),
+    enabled: tab === "ceipal",
+    retry: 2,
+  });
   const [importOpen, setImportOpen] = useState(false);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [activityType, setActivityType] = useState<ActivityType>("Task");
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
-  const { uploadedLeads, ceipalLeads } = useMemo(() => {
-    const uploaded: Lead[] = [];
-    const ceipal: Lead[] = [];
-    for (const lead of leads.data ?? []) {
-      if (lead.ceipal_id || lead.source?.toLowerCase() === "ceipal") ceipal.push(lead);
-      else uploaded.push(lead);
-    }
-    return { uploadedLeads: uploaded, ceipalLeads: ceipal };
-  }, [leads.data]);
+  const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const ceipalLeadSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async (result) => {
@@ -137,8 +166,11 @@ function LeadsPage() {
         onChange={setTab}
         recordsLabel="Uploaded Leads"
         tabs={[
-          { id: "records", label: `Uploaded Leads (${uploadedLeads.length})` },
-          { id: "ceipal", label: `CEIPAL Sync (${ceipalLeads.length})` },
+          { id: "records", label: `Uploaded Leads (${uploadedLeads.data?.length ?? 0})` },
+          {
+            id: "ceipal",
+            label: ceipalLeads.data ? `CEIPAL Sync (${ceipalLeads.data.length})` : "CEIPAL Sync",
+          },
           { id: "apollo", label: "Find Contacts via Apollo" },
         ]}
       />
@@ -146,14 +178,27 @@ function LeadsPage() {
         <ApolloProspector target="leads" />
       ) : (
         <>
-          <ListModule<Lead>
+          {activeLeadsQuery.isError ? (
+            <div className="mx-4 mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Leads could not be loaded. Please try again.
+              <Button
+                className="ml-3"
+                size="sm"
+                variant="outline"
+                onClick={() => activeLeadsQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : null}
+                    <ListModule<Lead>
             title={tab === "ceipal" ? "CEIPAL Leads" : "Uploaded Leads"}
             createLabel="Add Lead"
             recordLabel="Lead"
             table="leads"
             fields={leadFields}
-            rows={tab === "ceipal" ? ceipalLeads : uploadedLeads}
-            isLoading={leads.isLoading}
+            rows={tab === "ceipal" ? (ceipalLeads.data ?? []) : (uploadedLeads.data ?? [])}
+            isLoading={activeLeadsQuery.isLoading}
             columns={columns}
             mobileColumns={[
               { header: "HR / Contact", render: (row) => row.contact_name ?? "—" },
@@ -309,7 +354,7 @@ function LeadsPage() {
           <LeadImportDialog
             open={importOpen}
             onOpenChange={setImportOpen}
-            leads={leads.data ?? []}
+            leads={uploadedLeads.data ?? []}
           />
           <RecordDialog
             open={activityDialogOpen}
