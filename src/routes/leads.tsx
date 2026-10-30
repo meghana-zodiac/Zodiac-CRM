@@ -21,6 +21,13 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { activityFields } from "@/components/crm/field-defs";
 import {
@@ -54,6 +61,104 @@ export const Route = createFileRoute("/leads")({
   }),
   component: LeadsPage,
 });
+
+const CALL_STATUSES = [
+  "Interested",
+  "Not Interested",
+  "Follow-up Required",
+  "Call Back",
+  "No Response",
+  "Busy",
+  "Wrong Number",
+  "Converted / Closed",
+] as const;
+
+type CallStatus = (typeof CALL_STATUSES)[number];
+
+const CALL_STATUS_STYLE: Record<CallStatus, { pill: string; dot: string; row: string }> = {
+  Interested: {
+    pill: "border-emerald-300 bg-emerald-100 text-emerald-800",
+    dot: "bg-emerald-500",
+    row: "bg-emerald-50/80 hover:bg-emerald-100/70",
+  },
+  "Not Interested": {
+    pill: "border-rose-300 bg-rose-100 text-rose-800",
+    dot: "bg-rose-500",
+    row: "bg-rose-50/80 hover:bg-rose-100/70",
+  },
+  "Follow-up Required": {
+    pill: "border-amber-300 bg-amber-100 text-amber-800",
+    dot: "bg-amber-500",
+    row: "bg-amber-50/80 hover:bg-amber-100/70",
+  },
+  "Call Back": {
+    pill: "border-orange-300 bg-orange-100 text-orange-800",
+    dot: "bg-orange-500",
+    row: "bg-orange-50/80 hover:bg-orange-100/70",
+  },
+  "No Response": {
+    pill: "border-slate-300 bg-slate-100 text-slate-700",
+    dot: "bg-slate-500",
+    row: "bg-slate-50/90 hover:bg-slate-100/80",
+  },
+  Busy: {
+    pill: "border-violet-300 bg-violet-100 text-violet-800",
+    dot: "bg-violet-500",
+    row: "bg-violet-50/80 hover:bg-violet-100/70",
+  },
+  "Wrong Number": {
+    pill: "border-red-300 bg-red-100 text-red-800",
+    dot: "bg-red-600",
+    row: "bg-red-50/80 hover:bg-red-100/70",
+  },
+  "Converted / Closed": {
+    pill: "border-blue-300 bg-blue-100 text-blue-800",
+    dot: "bg-blue-600",
+    row: "bg-blue-50/80 hover:bg-blue-100/70",
+  },
+};
+
+function isCallStatus(value: string | null): value is CallStatus {
+  return CALL_STATUSES.includes(value as CallStatus);
+}
+
+function leadCallStatusRowClass(status: string | null) {
+  return isCallStatus(status) ? CALL_STATUS_STYLE[status].row : "";
+}
+
+function CallStatusSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | null;
+  onChange: (status: CallStatus) => void;
+  disabled?: boolean;
+}) {
+  const selected = isCallStatus(value) ? value : null;
+  return (
+    <div onClick={(event) => event.stopPropagation()}>
+      <Select value={selected ?? undefined} onValueChange={(status) => onChange(status as CallStatus)} disabled={disabled}>
+        <SelectTrigger
+          className={`h-9 min-w-48 border ${selected ? CALL_STATUS_STYLE[selected].pill : "bg-surface"}`}
+          aria-label="Call status"
+        >
+          <SelectValue placeholder="Select status" />
+        </SelectTrigger>
+        <SelectContent>
+          {CALL_STATUSES.map((status) => (
+            <SelectItem key={status} value={status}>
+              <span className="flex items-center gap-2">
+                <span className={`size-2.5 rounded-full ${CALL_STATUS_STYLE[status].dot}`} />
+                {status}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 const LEADS_PAGE_SIZE = 500;
 type LeadOrigin = "uploaded" | "ceipal";
@@ -104,6 +209,16 @@ function LeadsPage() {
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
+  const callStatusUpdate = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: CallStatus }) => {
+      const { error } = await supabase.from("leads").update({ call_status: status }).eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error: Error) => toast.error(`Call status could not be updated: ${error.message}`),
+  });
   const ceipalLeadSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async (result) => {
@@ -153,6 +268,17 @@ function LeadsPage() {
     {
       header: "Lead status",
       render: (row) => <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>,
+    },
+    {
+      header: "Call status",
+      className: "whitespace-nowrap px-3 py-2.5",
+      render: (row) => (
+        <CallStatusSelect
+          value={row.call_status}
+          disabled={callStatusUpdate.isPending}
+          onChange={(status) => callStatusUpdate.mutate({ id: row.id, status })}
+        />
+      ),
     },
     { header: "Estimated value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
@@ -210,7 +336,9 @@ function LeadsPage() {
               { header: "Designation", render: (row) => row.designation ?? "—" },
               { header: "Location", render: (row) => row.city ?? "—" },
             ]}
-            minWidth={3900}
+            minWidth={4200}
+            showSerialNumbers
+            rowClassName={(row) => leadCallStatusRowClass(row.call_status)}
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
@@ -299,7 +427,13 @@ function LeadsPage() {
               };
 
               return (
-                <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
+                <div className="space-y-2">
+                  <CallStatusSelect
+                    value={row.call_status}
+                    disabled={callStatusUpdate.isPending}
+                    onChange={(status) => callStatusUpdate.mutate({ id: row.id, status })}
+                  />
+                  <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
                     <a
                       key={label}
@@ -344,6 +478,7 @@ function LeadsPage() {
                   >
                     <Clock3 className="size-3.5" /> Follow-up
                   </button>
+                  </div>
                 </div>
               );
             }}
