@@ -47,6 +47,8 @@ export function ListModule<T extends { id: string }>({
   headerAction,
   allowCreate = true,
   filterPlacement = "sidebar",
+  rowClassName,
+  showSerialNumbers = false,
 }: {
   title: string;
   createLabel: string;
@@ -70,6 +72,8 @@ export function ListModule<T extends { id: string }>({
   headerAction?: React.ReactNode;
   allowCreate?: boolean;
   filterPlacement?: "sidebar" | "toolbar";
+  rowClassName?: (row: T) => string;
+  showSerialNumbers?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
@@ -237,7 +241,7 @@ export function ListModule<T extends { id: string }>({
               {visibleRows.map((row) => (
                 <div
                   key={row.id}
-                  className="cursor-pointer rounded-lg border border-border bg-surface p-4 shadow-panel transition-all hover:border-brand-accent/50 hover:shadow-card-hover"
+                  className={`cursor-pointer rounded-lg border border-border bg-surface p-4 shadow-panel transition-all hover:border-brand-accent/50 hover:shadow-card-hover ${rowClassName?.(row) ?? ""}`}
                   onClick={() => openDetails(row)}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -273,10 +277,10 @@ export function ListModule<T extends { id: string }>({
           ) : (
             <>
               <div className="space-y-2.5 md:hidden">
-                {visibleRows.map((row) => (
+                {visibleRows.map((row, rowIndex) => (
                   <article
                     key={row.id}
-                    className="cursor-pointer overflow-hidden rounded-xl border border-border bg-surface shadow-panel transition-shadow active:shadow-none"
+                    className={`cursor-pointer overflow-hidden rounded-xl border border-border bg-surface shadow-panel transition-shadow active:shadow-none ${rowClassName?.(row) ?? ""}`}
                     onClick={() => openDetails(row)}
                   >
                     <div className="flex items-start gap-3 p-3.5">
@@ -286,8 +290,15 @@ export function ListModule<T extends { id: string }>({
                         className="min-w-0 flex-1 text-left"
                       >
                         <div className="mb-2.5 flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-[15px] font-semibold leading-5 text-foreground">
+                          <div className="flex min-w-0 items-start gap-2">
+                            {showSerialNumbers ? (
+                              <span className="mt-0.5 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
+                                #{(page - 1) * ROWS_PER_PAGE + rowIndex + 1}
+                              </span>
+                            ) : null}
+                            <div className="min-w-0 text-[15px] font-semibold leading-5 text-foreground">
                             {compactColumns[0]?.render(row)}
+                            </div>
                           </div>
                         </div>
                         <dl className="grid gap-2">
@@ -343,6 +354,7 @@ export function ListModule<T extends { id: string }>({
                 <table className="w-full text-sm" style={{ minWidth }}>
                   <thead>
                     <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {showSerialNumbers ? <th className="w-20 px-3 py-2.5">Sr. No.</th> : null}
                       {columns.map((column) => (
                         <th key={column.header} className="px-3 py-2.5">
                           {column.header}
@@ -353,12 +365,17 @@ export function ListModule<T extends { id: string }>({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {visibleRows.map((row) => (
+                    {visibleRows.map((row, rowIndex) => (
                       <tr
                         key={row.id}
-                        className="cursor-pointer transition-colors hover:bg-muted/40"
+                        className={`cursor-pointer transition-colors hover:bg-muted/40 ${rowClassName?.(row) ?? ""}`}
                         onClick={() => openDetails(row)}
                       >
+                        {showSerialNumbers ? (
+                          <td className="px-3 py-2.5 font-medium tabular-nums text-muted-foreground">
+                            {(page - 1) * ROWS_PER_PAGE + rowIndex + 1}
+                          </td>
+                        ) : null}
                         {columns.map((column) => (
                           <td
                             key={column.header}
