@@ -379,22 +379,33 @@ function LeadsPage() {
   });
 
   const columns: Column<Lead>[] = [
-    { header: "Name", inlineEditable: true, render: (row) => inlineCell(row, "contact_name") },
+    {
+      header: "Name",
+      className: "w-56 max-w-56 truncate px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "contact_name"),
+    },
     {
       header: "Current company",
-      className: "px-3 py-2.5 font-medium text-foreground",
+      className: "w-72 max-w-72 truncate px-3 py-2.5 font-medium text-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "company_name", undefined, true),
     },
-    { header: "Industry", inlineEditable: true, render: (row) => inlineCell(row, "industry") },
+    {
+      header: "Industry",
+      className: "w-40 max-w-40 truncate px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "industry"),
+    },
     {
       header: "Current location",
+      className: "w-48 max-w-48 truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "city"),
     },
     {
       header: "Designation",
-      className: "w-80 max-w-80 px-3 py-2.5 text-muted-foreground",
+      className: "w-72 max-w-72 truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "designation"),
     },
@@ -479,7 +490,7 @@ function LeadsPage() {
               { header: "Designation", render: (row) => row.designation ?? "—" },
               { header: "Location", render: (row) => row.city ?? "—" },
             ]}
-            minWidth={4200}
+            minWidth={3100}
             showSerialNumbers
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
