@@ -77,6 +77,17 @@ const CALL_STATUSES = [
 type CallStatus = (typeof CALL_STATUSES)[number];
 const CLEAR_CALL_STATUS = "__clear_call_status__";
 
+function whatsappUrl(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const internationalNumber =
+    digits.length === 10 ? `91${digits}` : digits.length === 11 && digits.startsWith("0") ? `91${digits.slice(1)}` : digits;
+  return `https://wa.me/${internationalNumber}`;
+}
+
+function gmailComposeUrl(email: string) {
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
+}
+
 type InlineLeadField =
   | "contact_name"
   | "company_name"
@@ -184,11 +195,15 @@ function InlineLeadCell({
   value,
   displayValue,
   required = false,
+  actionHref,
+  actionLabel,
   onSave,
 }: {
   value: string | null;
   displayValue?: string;
   required?: boolean;
+  actionHref?: string;
+  actionLabel?: string;
   onSave: (value: string | null) => Promise<void>;
 }) {
   const initialValue = value ?? "";
@@ -196,6 +211,13 @@ function InlineLeadCell({
   const [draft, setDraft] = useState(initialValue);
   const [saving, setSaving] = useState(false);
   const cancelRef = useRef(false);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!editing) setDraft(initialValue);
@@ -227,10 +249,23 @@ function InlineLeadCell({
   if (!editing) {
     return (
       <span
-        className="block min-h-5 cursor-text"
-        title="Double-click to edit"
+        className={`block min-h-5 ${actionHref && value ? "cursor-pointer text-primary hover:underline" : "cursor-text"}`}
+        title={actionHref && value ? `${actionLabel ?? "Open"} (double-click to edit)` : "Double-click to edit"}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!actionHref || !value) return;
+          if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+          clickTimerRef.current = setTimeout(() => {
+            window.open(actionHref, "_blank", "noopener,noreferrer");
+            clickTimerRef.current = null;
+          }, 250);
+        }}
         onDoubleClick={(event) => {
           event.stopPropagation();
+          if (clickTimerRef.current) {
+            clearTimeout(clickTimerRef.current);
+            clickTimerRef.current = null;
+          }
           setEditing(true);
         }}
       >
@@ -344,11 +379,15 @@ function LeadsPage() {
     field: InlineLeadField,
     displayValue?: string,
     required = false,
+    actionHref?: string,
+    actionLabel?: string,
   ) => (
     <InlineLeadCell
       value={row[field] as string | null}
       displayValue={displayValue}
       required={required}
+      actionHref={actionHref}
+      actionLabel={actionLabel}
       onSave={(value) => inlineLeadUpdate.mutateAsync({ id: row.id, field, value })}
     />
   );
@@ -409,9 +448,38 @@ function LeadsPage() {
       inlineEditable: true,
       render: (row) => inlineCell(row, "designation"),
     },
-    { header: "Phone 1", inlineEditable: true, render: (row) => inlineCell(row, "phone") },
-    { header: "Phone 2", inlineEditable: true, render: (row) => inlineCell(row, "phone_2") },
-    { header: "Email ID", inlineEditable: true, render: (row) => inlineCell(row, "email") },
+    {
+      header: "Phone 1",
+      inlineEditable: true,
+      render: (row) =>
+        inlineCell(row, "phone", undefined, false, row.phone ? whatsappUrl(row.phone) : undefined, "Open WhatsApp"),
+    },
+    {
+      header: "Phone 2",
+      inlineEditable: true,
+      render: (row) =>
+        inlineCell(
+          row,
+          "phone_2",
+          undefined,
+          false,
+          row.phone_2 ? whatsappUrl(row.phone_2) : undefined,
+          "Open WhatsApp",
+        ),
+    },
+    {
+      header: "Email ID",
+      inlineEditable: true,
+      render: (row) =>
+        inlineCell(
+          row,
+          "email",
+          undefined,
+          false,
+          row.email ? gmailComposeUrl(row.email) : undefined,
+          "Compose email",
+        ),
+    },
     { header: "Landline", inlineEditable: true, render: (row) => inlineCell(row, "landline") },
     {
       header: "Date of birth",
@@ -590,16 +658,19 @@ function LeadsPage() {
                   {numbers.map(({ label, value }) => (
                     <a
                       key={label}
-                      href={`tel:${value}`}
+                      href={label === "Landline" ? `tel:${value}` : whatsappUrl(value)}
+                      target={label === "Landline" ? undefined : "_blank"}
+                      rel={label === "Landline" ? undefined : "noreferrer"}
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                      aria-label={`Call ${label}: ${value}`}
+                      aria-label={label === "Landline" ? `Call ${label}: ${value}` : `Open WhatsApp for ${label}: ${value}`}
                     >
-                      <Phone className="size-3.5" /> {label}
+                      {label === "Landline" ? <Phone className="size-3.5" /> : <MessageCircle className="size-3.5" />}{" "}
+                      {label}: {value}
                     </a>
                   ))}
                   {whatsappNumber ? (
                     <a
-                      href={`https://wa.me/${whatsappNumber.replace(/\D/g, "")}`}
+                      href={whatsappUrl(whatsappNumber)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
@@ -609,10 +680,12 @@ function LeadsPage() {
                   ) : null}
                   {row.email ? (
                     <a
-                      href={`mailto:${row.email}`}
+                      href={gmailComposeUrl(row.email)}
+                      target="_blank"
+                      rel="noreferrer"
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
                     >
-                      <Mail className="size-3.5" /> Email
+                      <Mail className="size-3.5" /> Email: {row.email}
                     </a>
                   ) : null}
                   <button
