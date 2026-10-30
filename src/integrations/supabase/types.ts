@@ -664,6 +664,7 @@ export type Database = {
           industry: string | null;
           age_or_dob: string | null;
           annual_salary: string | null;
+          call_status: string | null;
           designation: string | null;
           last_active: string | null;
           notes: string | null;
@@ -704,6 +705,7 @@ export type Database = {
           industry?: string | null;
           age_or_dob?: string | null;
           annual_salary?: string | null;
+          call_status?: string | null;
           designation?: string | null;
           last_active?: string | null;
           notes?: string | null;
@@ -742,6 +744,7 @@ export type Database = {
           industry?: string | null;
           age_or_dob?: string | null;
           annual_salary?: string | null;
+          call_status?: string | null;
           designation?: string | null;
           last_active?: string | null;
           notes?: string | null;
