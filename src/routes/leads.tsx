@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -34,6 +34,7 @@ import {
   LEAD_STATUSES,
   currency,
   formatDateOnly,
+  updateRecord,
   type ActivityType,
   type Lead,
 } from "@/lib/crm";
@@ -74,6 +75,20 @@ const CALL_STATUSES = [
 ] as const;
 
 type CallStatus = (typeof CALL_STATUSES)[number];
+const CLEAR_CALL_STATUS = "__clear_call_status__";
+
+type InlineLeadField =
+  | "contact_name"
+  | "company_name"
+  | "industry"
+  | "city"
+  | "designation"
+  | "phone"
+  | "phone_2"
+  | "email"
+  | "landline"
+  | "age_or_dob"
+  | "notes";
 
 const CALL_STATUS_STYLE: Record<CallStatus, { pill: string; dot: string; row: string }> = {
   Interested: {
@@ -128,13 +143,19 @@ function CallStatusSelect({
   disabled,
 }: {
   value: string | null;
-  onChange: (status: CallStatus) => void;
+  onChange: (status: CallStatus | null) => void;
   disabled?: boolean;
 }) {
   const selected = isCallStatus(value) ? value : null;
   return (
     <div onClick={(event) => event.stopPropagation()}>
-      <Select value={selected ?? undefined} onValueChange={(status) => onChange(status as CallStatus)} disabled={disabled}>
+      <Select
+        value={selected ?? CLEAR_CALL_STATUS}
+        onValueChange={(status) =>
+          onChange(status === CLEAR_CALL_STATUS ? null : (status as CallStatus))
+        }
+        disabled={disabled}
+      >
         <SelectTrigger
           className={`h-9 min-w-48 border ${selected ? CALL_STATUS_STYLE[selected].pill : "bg-surface"}`}
           aria-label="Call status"
@@ -142,6 +163,9 @@ function CallStatusSelect({
           <SelectValue placeholder="Select status" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value={CLEAR_CALL_STATUS}>
+            <span className="text-muted-foreground">Select status</span>
+          </SelectItem>
           {CALL_STATUSES.map((status) => (
             <SelectItem key={status} value={status}>
               <span className="flex items-center gap-2">
@@ -153,6 +177,91 @@ function CallStatusSelect({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+function InlineLeadCell({
+  value,
+  displayValue,
+  required = false,
+  onSave,
+}: {
+  value: string | null;
+  displayValue?: string;
+  required?: boolean;
+  onSave: (value: string | null) => Promise<void>;
+}) {
+  const initialValue = value ?? "";
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const cancelRef = useRef(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(initialValue);
+  }, [editing, initialValue]);
+
+  const save = async () => {
+    if (cancelRef.current) {
+      cancelRef.current = false;
+      return;
+    }
+    const normalized = draft.trim();
+    if (required && !normalized) {
+      toast.error("This field cannot be left empty.");
+      return;
+    }
+    if (normalized === initialValue.trim()) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(normalized || null);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <span
+        className="block min-h-5 cursor-text"
+        title="Double-click to edit"
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          setEditing(true);
+        }}
+      >
+        {displayValue ?? value ?? "—"}
+      </span>
+    );
+  }
+
+  return (
+    <input
+      autoFocus
+      value={draft}
+      disabled={saving}
+      className="h-8 w-full min-w-32 rounded-md border border-primary bg-surface px-2 text-sm text-foreground outline-none ring-2 ring-primary/20"
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => void save()}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void save();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          cancelRef.current = true;
+          setDraft(initialValue);
+          setEditing(false);
+        }
+      }}
+      aria-label="Edit lead field"
+    />
   );
 }
 
@@ -206,7 +315,7 @@ function LeadsPage() {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const callStatusUpdate = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: CallStatus }) => {
+    mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
       const { error } = await supabase.from("leads").update({ call_status: status }).eq("id", id);
       if (error) throw new Error(error.message);
     },
@@ -215,6 +324,34 @@ function LeadsPage() {
     },
     onError: (error: Error) => toast.error(`Call status could not be updated: ${error.message}`),
   });
+  const inlineLeadUpdate = useMutation({
+    mutationFn: async ({
+      id,
+      field,
+      value,
+    }: {
+      id: string;
+      field: InlineLeadField;
+      value: string | null;
+    }) => updateRecord("leads", id, { [field]: value }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error: Error) => toast.error(`Lead could not be updated: ${error.message}`),
+  });
+  const inlineCell = (
+    row: Lead,
+    field: InlineLeadField,
+    displayValue?: string,
+    required = false,
+  ) => (
+    <InlineLeadCell
+      value={row[field] as string | null}
+      displayValue={displayValue}
+      required={required}
+      onSave={(value) => inlineLeadUpdate.mutateAsync({ id: row.id, field, value })}
+    />
+  );
   const ceipalLeadSync = useMutation({
     mutationFn: () => runCeipalSync(),
     onSuccess: async (result) => {
@@ -242,24 +379,34 @@ function LeadsPage() {
   });
 
   const columns: Column<Lead>[] = [
-    { header: "Name", render: (row) => row.contact_name ?? "—" },
+    { header: "Name", inlineEditable: true, render: (row) => inlineCell(row, "contact_name") },
     {
       header: "Current company",
       className: "px-3 py-2.5 font-medium text-foreground",
-      render: (row) => row.company_name,
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "company_name", undefined, true),
     },
-    { header: "Industry", render: (row) => row.industry ?? "—" },
-    { header: "Current location", render: (row) => row.city ?? "—" },
+    { header: "Industry", inlineEditable: true, render: (row) => inlineCell(row, "industry") },
+    {
+      header: "Current location",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "city"),
+    },
     {
       header: "Designation",
-      className: "w-80 max-w-80 truncate px-3 py-2.5 text-muted-foreground",
-      render: (row) => row.designation ?? "—",
+      className: "w-80 max-w-80 px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "designation"),
     },
-    { header: "Phone 1", render: (row) => row.phone ?? "—" },
-    { header: "Phone 2", render: (row) => row.phone_2 ?? "—" },
-    { header: "Email ID", render: (row) => row.email ?? "—" },
-    { header: "Landline", render: (row) => row.landline ?? "—" },
-    { header: "Date of birth", render: (row) => formatDateOnly(row.age_or_dob) },
+    { header: "Phone 1", inlineEditable: true, render: (row) => inlineCell(row, "phone") },
+    { header: "Phone 2", inlineEditable: true, render: (row) => inlineCell(row, "phone_2") },
+    { header: "Email ID", inlineEditable: true, render: (row) => inlineCell(row, "email") },
+    { header: "Landline", inlineEditable: true, render: (row) => inlineCell(row, "landline") },
+    {
+      header: "Date of birth",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "age_or_dob", formatDateOnly(row.age_or_dob)),
+    },
     { header: "Lead source", render: (row) => row.source ?? "—" },
     {
       header: "Lead status",
@@ -278,7 +425,7 @@ function LeadsPage() {
     },
     { header: "Estimated value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
-    { header: "Notes", render: (row) => row.notes ?? "—" },
+    { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },
   ];
 
   return (
