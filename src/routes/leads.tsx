@@ -122,10 +122,6 @@ function isCallStatus(value: string | null): value is CallStatus {
   return CALL_STATUSES.includes(value as CallStatus);
 }
 
-function leadCallStatusRowClass(status: string | null) {
-  return isCallStatus(status) ? CALL_STATUS_STYLE[status].row : "";
-}
-
 function CallStatusSelect({
   value,
   onChange,
@@ -338,7 +334,6 @@ function LeadsPage() {
             ]}
             minWidth={4200}
             showSerialNumbers
-            rowClassName={(row) => leadCallStatusRowClass(row.call_status)}
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
