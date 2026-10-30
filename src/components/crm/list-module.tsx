@@ -20,6 +20,7 @@ export type Column<T> = {
   header: string;
   render: (row: T) => React.ReactNode;
   className?: string;
+  inlineEditable?: boolean;
 };
 
 const ROWS_PER_PAGE = 100;
@@ -380,7 +381,10 @@ export function ListModule<T extends { id: string }>({
                           <td
                             key={column.header}
                             className={column.className ?? "px-3 py-2.5 text-muted-foreground"}
-                            onClick={() => openDetails(row)}
+                            onClick={(event) => {
+                              if (column.inlineEditable) event.stopPropagation();
+                              else openDetails(row);
+                            }}
                           >
                             {column.render(row)}
                           </td>
