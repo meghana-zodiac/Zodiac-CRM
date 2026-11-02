@@ -104,8 +104,9 @@ function whatsappWebUrl(value: string) {
   return `https://web.whatsapp.com/send?phone=${whatsappNumber(value)}`;
 }
 
-function gmailComposeUrl(email: string) {
-  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
+function gmailComposeUrl(email: string, subject?: string) {
+  const subjectParameter = subject ? `&su=${encodeURIComponent(subject)}` : "";
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subjectParameter}`;
 }
 
 function proposalDetails(lead: Lead) {
@@ -682,7 +683,7 @@ function LeadsPage() {
             setProposalLead(row);
           }}
         >
-          <Sparkles className="size-3.5" /> Strategic proposal
+          <Sparkles className="size-3.5" /> AI Proposal Email
         </Button>
       ),
     },
@@ -844,7 +845,7 @@ function LeadsPage() {
                     className="w-full justify-center gap-1.5"
                     onClick={() => setProposalLead(row)}
                   >
-                    <Sparkles className="size-3.5" /> Detailed strategic proposal
+                    <Sparkles className="size-3.5" /> AI Proposal Email
                   </Button>
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
@@ -911,10 +912,10 @@ function LeadsPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Sparkles className="size-5 text-primary" />
-                  Detailed strategic proposal
+                  AI Proposal Email
                 </DialogTitle>
                 <DialogDescription>
-                  Review the lead details and the complete strategic-proposal instructions before opening ChatGPT.
+                  Generate the proposal in ChatGPT, then return here to open a prepared Gmail draft.
                 </DialogDescription>
               </DialogHeader>
               {proposalLead ? (
@@ -945,9 +946,13 @@ function LeadsPage() {
                       {proposalDetails(proposalLead).prompt}
                     </pre>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    ChatGPT will open in a new tab. Paste the copied prompt, allow it to research and generate the detailed strategic proposal, then verify every factual claim before sending.
-                  </p>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
+                    <p className="font-semibold">Complete the email in two steps</p>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+                      <li>Open ChatGPT, paste the copied prompt and generate the proposal.</li>
+                      <li>Copy the completed proposal, return to this CRM tab, open the Gmail draft and paste it before sending.</li>
+                    </ol>
+                  </div>
                 </div>
               ) : null}
               <DialogFooter className="gap-2">
@@ -994,7 +999,31 @@ function LeadsPage() {
                     }
                   }}
                 >
-                  <ExternalLink className="size-4" /> Copy & open ChatGPT
+                  <ExternalLink className="size-4" /> 1. Copy prompt & open ChatGPT
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!proposalLead?.email}
+                  title={proposalLead?.email ? "Open Gmail with recipient and subject filled" : "Add an email address to this lead first"}
+                  onClick={() => {
+                    if (!proposalLead?.email) {
+                      toast.error("Add an email address to this lead before opening Gmail.");
+                      return;
+                    }
+                    const details = proposalDetails(proposalLead);
+                    const gmailWindow = window.open(
+                      gmailComposeUrl(proposalLead.email, details.subject),
+                      "_blank",
+                    );
+                    if (!gmailWindow) {
+                      toast.error("The browser blocked the Gmail tab. Please allow pop-ups and try again.");
+                      return;
+                    }
+                    gmailWindow.opener = null;
+                    toast.info("Gmail opened with the recipient and subject filled. Paste the generated proposal into the email body.");
+                  }}
+                >
+                  <Mail className="size-4" /> 2. Open Gmail draft
                 </Button>
               </DialogFooter>
             </DialogContent>
