@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DesktopContactActions } from "@/components/crm/desktop-contact-actions";
 import { activityFields } from "@/components/crm/field-defs";
 import {
   LEAD_STATUSES,
@@ -708,9 +707,6 @@ function LeadsPage() {
                 </div>
               );
             }}
-            desktopActions={(row) => (
-              <DesktopContactActions phone={row.phone ?? row.phone_2} email={row.email} compact />
-            )}
           />
           <LeadImportDialog
             open={importOpen}
