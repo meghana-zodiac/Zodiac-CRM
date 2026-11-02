@@ -113,24 +113,54 @@ function proposalDetails(lead: Lead) {
   const company = lead.company_name.trim();
   const role = lead.designation?.trim();
   const industry = lead.industry?.trim();
+  const location = lead.city?.trim();
   const context = lead.notes?.trim();
 
   return {
     attention: `Attention: ${contact}`,
     subject: `Strategic HR Partnership | ${company} × Zodiac HR`,
     prompt: [
-      "Draft a polished, concise business-development proposal email from Zodiac HR Consultants.",
+      "Create a detailed, boardroom-quality strategic HR partnership proposal email from Zodiac HR Consultants (India) Pvt. Ltd.",
+      "This must be a comprehensive strategic proposal, not a short cold-outreach email or a generic sales introduction.",
       `Address it to ${contact}${role ? `, ${role}` : ""} at ${company}.`,
       `Use this subject exactly: Strategic HR Partnership | ${company} × Zodiac HR`,
-      industry ? `Personalise it for the ${industry} industry.` : "",
-      "Introduce Zodiac HR as an experienced HR consulting and talent-acquisition organisation.",
-      "Mention recruitment and staffing, executive search, RPO, corporate training, assessments, background verification, salary benchmarking, compliance, HR consulting and OD interventions.",
-      context ? `Use this CRM context where relevant: ${context}` : "",
-      "Keep the tone professional, consultative and personalised. Do not invent client requirements.",
-      "End with a clear request for a short discussion about their current or upcoming HR requirements.",
-      "Include a professional Zodiac HR signature and website: https://zodiachrc.com",
+      industry ? `The CRM industry is recorded as: ${industry}.` : "",
+      location ? `The CRM location is recorded as: ${location}.` : "",
+      context ? `Use this CRM context only where relevant: ${context}` : "",
+      "",
+      "RESEARCH AND ACCURACY:",
+      `Before drafting, research ${company} using reliable public sources and understand its business model, locations, services/products, positioning, customer experience and likely workforce environment.`,
+      "Include only information that can be verified. Do not invent founders, outlets, expansion plans, hiring requirements, previous discussions, client relationships or business facts.",
+      "Mention a previous conversation with Mr. Preetam Sanil only if the CRM context above explicitly confirms that conversation.",
+      "If a company fact cannot be verified, omit it rather than qualifying or guessing.",
+      "",
+      "REQUIRED PROPOSAL STRUCTURE:",
+      "1. Personalised greeting and acknowledgement of the relationship or approach, but only when supported by the CRM context.",
+      "2. A section showing a thoughtful understanding of the company, its brand, business model and workforce environment.",
+      "3. Explain why the company's operating model requires specialised and relevant talent rather than generic hiring.",
+      "4. Introduce Zodiac HR Consultants: established in 2006, 20 years of experience, 250+ clients served, a 1M+ candidate network and 18,000+ professionals placed.",
+      "5. Present Zodiac as a Recruitment and Total HR Solutions organisation with relevant industry exposure.",
+      "6. Explain the major hiring categories relevant to this company. For each category, list suitable roles and explain Zodiac's screening focus.",
+      "7. Include leadership, operational and corporate/support hiring where relevant.",
+      "8. Propose a dedicated industry-focused recruitment desk and targeted talent mapping across relevant Indian markets.",
+      "9. Explain what information will accompany each shortlisted candidate: current designation, relevant company/brand experience, specialisation, total experience, current salary, expected salary, notice period, location and interview availability.",
+      "10. Explain the recruitment process: requirement discussion, sourcing, experience validation, screening, curated shortlist, client interviews, selection, offer and joining follow-up.",
+      "11. Include the philosophy: Not More CVs. Better Candidates. Faster Closures.",
+      "12. Explain support for urgent, replacement, multi-location and planned hiring, where relevant.",
+      "13. Include a consolidated recruitment tracker covering positions, locations, openings, submissions, interviews, selections, offers and joining status.",
+      "14. Add a Beyond Recruitment section covering relevant corporate training, assessments, background verification, salary benchmarking, HR consulting, policies, KRAs/KPIs, performance management and employee engagement.",
+      "15. Close with a clear request for current manpower requirements, number of openings, salary budgets, experience, locations and joining timelines.",
+      "16. End with a memorable, company-specific closing line connecting the client's business with Zodiac's contribution.",
+      "",
+      "WRITING STANDARD:",
+      "Use clear professional headings, short paragraphs, selective bold emphasis and readable lists.",
+      "Keep the tone premium, consultative, researched and confident without sounding exaggerated.",
+      "Target approximately 1,200–1,800 words, but avoid repetition and filler.",
+      "Use Indian English and correct grammar.",
+      "Do not fabricate a Zodiac client portfolio. Mention named clients only when they are explicitly provided in the CRM context or verified approved source material.",
+      "Finish with a professional Zodiac HR signature and website: https://zodiachrc.com",
     ]
-      .filter(Boolean)
+      .filter((line) => line !== "")
       .join("\n"),
   };
 }
@@ -643,7 +673,7 @@ function LeadsPage() {
             setProposalLead(row);
           }}
         >
-          <Sparkles className="size-3.5" /> Draft proposal
+          <Sparkles className="size-3.5" /> Strategic proposal
         </Button>
       ),
     },
@@ -805,7 +835,7 @@ function LeadsPage() {
                     className="w-full justify-center gap-1.5"
                     onClick={() => setProposalLead(row)}
                   >
-                    <Sparkles className="size-3.5" /> Draft proposal with ChatGPT
+                    <Sparkles className="size-3.5" /> Detailed strategic proposal
                   </Button>
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
@@ -872,10 +902,10 @@ function LeadsPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Sparkles className="size-5 text-primary" />
-                  Draft proposal with ChatGPT
+                  Detailed strategic proposal
                 </DialogTitle>
                 <DialogDescription>
-                  Review the lead details and prompt before opening ChatGPT.
+                  Review the lead details and the complete strategic-proposal instructions before opening ChatGPT.
                 </DialogDescription>
               </DialogHeader>
               {proposalLead ? (
@@ -907,7 +937,7 @@ function LeadsPage() {
                     </pre>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    ChatGPT will open in a new tab. Paste the copied prompt, generate the proposal and review it before sending.
+                    ChatGPT will open in a new tab. Paste the copied prompt, allow it to research and generate the detailed strategic proposal, then verify every factual claim before sending.
                   </p>
                 </div>
               ) : null}
@@ -937,7 +967,7 @@ function LeadsPage() {
                     const chatgptWindow = window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
                     try {
                       await copyToClipboard(proposalDetails(proposalLead).prompt);
-                      toast.success("Prompt copied. Paste it into ChatGPT to create the proposal.");
+                      toast.success("Prompt copied. Paste it into ChatGPT to create the detailed strategic proposal.");
                     } catch {
                       toast.info("ChatGPT opened. Copy the prompt from this preview.");
                     }
