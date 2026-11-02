@@ -364,23 +364,42 @@ function LeadsPage() {
       const { error } = await supabase.from("leads").update({ call_status: status }).eq("id", id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+    onMutate: ({ id, status }) => {
+      const previous = queryClient.getQueriesData<Lead[]>({ queryKey: ["leads"] });
+      queryClient.setQueriesData<Lead[]>({ queryKey: ["leads"] }, (rows) =>
+        rows?.map((lead) => (lead.id === id ? { ...lead, call_status: status } : lead)),
+      );
+      void queryClient.cancelQueries({ queryKey: ["leads"] });
+      return { previous };
     },
-    onError: (error: Error) => toast.error(`Call status could not be updated: ${error.message}`),
+    onError: (error: Error, _variables, context) => {
+      for (const [queryKey, data] of context?.previous ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+      toast.error(`Call status could not be updated: ${error.message}`);
+    },
   });
   const updateCallStatus = async (row: Lead, status: CallStatus | null) => {
-    try {
-      await callStatusUpdate.mutateAsync({ id: row.id, status });
-      if (status !== "Follow-up Required" && status !== "Call Back") return;
+    const statusUpdate = callStatusUpdate.mutateAsync({ id: row.id, status });
 
-      const { data: pendingTasks, error } = await supabase
+    try {
+      if (status !== "Follow-up Required" && status !== "Call Back") {
+        await statusUpdate;
+        return;
+      }
+
+      const pendingTaskCheck = supabase
         .from("activities")
         .select("id,title")
         .eq("related_to_type", "Corporate Lead")
         .eq("related_to_id", row.id)
         .eq("activity_type", "Task")
         .neq("status", "Completed");
+
+      const [, { data: pendingTasks, error }] = await Promise.all([
+        statusUpdate,
+        pendingTaskCheck,
+      ]);
 
       if (error) throw new Error(error.message);
 
@@ -394,7 +413,7 @@ function LeadsPage() {
         return;
       }
 
-      setActivityLead(row);
+      setActivityLead({ ...row, call_status: status });
       setActivityType("Task");
       setActivityTitle(
         status === "Call Back"
@@ -404,6 +423,7 @@ function LeadsPage() {
       setHideActivityType(true);
       setActivityDialogOpen(true);
     } catch (error) {
+      if (callStatusUpdate.isError) return;
       toast.error(
         error instanceof Error ? error.message : "The follow-up task form could not be opened.",
       );
