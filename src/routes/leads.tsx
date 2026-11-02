@@ -357,6 +357,7 @@ function LeadsPage() {
   const [activityType, setActivityType] = useState<ActivityType>("Task");
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
+  const [hideActivityType, setHideActivityType] = useState(false);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
@@ -368,6 +369,47 @@ function LeadsPage() {
     },
     onError: (error: Error) => toast.error(`Call status could not be updated: ${error.message}`),
   });
+  const updateCallStatus = async (row: Lead, status: CallStatus | null) => {
+    try {
+      await callStatusUpdate.mutateAsync({ id: row.id, status });
+      if (status !== "Follow-up Required" && status !== "Call Back") return;
+
+      const { data: pendingTasks, error } = await supabase
+        .from("activities")
+        .select("id,title")
+        .eq("related_to_type", "Corporate Lead")
+        .eq("related_to_id", row.id)
+        .eq("activity_type", "Task")
+        .neq("status", "Completed");
+
+      if (error) throw new Error(error.message);
+
+      const hasExistingFollowUp = (pendingTasks ?? []).some((task) => {
+        const title = task.title.toLowerCase();
+        return title.startsWith("follow up:") || title.startsWith("call back:");
+      });
+
+      if (hasExistingFollowUp) {
+        toast.info("A pending follow-up task already exists for this lead.");
+        return;
+      }
+
+      setActivityLead(row);
+      setActivityType("Task");
+      setActivityTitle(
+        status === "Call Back"
+          ? `Call back: ${row.contact_name ?? row.company_name}`
+          : `Follow up: ${row.company_name}`,
+      );
+      setHideActivityType(true);
+      setActivityDialogOpen(true);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "The follow-up task form could not be opened.",
+      );
+    }
+  };
+
   const inlineLeadUpdate = useMutation({
     mutationFn: async ({
       id,
@@ -507,7 +549,7 @@ function LeadsPage() {
         <CallStatusSelect
           value={row.call_status}
           disabled={callStatusUpdate.isPending}
-          onChange={(status) => callStatusUpdate.mutate({ id: row.id, status })}
+          onChange={(status) => void updateCallStatus(row, status)}
         />
       ),
     },
@@ -653,6 +695,7 @@ function LeadsPage() {
                 setActivityLead(row);
                 setActivityType(type);
                 setActivityTitle(title);
+                setHideActivityType(false);
                 setActivityDialogOpen(true);
               };
 
@@ -661,7 +704,7 @@ function LeadsPage() {
                   <CallStatusSelect
                     value={row.call_status}
                     disabled={callStatusUpdate.isPending}
-                    onChange={(status) => callStatusUpdate.mutate({ id: row.id, status })}
+                    onChange={(status) => void updateCallStatus(row, status)}
                   />
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
@@ -728,7 +771,16 @@ function LeadsPage() {
             onOpenChange={setActivityDialogOpen}
             table="activities"
             title={activityTitle}
-            fields={activityFields(activityType)}
+            description={
+              hideActivityType
+                ? "Choose the follow-up date, reminder, priority and notes. The task is already linked to this lead."
+                : undefined
+            }
+            fields={
+              hideActivityType
+                ? activityFields("Task").filter((field) => field.name !== "activity_type")
+                : activityFields(activityType)
+            }
             record={{
               title: activityTitle,
               activity_type: activityType,
@@ -738,7 +790,11 @@ function LeadsPage() {
             }}
             fixedValues={
               activityLead
-                ? { related_to_type: "Corporate Lead", related_to_id: activityLead.id }
+                ? {
+                    related_to_type: "Corporate Lead",
+                    related_to_id: activityLead.id,
+                    ...(hideActivityType ? { activity_type: "Task" } : {}),
+                  }
                 : undefined
             }
             invalidateKeys={["activities"]}
