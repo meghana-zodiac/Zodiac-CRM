@@ -76,11 +76,21 @@ const CALL_STATUSES = [
 type CallStatus = (typeof CALL_STATUSES)[number];
 const CLEAR_CALL_STATUS = "__clear_call_status__";
 
-function whatsappUrl(value: string) {
+function whatsappNumber(value: string) {
   const digits = value.replace(/\D/g, "");
-  const internationalNumber =
-    digits.length === 10 ? `91${digits}` : digits.length === 11 && digits.startsWith("0") ? `91${digits.slice(1)}` : digits;
-  return `https://wa.me/${internationalNumber}`;
+  return digits.length === 10
+    ? `91${digits}`
+    : digits.length === 11 && digits.startsWith("0")
+      ? `91${digits.slice(1)}`
+      : digits;
+}
+
+function whatsappUrl(value: string) {
+  return `https://wa.me/${whatsappNumber(value)}`;
+}
+
+function whatsappWebUrl(value: string) {
+  return `https://web.whatsapp.com/send?phone=${whatsappNumber(value)}`;
 }
 
 function gmailComposeUrl(email: string) {
@@ -451,7 +461,7 @@ function LeadsPage() {
       header: "Phone 1",
       inlineEditable: true,
       render: (row) =>
-        inlineCell(row, "phone", undefined, false, row.phone ? whatsappUrl(row.phone) : undefined, "Open WhatsApp"),
+        inlineCell(row, "phone", undefined, false, row.phone ? whatsappWebUrl(row.phone) : undefined, "Open WhatsApp Web"),
     },
     {
       header: "Phone 2",
@@ -462,8 +472,8 @@ function LeadsPage() {
           "phone_2",
           undefined,
           false,
-          row.phone_2 ? whatsappUrl(row.phone_2) : undefined,
-          "Open WhatsApp",
+          row.phone_2 ? whatsappWebUrl(row.phone_2) : undefined,
+          "Open WhatsApp Web",
         ),
     },
     {
