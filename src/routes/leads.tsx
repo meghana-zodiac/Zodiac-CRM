@@ -4,12 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Clock3,
+  Copy,
+  ExternalLink,
   FileSpreadsheet,
   Mail,
   MessageCircle,
   NotebookPen,
   Phone,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +24,14 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -95,6 +106,48 @@ function whatsappWebUrl(value: string) {
 
 function gmailComposeUrl(email: string) {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
+}
+
+function proposalDetails(lead: Lead) {
+  const contact = lead.contact_name?.trim() || "Hiring Team";
+  const company = lead.company_name.trim();
+  const role = lead.designation?.trim();
+  const industry = lead.industry?.trim();
+  const context = lead.notes?.trim();
+
+  return {
+    attention: `Attention: ${contact}`,
+    subject: `Strategic HR Partnership | ${company} × Zodiac HR`,
+    prompt: [
+      "Draft a polished, concise business-development proposal email from Zodiac HR Consultants.",
+      `Address it to ${contact}${role ? `, ${role}` : ""} at ${company}.`,
+      `Use this subject exactly: Strategic HR Partnership | ${company} × Zodiac HR`,
+      industry ? `Personalise it for the ${industry} industry.` : "",
+      "Introduce Zodiac HR as an experienced HR consulting and talent-acquisition organisation.",
+      "Mention recruitment and staffing, executive search, RPO, corporate training, assessments, background verification, salary benchmarking, compliance, HR consulting and OD interventions.",
+      context ? `Use this CRM context where relevant: ${context}` : "",
+      "Keep the tone professional, consultative and personalised. Do not invent client requirements.",
+      "End with a clear request for a short discussion about their current or upcoming HR requirements.",
+      "Include a professional Zodiac HR signature and website: https://zodiachrc.com",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+}
+
+async function copyToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 type InlineLeadField =
@@ -358,6 +411,7 @@ function LeadsPage() {
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [hideActivityType, setHideActivityType] = useState(false);
+  const [proposalLead, setProposalLead] = useState<Lead | null>(null);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
@@ -575,6 +629,24 @@ function LeadsPage() {
     },
     { header: "Estimated value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
+    {
+      header: "Proposal",
+      className: "whitespace-nowrap px-3 py-2.5",
+      render: (row) => (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={(event) => {
+            event.stopPropagation();
+            setProposalLead(row);
+          }}
+        >
+          <Sparkles className="size-3.5" /> Draft proposal
+        </Button>
+      ),
+    },
     { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },
   ];
 
@@ -726,6 +798,15 @@ function LeadsPage() {
                     disabled={callStatusUpdate.isPending}
                     onChange={(status) => void updateCallStatus(row, status)}
                   />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full justify-center gap-1.5"
+                    onClick={() => setProposalLead(row)}
+                  >
+                    <Sparkles className="size-3.5" /> Draft proposal with ChatGPT
+                  </Button>
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
                     <a
@@ -786,6 +867,90 @@ function LeadsPage() {
             onOpenChange={setImportOpen}
             leads={uploadedLeads.data ?? []}
           />
+          <Dialog open={Boolean(proposalLead)} onOpenChange={(open) => !open && setProposalLead(null)}>
+            <DialogContent className="max-h-[calc(100dvh-1rem)] sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="size-5 text-primary" />
+                  Draft proposal with ChatGPT
+                </DialogTitle>
+                <DialogDescription>
+                  Review the lead details and prompt before opening ChatGPT.
+                </DialogDescription>
+              </DialogHeader>
+              {proposalLead ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Attention
+                      </p>
+                      <p className="mt-1 font-semibold text-foreground">
+                        {proposalDetails(proposalLead).attention.replace(/^Attention:\s*/, "")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Email subject
+                      </p>
+                      <p className="mt-1 font-semibold text-foreground">
+                        {proposalDetails(proposalLead).subject}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Prompt that will be copied
+                    </p>
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 font-sans text-sm leading-6 text-foreground">
+                      {proposalDetails(proposalLead).prompt}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ChatGPT will open in a new tab. Paste the copied prompt, generate the proposal and review it before sending.
+                  </p>
+                </div>
+              ) : null}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setProposalLead(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!proposalLead}
+                  onClick={async () => {
+                    if (!proposalLead) return;
+                    try {
+                      await copyToClipboard(proposalDetails(proposalLead).prompt);
+                      toast.success("Proposal prompt copied.");
+                    } catch {
+                      toast.error("The prompt could not be copied. Please copy it from the preview.");
+                    }
+                  }}
+                >
+                  <Copy className="size-4" /> Copy prompt
+                </Button>
+                <Button
+                  disabled={!proposalLead}
+                  onClick={async () => {
+                    if (!proposalLead) return;
+                    const chatgptWindow = window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
+                    try {
+                      await copyToClipboard(proposalDetails(proposalLead).prompt);
+                      toast.success("Prompt copied. Paste it into ChatGPT to create the proposal.");
+                    } catch {
+                      toast.info("ChatGPT opened. Copy the prompt from this preview.");
+                    }
+                    if (!chatgptWindow) {
+                      toast.error("The browser blocked the ChatGPT tab. Please allow pop-ups and try again.");
+                    }
+                  }}
+                >
+                  <ExternalLink className="size-4" /> Copy & open ChatGPT
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <RecordDialog
             open={activityDialogOpen}
             onOpenChange={setActivityDialogOpen}
