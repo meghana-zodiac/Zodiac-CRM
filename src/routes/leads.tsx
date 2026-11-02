@@ -115,6 +115,7 @@ function proposalDetails(lead: Lead) {
   const industry = lead.industry?.trim();
   const location = lead.city?.trim();
   const context = lead.notes?.trim();
+  const owner = lead.owner_name?.trim();
 
   return {
     attention: `Attention: ${contact}`,
@@ -138,9 +139,11 @@ function proposalDetails(lead: Lead) {
       "1. Personalised greeting and acknowledgement of the relationship or approach, but only when supported by the CRM context.",
       "2. A section showing a thoughtful understanding of the company, its brand, business model and workforce environment.",
       "3. Explain why the company's operating model requires specialised and relevant talent rather than generic hiring.",
-      "4. Introduce Zodiac HR Consultants: established in 2006, 20 years of experience, 250+ clients served, a 1M+ candidate network and 18,000+ professionals placed.",
+      "4. Introduce Zodiac HR Consultants: established in 2006, 20 years of experience, 250+ clients served, 70+ recruitment professionals, a 1M+ candidate network and 18,000+ professionals placed.",
       "5. Present Zodiac as a Recruitment and Total HR Solutions organisation with relevant industry exposure.",
       "6. Explain the major hiring categories relevant to this company. For each category, list suitable roles and explain Zodiac's screening focus.",
+      "For BFSI, banking or financial-services companies, prioritise relevant capabilities such as branch banking, retail liabilities, microfinance, rural banking, MSME and secured lending, sales and relationship management, credit and underwriting, operations, collections, risk, compliance, audit, treasury, digital banking, analytics, technology, cybersecurity and leadership hiring.",
+      "For hospitality, restaurant, café or F&B companies, prioritise front-of-house, culinary/back-of-house, bar, beverage and coffee specialists, operations leadership, multi-outlet hiring and corporate support roles.",
       "7. Include leadership, operational and corporate/support hiring where relevant.",
       "8. Propose a dedicated industry-focused recruitment desk and targeted talent mapping across relevant Indian markets.",
       "9. Explain what information will accompany each shortlisted candidate: current designation, relevant company/brand experience, specialisation, total experience, current salary, expected salary, notice period, location and interview availability.",
@@ -155,10 +158,14 @@ function proposalDetails(lead: Lead) {
       "WRITING STANDARD:",
       "Use clear professional headings, short paragraphs, selective bold emphasis and readable lists.",
       "Keep the tone premium, consultative, researched and confident without sounding exaggerated.",
-      "Target approximately 1,200–1,800 words, but avoid repetition and filler.",
+      "Choose the length according to the purpose and available verified information. For introductory outreach, vendor empanelment or a first strategic approach, write a focused 500–800 word proposal. For a confirmed discussion, complex multi-location requirement or detailed operating context, write a fuller 1,000–1,600 word proposal.",
+      "Detailed means specifically researched and strategically relevant; it does not mean unnecessarily long. Avoid repetition, filler and sections that add no value.",
       "Use Indian English and correct grammar.",
       "Do not fabricate a Zodiac client portfolio. Mention named clients only when they are explicitly provided in the CRM context or verified approved source material.",
-      "Finish with a professional Zodiac HR signature and website: https://zodiachrc.com",
+      owner
+        ? `Sign off in the name of the CRM lead owner: ${owner}. Leave mobile and email placeholders if they are not available in the CRM.`
+        : "Use a professional Zodiac HR Business Development signature and leave mobile and email placeholders.",
+      "Include the Zodiac HR website: https://zodiachrc.com",
     ]
       .filter((line) => line !== "")
       .join("\n"),
