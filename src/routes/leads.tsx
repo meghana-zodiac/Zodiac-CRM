@@ -372,11 +372,10 @@ function LeadsPage() {
       void queryClient.cancelQueries({ queryKey: ["leads"] });
       return { previous };
     },
-    onError: (error: Error, _variables, context) => {
+    onError: (_error: Error, _variables, context) => {
       for (const [queryKey, data] of context?.previous ?? []) {
         queryClient.setQueryData(queryKey, data);
       }
-      toast.error(`Call status could not be updated: ${error.message}`);
     },
   });
   const updateCallStatus = async (row: Lead, status: CallStatus | null) => {
@@ -423,9 +422,10 @@ function LeadsPage() {
       setHideActivityType(true);
       setActivityDialogOpen(true);
     } catch (error) {
-      if (callStatusUpdate.isError) return;
       toast.error(
-        error instanceof Error ? error.message : "The follow-up task form could not be opened.",
+        error instanceof Error
+          ? `Call status could not be updated: ${error.message}`
+          : "The follow-up task form could not be opened.",
       );
     }
   };
