@@ -19,6 +19,7 @@ export type Database = {
           device_limit: number;
           email: string;
           id: string;
+          mobile_number: string | null;
           reviewed_at: string | null;
           reviewed_by: string | null;
           updated_at: string;
@@ -33,6 +34,7 @@ export type Database = {
           device_limit?: number;
           email: string;
           id: string;
+          mobile_number?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           updated_at?: string;
@@ -47,6 +49,7 @@ export type Database = {
           device_limit?: number;
           email?: string;
           id?: string;
+          mobile_number?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           updated_at?: string;
