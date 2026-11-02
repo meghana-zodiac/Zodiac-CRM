@@ -109,14 +109,22 @@ function gmailComposeUrl(email: string, subject?: string) {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subjectParameter}`;
 }
 
-function proposalDetails(lead: Lead) {
+type ProposalSender = {
+  display_name: string;
+  email: string;
+  mobile_number: string | null;
+};
+
+function proposalDetails(lead: Lead, sender?: ProposalSender | null) {
   const contact = lead.contact_name?.trim() || "Hiring Team";
   const company = lead.company_name.trim();
   const role = lead.designation?.trim();
   const industry = lead.industry?.trim();
   const location = lead.city?.trim();
   const context = lead.notes?.trim();
-  const owner = lead.owner_name?.trim();
+  const owner = sender?.display_name?.trim() || lead.owner_name?.trim();
+  const senderEmail = sender?.email?.trim();
+  const senderMobile = sender?.mobile_number?.trim();
 
   return {
     attention: `Attention: ${contact}`,
@@ -164,7 +172,7 @@ function proposalDetails(lead: Lead) {
       "Do not name Zodiac clients unless the CRM notes explicitly provide approved client names.",
       "Use the company name consistently and check spelling.",
       owner
-        ? `Sign off as ${owner}, Zodiac HR Consultants, Mumbai | India. Leave mobile and email as placeholders when they are unavailable.`
+        ? `Sign off exactly as follows: ${owner}; Zodiac HR Consultants (India) Pvt. Ltd.; Mumbai | India; Mobile: ${senderMobile || "[Contact Number]"}; Email: ${senderEmail || "[Email Address]"}; W: https://zodiachrc.com/.`
         : "Use a professional Zodiac HR Business Development signature. Leave mobile and email as placeholders.",
       "Always include W: https://zodiachrc.com/",
       "",
@@ -452,6 +460,21 @@ function LeadsPage() {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [hideActivityType, setHideActivityType] = useState(false);
   const [proposalLead, setProposalLead] = useState<Lead | null>(null);
+  const currentMember = useQuery({
+    queryKey: ["current-member-signature"],
+    queryFn: async () => {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError ?? new Error("CRM user could not be identified.");
+      const { data, error } = await supabase
+        .from("bd_team_members")
+        .select("display_name,email,mobile_number")
+        .eq("id", auth.user.id)
+        .single();
+      if (error) throw error;
+      return data as ProposalSender;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
@@ -926,7 +949,7 @@ function LeadsPage() {
                         Attention
                       </p>
                       <p className="mt-1 font-semibold text-foreground">
-                        {proposalDetails(proposalLead).attention.replace(/^Attention:\s*/, "")}
+                        {proposalDetails(proposalLead, currentMember.data).attention.replace(/^Attention:\s*/, "")}
                       </p>
                     </div>
                     <div>
@@ -934,7 +957,7 @@ function LeadsPage() {
                         Email subject
                       </p>
                       <p className="mt-1 font-semibold text-foreground">
-                        {proposalDetails(proposalLead).subject}
+                        {proposalDetails(proposalLead, currentMember.data).subject}
                       </p>
                     </div>
                   </div>
@@ -943,7 +966,7 @@ function LeadsPage() {
                       Prompt that will be copied
                     </p>
                     <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 font-sans text-sm leading-6 text-foreground">
-                      {proposalDetails(proposalLead).prompt}
+                      {proposalDetails(proposalLead, currentMember.data).prompt}
                     </pre>
                   </div>
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
@@ -965,7 +988,7 @@ function LeadsPage() {
                   onClick={async () => {
                     if (!proposalLead) return;
                     try {
-                      await copyToClipboard(proposalDetails(proposalLead).prompt);
+                      await copyToClipboard(proposalDetails(proposalLead, currentMember.data).prompt);
                       toast.success("Proposal prompt copied.");
                     } catch {
                       toast.error("The prompt could not be copied. Please copy it from the preview.");
@@ -992,7 +1015,7 @@ function LeadsPage() {
                     chatgptWindow.location.replace("https://chatgpt.com/");
 
                     try {
-                      await copyToClipboard(proposalDetails(proposalLead).prompt);
+                      await copyToClipboard(proposalDetails(proposalLead, currentMember.data).prompt);
                       toast.success("Prompt copied. Paste it into ChatGPT to create the detailed strategic proposal.");
                     } catch {
                       toast.info("ChatGPT opened. Copy the prompt from this preview.");
@@ -1010,7 +1033,7 @@ function LeadsPage() {
                       toast.error("Add an email address to this lead before opening Gmail.");
                       return;
                     }
-                    const details = proposalDetails(proposalLead);
+                    const details = proposalDetails(proposalLead, currentMember.data);
                     const gmailWindow = window.open(
                       gmailComposeUrl(proposalLead.email, details.subject),
                       "_blank",
