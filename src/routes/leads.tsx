@@ -973,15 +973,24 @@ function LeadsPage() {
                   disabled={!proposalLead}
                   onClick={async () => {
                     if (!proposalLead) return;
-                    const chatgptWindow = window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
+
+                    // Open synchronously while the click is still a trusted user gesture.
+                    // Safari may report a noopener tab as null even when it opened, so start
+                    // with a same-origin blank tab, then detach and navigate it securely.
+                    const chatgptWindow = window.open("", "_blank");
+                    if (!chatgptWindow) {
+                      toast.error("The browser blocked the ChatGPT tab. Please allow pop-ups and try again.");
+                      return;
+                    }
+
+                    chatgptWindow.opener = null;
+                    chatgptWindow.location.replace("https://chatgpt.com/");
+
                     try {
                       await copyToClipboard(proposalDetails(proposalLead).prompt);
                       toast.success("Prompt copied. Paste it into ChatGPT to create the detailed strategic proposal.");
                     } catch {
                       toast.info("ChatGPT opened. Copy the prompt from this preview.");
-                    }
-                    if (!chatgptWindow) {
-                      toast.error("The browser blocked the ChatGPT tab. Please allow pop-ups and try again.");
                     }
                   }}
                 >
