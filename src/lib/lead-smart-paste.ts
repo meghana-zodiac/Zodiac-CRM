@@ -329,9 +329,9 @@ function deliveryMode(raw: string) {
 }
 
 function leadStatus(raw: string) {
-  if (/\bdisqualified|not interested|invalid lead\b/i.test(raw)) return "Disqualified";
+  if (/\bdisqualified|not interested|invalid lead\b/i.test(raw)) return "Not Interested";
   if (/\bconverted|won|client onboarded\b/i.test(raw)) return "Converted";
-  if (/\bqualified|interested|requirement confirmed\b/i.test(raw)) return "Qualified";
+  if (/\bqualified|interested|requirement confirmed\b/i.test(raw)) return "Contacted";
   if (/\bcontacted|spoke|called|emailed\b/i.test(raw)) return "Contacted";
   if (/\bnew lead\b/i.test(raw)) return "New";
   return "";
