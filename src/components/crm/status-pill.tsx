@@ -45,8 +45,8 @@ export function bdTone(stage: string): Tone {
 /** Corporate lead qualification */
 export function leadTone(status: string): Tone {
   if (status === "Converted") return "success";
-  if (status === "Disqualified") return "danger";
-  if (status === "Qualified") return "info";
+  if (status === "Not Interested" || status === "Disqualified") return "danger";
+  if (status === "Qualified") return "warning";
   if (status === "Contacted") return "warning";
   return "primary";
 }
