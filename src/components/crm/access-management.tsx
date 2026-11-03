@@ -6,9 +6,7 @@ import {
   Clock3,
   KeyRound,
   Laptop,
-  Phone,
   RefreshCw,
-  Save,
   ShieldCheck,
   Smartphone,
   UserX,
@@ -18,7 +16,6 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -39,7 +36,6 @@ type Member = {
   id: string;
   email: string;
   display_name: string;
-  mobile_number: string | null;
   access_status: AccessStatus;
   access_role: "primary_admin" | "bd_member";
   active: boolean;
@@ -72,7 +68,6 @@ export function AccessManagement({
     code: string;
     expiresAt: string;
   } | null>(null);
-  const [mobileDrafts, setMobileDrafts] = useState<Record<string, string>>({});
   const members = useQuery({
     queryKey: ["bd-team-access"],
     enabled: open,
@@ -80,7 +75,7 @@ export function AccessManagement({
       const { data, error } = await supabase
         .from("bd_team_members")
         .select(
-          "id,email,display_name,mobile_number,access_status,access_role,active,device_access_required,device_limit,created_at",
+          "id,email,display_name,access_status,access_role,active,device_access_required,device_limit,created_at",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -144,29 +139,6 @@ export function AccessManagement({
       toast.error(error instanceof Error ? error.message : "Access could not be updated"),
   });
 
-  const updateMobile = useMutation({
-    mutationFn: async ({ id, mobile }: { id: string; mobile: string }) => {
-      const normalized = mobile.trim();
-      const { error } = await supabase
-        .from("bd_team_members")
-        .update({ mobile_number: normalized || null, updated_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: (_data, variables) => {
-      setMobileDrafts((current) => {
-        const next = { ...current };
-        delete next[variables.id];
-        return next;
-      });
-      void queryClient.invalidateQueries({ queryKey: ["bd-team-access"] });
-      void queryClient.invalidateQueries({ queryKey: ["current-member-signature"] });
-      toast.success("Employee mobile number saved");
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Mobile number could not be saved"),
-  });
-
   const pending = members.data?.filter((member) => member.access_status === "pending") ?? [];
   const decided = members.data?.filter((member) => member.access_status !== "pending") ?? [];
 
@@ -228,42 +200,6 @@ export function AccessManagement({
         )}
         {member.access_status === "approved" ? (
           <div className="mt-4 border-t pt-3">
-            <div className="mb-4 rounded-lg border bg-muted/30 p-3">
-              <label
-                htmlFor={`member-mobile-${member.id}`}
-                className="mb-2 flex items-center gap-1.5 text-xs font-semibold"
-              >
-                <Phone className="size-3.5" /> Work mobile for email signature
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id={`member-mobile-${member.id}`}
-                  inputMode="tel"
-                  placeholder="e.g. +91 98765 43210"
-                  value={mobileDrafts[member.id] ?? member.mobile_number ?? ""}
-                  onChange={(event) =>
-                    setMobileDrafts((current) => ({ ...current, [member.id]: event.target.value }))
-                  }
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    updateMobile.isPending ||
-                    (mobileDrafts[member.id] ?? member.mobile_number ?? "").trim() ===
-                      (member.mobile_number ?? "").trim()
-                  }
-                  onClick={() =>
-                    updateMobile.mutate({
-                      id: member.id,
-                      mobile: mobileDrafts[member.id] ?? member.mobile_number ?? "",
-                    })
-                  }
-                >
-                  <Save className="mr-1 size-3.5" /> Save
-                </Button>
-              </div>
-            </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold">Approved work devices</p>
