@@ -90,9 +90,8 @@ export const BENCHMARK_PERCENTILES = ["50th Percentile", "75th Percentile"] as c
 export const LEAD_STATUSES = [
   "New",
   "Contacted",
-  "Qualified",
   "Converted",
-  "Disqualified",
+  "Not Interested",
 ] as const;
 
 export const LEAD_SOURCES = [
