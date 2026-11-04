@@ -30,6 +30,7 @@ type LeadField =
   | "company_name"
   | "contact_name"
   | "email"
+  | "email_2"
   | "phone"
   | "phone_2"
   | "landline"
@@ -48,6 +49,7 @@ type ImportRow = {
   company_name: string;
   contact_name: string | null;
   email: string | null;
+  email_2: string | null;
   phone: string | null;
   phone_2: string | null;
   landline: string | null;
@@ -88,6 +90,7 @@ const aliases: Record<LeadField, string[]> = {
     "name",
   ],
   email: ["email", "email address", "work email", "official email", "email id"],
+  email_2: ["email 2", "secondary email", "alternate email", "email id 2"],
   phone: [
     "phone",
     "phone 1",
@@ -198,7 +201,9 @@ function companyContactKey(company: string, contact: string | null) {
 }
 
 function markDuplicates(rows: ImportRow[], leads: Lead[]) {
-  const emails = new Set(leads.map((lead) => identityKey(lead.email)).filter(Boolean));
+  const emails = new Set(
+    leads.flatMap((lead) => [identityKey(lead.email), identityKey(lead.email_2)]).filter(Boolean),
+  );
   const phones = new Set(leads.flatMap(phoneKeys));
   const companyContacts = new Set(
     leads.map((lead) => companyContactKey(lead.company_name, lead.contact_name)).filter(Boolean),
@@ -206,12 +211,12 @@ function markDuplicates(rows: ImportRow[], leads: Lead[]) {
 
   return rows.map((row) => {
     if (row.error) return { ...row, duplicate: undefined };
-    const email = identityKey(row.email);
+    const rowEmails = [identityKey(row.email), identityKey(row.email_2)].filter(Boolean);
     const rowPhones = phoneKeys(row);
     const companyContact = companyContactKey(row.company_name, row.contact_name);
     let duplicate = "";
 
-    if (email && emails.has(email)) duplicate = "Duplicate email already exists";
+    if (rowEmails.some((email) => emails.has(email))) duplicate = "Duplicate email already exists";
     else if (rowPhones.some((phone) => phones.has(phone))) {
       duplicate = "Duplicate phone number already exists";
     } else if (companyContact && companyContacts.has(companyContact)) {
@@ -219,7 +224,7 @@ function markDuplicates(rows: ImportRow[], leads: Lead[]) {
     }
 
     if (!duplicate) {
-      if (email) emails.add(email);
+      rowEmails.forEach((email) => emails.add(email));
       rowPhones.forEach((phone) => phones.add(phone));
       if (companyContact) companyContacts.add(companyContact);
     }
@@ -333,6 +338,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       company_name: companyName,
       contact_name: nullable(valueFor(row, "contact_name")),
       email: nullable(valueFor(row, "email")),
+      email_2: nullable(valueFor(row, "email_2")),
       phone,
       phone_2: phone2,
       landline,
@@ -445,6 +451,7 @@ export function LeadImportDialog({
         "Phone 1",
         "Phone 2",
         "Email ID",
+        "Email 2",
         "Landline",
         "Date of Birth",
         "Lead Source",
@@ -462,6 +469,7 @@ export function LeadImportDialog({
         "+91 98450 11223",
         "+91 98765 44321",
         "rahul@vertexglobal.in",
+        "rahul.menon@vertexglobal.in",
         "080 4000 0000",
         "15/08/1991",
         "Naukri Resdex",
@@ -471,8 +479,8 @@ export function LeadImportDialog({
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 15 }, (_, index) => ({
-      wch: [0, 1, 14].includes(index) ? 36 : 20,
+    sheet["!cols"] = Array.from({ length: 16 }, (_, index) => ({
+      wch: [0, 1, 15].includes(index) ? 36 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
@@ -501,6 +509,7 @@ export function LeadImportDialog({
           city: row.city,
           designation: row.designation,
           email: row.email,
+          email_2: row.email_2,
           phone: row.phone,
           phone_2: row.phone_2,
           landline: row.landline,
@@ -645,6 +654,7 @@ export function LeadImportDialog({
                         "Phone 1",
                         "Phone 2",
                         "Email ID",
+                        "Email 2",
                         "Landline",
                         "Date of birth",
                         "Lead source",
@@ -687,6 +697,7 @@ export function LeadImportDialog({
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
+                        <td className="px-3 py-2">{row.email_2 ?? "—"}</td>
                         <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{formatDateOnly(row.age_or_dob)}</td>
                         <td className="px-3 py-2">{row.source ?? "—"}</td>
