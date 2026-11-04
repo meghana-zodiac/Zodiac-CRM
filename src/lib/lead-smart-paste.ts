@@ -32,6 +32,9 @@ const KNOWN_LABELS = new Set([
   "name",
   "email",
   "email id",
+  "email 2",
+  "secondary email",
+  "alternate email",
   "phone",
   "mobile",
   "contact number",
@@ -392,6 +395,12 @@ export function parseLeadPasteDetailed(raw: string): SmartPasteResult {
   const labelled = labelledValues(raw);
   const labels = labelled.values;
   addCommon(result, raw, labels);
+  const emails = Array.from(raw.matchAll(new RegExp(EMAIL.source, "gi")), (match) => match[0]);
+  put(
+    result,
+    "email_2",
+    firstLabel(labels, ["email 2", "secondary email", "alternate email"]) ?? emails[1],
+  );
   put(
     result,
     "company_name",
