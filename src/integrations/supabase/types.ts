@@ -662,6 +662,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           email: string | null;
+          email_2: string | null;
           estimated_value: number | null;
           id: string;
           industry: string | null;
@@ -703,6 +704,7 @@ export type Database = {
           created_by?: string | null;
           created_by?: string | null;
           email?: string | null;
+          email_2?: string | null;
           estimated_value?: number | null;
           id?: string;
           industry?: string | null;
@@ -742,6 +744,7 @@ export type Database = {
           contact_name?: string | null;
           created_at?: string;
           email?: string | null;
+          email_2?: string | null;
           estimated_value?: number | null;
           id?: string;
           industry?: string | null;

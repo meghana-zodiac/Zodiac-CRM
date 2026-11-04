@@ -641,6 +641,19 @@ function LeadsPage() {
           "Compose email",
         ),
     },
+    {
+      header: "Email 2",
+      inlineEditable: true,
+      render: (row) =>
+        inlineCell(
+          row,
+          "email_2",
+          undefined,
+          false,
+          row.email_2 ? gmailComposeUrl(row.email_2) : undefined,
+          "Compose email",
+        ),
+    },
     { header: "Landline", inlineEditable: true, render: (row) => inlineCell(row, "landline") },
     {
       header: "Date of birth",
@@ -786,6 +799,7 @@ function LeadsPage() {
               row.company_name,
               row.contact_name,
               row.email,
+              row.email_2,
               row.phone,
               row.phone_2,
               row.landline,
@@ -875,6 +889,16 @@ function LeadsPage() {
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
                     >
                       <Mail className="size-3.5" /> Email: {row.email}
+                    </a>
+                  ) : null}
+                  {row.email_2 ? (
+                    <a
+                      href={gmailComposeUrl(row.email_2)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                    >
+                      <Mail className="size-3.5" /> Email 2: {row.email_2}
                     </a>
                   ) : null}
                   <button
@@ -999,16 +1023,17 @@ function LeadsPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  disabled={!proposalLead?.email}
-                  title={proposalLead?.email ? "Open Gmail with recipient and subject filled" : "Add an email address to this lead first"}
+                  disabled={!proposalLead?.email && !proposalLead?.email_2}
+                  title={proposalLead?.email || proposalLead?.email_2 ? "Open Gmail with recipient and subject filled" : "Add an email address to this lead first"}
                   onClick={() => {
-                    if (!proposalLead?.email) {
+                    const recipient = proposalLead?.email || proposalLead?.email_2;
+                    if (!recipient) {
                       toast.error("Add an email address to this lead before opening Gmail.");
                       return;
                     }
                     const details = proposalDetails(proposalLead);
                     const gmailWindow = window.open(
-                      gmailComposeUrl(proposalLead.email, details.subject),
+                      gmailComposeUrl(recipient, details.subject),
                       "_blank",
                     );
                     if (!gmailWindow) {
