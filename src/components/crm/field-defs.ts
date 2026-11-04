@@ -174,6 +174,7 @@ export const leadFields: FieldDef[] = [
   { name: "phone", label: "Phone 1", type: "tel" },
   { name: "phone_2", label: "Phone 2", type: "tel" },
   { name: "email", label: "Email ID", type: "email" },
+  { name: "email_2", label: "Email 2", type: "email" },
   { name: "landline", label: "Landline", type: "tel" },
   { name: "age_or_dob", label: "Date of birth", type: "date" },
   { name: "source", label: "Lead source", type: "select", options: opts(LEAD_SOURCES) },
