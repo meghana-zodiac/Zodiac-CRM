@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+          <RecordDialog    { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },type InlineLeadFieldimport { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Clock3,
-  Copy,
-  ExternalLink,
   FileSpreadsheet,
   Mail,
   MessageCircle,
   NotebookPen,
   Phone,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,14 +21,6 @@ import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -107,99 +96,6 @@ function whatsappWebUrl(value: string) {
 function gmailComposeUrl(email: string, subject?: string) {
   const subjectParameter = subject ? `&su=${encodeURIComponent(subject)}` : "";
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subjectParameter}`;
-}
-
-function proposalDetails(lead: Lead) {
-  const contact = lead.contact_name?.trim() || "Hiring Team";
-  const company = lead.company_name.trim();
-  const role = lead.designation?.trim();
-  const industry = lead.industry?.trim();
-  const location = lead.city?.trim();
-  const context = lead.notes?.trim();
-  const primaryEmail = lead.email?.trim();
-  const secondaryEmail = lead.email_2?.trim();
-  const subjectIndustry = industry || "Strategic";
-
-  return {
-    attention: `Attention: ${contact}`,
-    subject: `Strategic ${subjectIndustry} Recruitment Partnership | Zodiac HR Consultants × ${company}`,
-    prompt: [
-      "Act as the customised business development cold-email generator for Zodiac HR Consultants (India) Pvt. Ltd. and, only when the verified international context genuinely requires it, its international arm Zodiac Nexus Global.",
-      "",
-      "TARGET LEAD FROM THE CRM:",
-      `Contact name: ${contact}`,
-      role ? `Designation: ${role}` : "Designation: Not recorded",
-      `Company: ${company}`,
-      industry ? `CRM industry: ${industry}` : "CRM industry: Not recorded — determine it through research",
-      location ? `CRM location: ${location}` : "CRM location: Not recorded — verify it through research",
-      primaryEmail ? `Primary email: ${primaryEmail}` : "Primary email: Not recorded",
-      secondaryEmail ? `Secondary email: ${secondaryEmail}` : "Secondary email: Not recorded",
-      context ? `CRM notes: ${context}` : "CRM notes: No additional discussion or requirement is recorded.",
-      "",
-      "YOUR TASK:",
-      `Research ${company} using reliable public sources. Identify its correct industry, core operations, products or services, geographic focus and the recruitment needs that are reasonably relevant to its business.`,
-      "Then write a polished, company-specific business development proposal email. It must feel individually researched and commercially relevant, not like a generic template.",
-      "",
-      "SUBJECT LINE:",
-      `Use this format: Strategic [verified industry] Recruitment Partnership | Zodiac HR Consultants × ${company}`,
-      "Replace [verified industry] with a concise and accurate industry description. Do not use the CRM industry blindly when public research shows that another description is more accurate.",
-      "",
-      "ZODIAC HR FACTS — USE THESE APPROVED FIGURES ONLY:",
-      "Established in 2006.",
-      "20 years of recruitment and HR consulting experience.",
-      "18,000+ successful placements.",
-      "50+ HR and Search Experts.",
-      "A database and network of more than 10 lakh candidates.",
-      "250+ clients served.",
-      "Expertise spanning 9 industry sectors.",
-      "Do not add, alter or invent any other company statistic or team-size claim.",
-      "",
-      "EMAIL STRUCTURE:",
-      "1. Use 'Dear [appropriate title and surname],' when the recipient's name supports it; otherwise use a professional neutral greeting.",
-      "2. Add 'Greetings from Zodiac HR Consultants.'",
-      "3. Open with a concise proposal to explore a strategic recruitment partnership and support the organisation's current and upcoming talent requirements.",
-      "4. Add a short researched paragraph showing an accurate understanding of the company, its business and operating context.",
-      "5. Introduce Zodiac HR using the approved facts above without overcrowding the paragraph.",
-      "6. Add an industry-specific capabilities section with 7–10 relevant role families, hiring categories or business functions derived from the company's verified operations.",
-      "7. Explain Zodiac's methodology: detailed requirement understanding, targeted market mapping, proactive sourcing, structured or competency-based screening and continuous coordination throughout the selection process.",
-      "8. Add a concise wider-services section using only the services that are relevant: Executive Search, Permanent and Contract Staffing, RPO, Background Verification, Corporate Training, Leadership Development, Technical and Behavioural Assessments, POSH, MBTI, DEI and HR Policy Solutions.",
-      "9. Request a brief introductory discussion about current hiring priorities and, where appropriate, participation in the recruitment vendor empanelment process.",
-      "10. Close with interest in a meaningful, long-term association.",
-      "",
-      "CONTEXT RULES:",
-      "Mention a previous conversation, approach, referral, active requirement or requested proposal only when the CRM notes explicitly confirm it.",
-      "Use Zodiac Nexus Global only when the company's verified international context makes that relevant; otherwise write from Zodiac HR Consultants.",
-      "Never invent founders, offices, expansion plans, hiring mandates, conversations, client associations or vendor relationships.",
-      "Do not name Zodiac clients unless the CRM notes explicitly provide approved client names.",
-      "If a fact cannot be verified, omit it.",
-      "",
-      "WRITING RULES:",
-      "Use Indian English, short paragraphs, readable bullet points and a premium consultative tone.",
-      "Keep the email approximately 500–800 words unless the CRM notes clearly justify a more detailed strategic proposal.",
-      "Make the role and capability list specific to the verified company; never default automatically to BFSI, technology, hospitality or any other sector.",
-      "Avoid generic filler, repetition, exaggerated praise and unsupported claims.",
-      "Check the spelling of the recipient and company names.",
-      "Do not add a sender signature, mobile number, email address or website. The employee's configured Gmail signature will be added in Gmail.",
-      "",
-      "OUTPUT:",
-      "Return only the final subject line followed by the completed email. Do not include research notes, sources, explanations, caveats or drafting commentary.",
-    ].join("\\n"),
-  };
-}
-
-async function copyToClipboard(value: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
 }
 
 type InlineLeadField =
@@ -463,7 +359,6 @@ function LeadsPage() {
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [hideActivityType, setHideActivityType] = useState(false);
-  const [proposalLead, setProposalLead] = useState<Lead | null>(null);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
@@ -694,24 +589,6 @@ function LeadsPage() {
     },
     { header: "Estimated value", render: (row) => currency(row.estimated_value) },
     { header: "Owner", render: (row) => row.owner_name ?? "—" },
-    {
-      header: "Proposal",
-      className: "whitespace-nowrap px-3 py-2.5",
-      render: (row) => (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="gap-1.5"
-          onClick={(event) => {
-            event.stopPropagation();
-            setProposalLead(row);
-          }}
-        >
-          <Sparkles className="size-3.5" /> AI Proposal Email
-        </Button>
-      ),
-    },
     { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },
   ];
 
@@ -864,15 +741,6 @@ function LeadsPage() {
                     disabled={callStatusUpdate.isPending}
                     onChange={(status) => void updateCallStatus(row, status)}
                   />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-full justify-center gap-1.5"
-                    onClick={() => setProposalLead(row)}
-                  >
-                    <Sparkles className="size-3.5" /> AI Proposal Email
-                  </Button>
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
                     <a
@@ -943,128 +811,6 @@ function LeadsPage() {
             onOpenChange={setImportOpen}
             leads={uploadedLeads.data ?? []}
           />
-          <Dialog open={Boolean(proposalLead)} onOpenChange={(open) => !open && setProposalLead(null)}>
-            <DialogContent className="max-h-[calc(100dvh-1rem)] sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Sparkles className="size-5 text-primary" />
-                  AI Proposal Email
-                </DialogTitle>
-                <DialogDescription>
-                  Generate the proposal in ChatGPT, then return here to open a prepared Gmail draft.
-                </DialogDescription>
-              </DialogHeader>
-              {proposalLead ? (
-                <div className="space-y-4">
-                  <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Attention
-                      </p>
-                      <p className="mt-1 font-semibold text-foreground">
-                        {proposalDetails(proposalLead).attention.replace(/^Attention:\s*/, "")}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Email subject
-                      </p>
-                      <p className="mt-1 font-semibold text-foreground">
-                        {proposalDetails(proposalLead).subject}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Prompt that will be copied
-                    </p>
-                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 font-sans text-sm leading-6 text-foreground">
-                      {proposalDetails(proposalLead).prompt}
-                    </pre>
-                  </div>
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
-                    <p className="font-semibold">Complete the email in two steps</p>
-                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-                      <li>Open ChatGPT, paste the copied prompt and generate the proposal.</li>
-                      <li>Copy the completed proposal, return to this CRM tab, open the Gmail draft and paste it before sending.</li>
-                    </ol>
-                  </div>
-                </div>
-              ) : null}
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setProposalLead(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!proposalLead}
-                  onClick={async () => {
-                    if (!proposalLead) return;
-                    try {
-                      await copyToClipboard(proposalDetails(proposalLead).prompt);
-                      toast.success("Proposal prompt copied.");
-                    } catch {
-                      toast.error("The prompt could not be copied. Please copy it from the preview.");
-                    }
-                  }}
-                >
-                  <Copy className="size-4" /> Copy prompt
-                </Button>
-                <Button
-                  disabled={!proposalLead}
-                  onClick={async () => {
-                    if (!proposalLead) return;
-
-                    // Open synchronously while the click is still a trusted user gesture.
-                    // Safari may report a noopener tab as null even when it opened, so start
-                    // with a same-origin blank tab, then detach and navigate it securely.
-                    const chatgptWindow = window.open("", "_blank");
-                    if (!chatgptWindow) {
-                      toast.error("The browser blocked the ChatGPT tab. Please allow pop-ups and try again.");
-                      return;
-                    }
-
-                    chatgptWindow.opener = null;
-                    chatgptWindow.location.replace("https://chatgpt.com/");
-
-                    try {
-                      await copyToClipboard(proposalDetails(proposalLead).prompt);
-                      toast.success("Prompt copied. Paste it into ChatGPT to create the detailed strategic proposal.");
-                    } catch {
-                      toast.info("ChatGPT opened. Copy the prompt from this preview.");
-                    }
-                  }}
-                >
-                  <ExternalLink className="size-4" /> 1. Copy prompt & open ChatGPT
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!proposalLead?.email && !proposalLead?.email_2}
-                  title={proposalLead?.email || proposalLead?.email_2 ? "Open Gmail with recipient and subject filled" : "Add an email address to this lead first"}
-                  onClick={() => {
-                    const recipient = proposalLead?.email || proposalLead?.email_2;
-                    if (!recipient) {
-                      toast.error("Add an email address to this lead before opening Gmail.");
-                      return;
-                    }
-                    const details = proposalDetails(proposalLead);
-                    const gmailWindow = window.open(
-                      gmailComposeUrl(recipient, details.subject),
-                      "_blank",
-                    );
-                    if (!gmailWindow) {
-                      toast.error("The browser blocked the Gmail tab. Please allow pop-ups and try again.");
-                      return;
-                    }
-                    gmailWindow.opener = null;
-                    toast.info("Gmail opened with the recipient and subject filled. Paste the generated proposal into the email body.");
-                  }}
-                >
-                  <Mail className="size-4" /> 2. Open Gmail draft
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
           <RecordDialog
             open={activityDialogOpen}
             onOpenChange={setActivityDialogOpen}
