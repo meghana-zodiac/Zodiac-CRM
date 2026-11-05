@@ -1,4 +1,4 @@
-          <RecordDialog    { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },type InlineLeadFieldimport { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -741,6 +741,7 @@ function LeadsPage() {
                     disabled={callStatusUpdate.isPending}
                     onChange={(status) => void updateCallStatus(row, status)}
                   />
+
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
                   {numbers.map(({ label, value }) => (
                     <a
