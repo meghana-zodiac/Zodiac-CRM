@@ -56,6 +56,93 @@ export type Database = {
         };
         Relationships: [];
       };
+      crm_usage_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_key: string;
+          device_type: string;
+          browser: string | null;
+          operating_system: string | null;
+          current_path: string | null;
+          first_seen_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          session_key: string;
+          device_type: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          current_path?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          session_key?: string;
+          device_type?: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          current_path?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+        };
+        Relationships: [];
+      };
+      crm_usage_events: {
+        Row: {
+          id: number;
+          user_id: string;
+          event_type: string;
+          action: string;
+          entity_type: string | null;
+          entity_id: string | null;
+          entity_label: string | null;
+          device_type: string;
+          browser: string | null;
+          operating_system: string | null;
+          route: string | null;
+          source: string;
+          metadata: Json;
+          occurred_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id?: string;
+          event_type: string;
+          action: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          entity_label?: string | null;
+          device_type?: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          route?: string | null;
+          source?: string;
+          metadata?: Json;
+          occurred_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          event_type?: string;
+          action?: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          entity_label?: string | null;
+          device_type?: string;
+          browser?: string | null;
+          operating_system?: string | null;
+          route?: string | null;
+          source?: string;
+          metadata?: Json;
+          occurred_at?: string;
+        };
+        Relationships: [];
+      };
       crm_devices: {
         Row: {
           id: string;
