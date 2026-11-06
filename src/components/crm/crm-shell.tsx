@@ -45,6 +45,7 @@ import { contactFields, dealFields, leadFields } from "./field-defs";
 import { supabase } from "@/integrations/supabase/client";
 import { AccessManagement } from "./access-management";
 import { GlobalOwnerTabs } from "./owner-filter";
+import { logCrmUsageEvent, trackCrmSession } from "@/lib/crm-usage";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
@@ -277,6 +278,36 @@ export function CrmShell({
             : undefined;
       setAccountInitials(userInitials(name, user?.email));
     });
+  }, []);
+
+  useEffect(() => {
+    void trackCrmSession(pathname);
+    const heartbeat = window.setInterval(() => {
+      void trackCrmSession(pathname, false);
+    }, 3 * 60 * 1000);
+
+    return () => window.clearInterval(heartbeat);
+  }, [pathname]);
+
+  useEffect(() => {
+    const trackCommunication = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+
+      const href = anchor.getAttribute("href") ?? "";
+      if (/web\.whatsapp\.com|wa\.me/i.test(href)) {
+        void logCrmUsageEvent("whatsapp_opened", "Opened WhatsApp from CRM");
+      } else if (/mail\.google\.com|^mailto:/i.test(href)) {
+        void logCrmUsageEvent("email_opened", "Opened email from CRM");
+      } else if (/^tel:/i.test(href)) {
+        void logCrmUsageEvent("call_initiated", "Started phone call from CRM");
+      }
+    };
+
+    document.addEventListener("click", trackCommunication);
+    return () => document.removeEventListener("click", trackCommunication);
   }, []);
 
   const toggleSidebar = () => {
