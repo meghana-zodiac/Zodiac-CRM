@@ -1,5 +1,6 @@
 import {
   Home,
+  Activity,
   BarChart3,
   PieChart,
   Building2,
@@ -40,6 +41,7 @@ export const navGroups: NavGroup[] = [
       { label: "Home", to: "/", icon: Home },
       mod("Reports", BarChart3, "reports"),
       mod("Analytics", PieChart, "analytics"),
+      { label: "CRM Usage", to: "/usage", icon: Activity, adminOnly: true },
     ],
   },
   {
