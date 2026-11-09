@@ -286,17 +286,6 @@ function CrmUsagePage() {
             ))}
           </select>
           <select
-            value={memberFilter}
-            onChange={(event) => setMemberFilter(event.target.value)}
-            className="h-9 max-w-56 rounded-md border border-input bg-background px-3 text-sm"
-            aria-label="Team member"
-          >
-            <option value="all">All members</option>
-            {(members.data ?? []).map((member) => (
-              <option key={member.id} value={member.id}>{member.display_name}</option>
-            ))}
-          </select>
-          <select
             value={deviceFilter}
             onChange={(event) => setDeviceFilter(event.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -323,6 +312,42 @@ function CrmUsagePage() {
           </Button>
         </div>
       </div>
+
+      <section aria-label="Filter usage by team member" className="rounded-xl border border-border bg-surface p-2 shadow-card">
+        <div className="overflow-x-auto scrollbar-thin">
+          <div className="flex min-w-max gap-1">
+            <button
+              type="button"
+              onClick={() => setMemberFilter("all")}
+              aria-pressed={memberFilter === "all"}
+              className={cn(
+                "rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
+                memberFilter === "all"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              All Members
+            </button>
+            {(members.data ?? []).map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => setMemberFilter(member.id)}
+                aria-pressed={memberFilter === member.id}
+                className={cn(
+                  "rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
+                  memberFilter === member.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {member.display_name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Active members" value={activeUsers} detail="Used CRM in this period" icon={UsersRound} />
