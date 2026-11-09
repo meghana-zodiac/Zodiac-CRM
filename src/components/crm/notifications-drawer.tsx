@@ -295,6 +295,7 @@ export function useNotifications(enabled = true) {
   );
 
   return {
+    userId: currentMember.data?.userId,
     items,
     unreadIds: unread.map((i) => i.id),
     unreadCount: unread.length,
