@@ -201,11 +201,20 @@ function CrmUsagePage() {
 
   const memberRows = visibleMembers.map((member) => {
     const memberEvents = filteredEvents.filter((event) => event.user_id === member.id);
-    const memberSessions = (sessions.data ?? []).filter((session) => session.user_id === member.id);
+    const memberSessions = (sessions.data ?? []).filter(
+      (session) => session.user_id === member.id && session.last_seen_at >= since,
+    );
+    const firstLogin = memberSessions
+      .map((session) => session.first_seen_at)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? null;
     const latestTimes = [
       ...memberEvents.map((event) => event.occurred_at),
       ...memberSessions.map((session) => session.last_seen_at),
     ].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const lastActive = latestTimes[0] ?? null;
+    const isOnline = lastActive
+      ? Date.now() - new Date(lastActive).getTime() <= 5 * 60 * 1000
+      : false;
     const devices = Array.from(
       new Set(
         [...memberEvents.map((event) => event.device_type), ...memberSessions.map((session) => session.device_type)]
@@ -215,7 +224,9 @@ function CrmUsagePage() {
 
     return {
       member,
-      lastActive: latestTimes[0] ?? null,
+      firstLogin,
+      lastActive,
+      isOnline,
       devices,
       leadsAdded: memberEvents.filter(
         (event) => event.entity_type === "leads" && event.event_type === "record_created",
@@ -365,11 +376,12 @@ function CrmUsagePage() {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-left text-sm">
+          <table className="w-full min-w-[1160px] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Member</th>
-                <th className="px-4 py-3">Last active</th>
+                <th className="px-4 py-3">First login</th>
+                <th className="px-4 py-3">Last active / logout</th>
                 <th className="px-4 py-3">Device</th>
                 <th className="px-4 py-3 text-center">Leads added</th>
                 <th className="px-4 py-3 text-center">Leads updated</th>
@@ -387,9 +399,26 @@ function CrmUsagePage() {
                     <p className="text-xs text-muted-foreground">{row.member.email}</p>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                    {row.lastActive
-                      ? formatDistanceToNow(new Date(row.lastActive), { addSuffix: true })
-                      : "No tracked activity"}
+                    {row.firstLogin
+                      ? format(new Date(row.firstLogin), "dd MMM, h:mm a")
+                      : "No login recorded"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {row.isOnline ? (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-success">
+                        <span className="size-2 rounded-full bg-success" />
+                        Online now
+                      </span>
+                    ) : row.lastActive ? (
+                      <div>
+                        <p className="text-foreground">{format(new Date(row.lastActive), "dd MMM, h:mm a")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(row.lastActive), { addSuffix: true })}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">No logout recorded</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -405,7 +434,7 @@ function CrmUsagePage() {
                 </tr>
               ))}
               {!memberRows.length && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No approved members found.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">No approved members found.</td></tr>
               )}
             </tbody>
           </table>
