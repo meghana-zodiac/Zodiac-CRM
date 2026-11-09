@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -259,6 +259,7 @@ export function CrmShell({
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [accessManagementOpen, setAccessManagementOpen] = useState(false);
   const [accountInitials, setAccountInitials] = useState("—");
+  const lastCallClick = useRef<{ phone: string; at: number } | null>(null);
   const accounts = useQuery({
     ...accountsQuery(),
     enabled: quickCreate === "contact" || quickCreate === "deal",
@@ -339,7 +340,7 @@ export function CrmShell({
   }, [pathname]);
 
   useEffect(() => {
-    const trackCommunication = (event: MouseEvent) => {
+    const trackCommunication = async (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
@@ -348,10 +349,58 @@ export function CrmShell({
       const href = anchor.getAttribute("href") ?? "";
       if (/web\.whatsapp\.com|wa\.me/i.test(href)) {
         void logCrmUsageEvent("whatsapp_opened", "Opened WhatsApp from CRM");
-      } else if (/mail\.google\.com|^mailto:/i.test(href)) {
+        return;
+      }
+      if (/mail\.google\.com|^mailto:/i.test(href)) {
         void logCrmUsageEvent("email_opened", "Opened email from CRM");
-      } else if (/^tel:/i.test(href)) {
-        void logCrmUsageEvent("call_initiated", "Started phone call from CRM");
+        return;
+      }
+      if (!/^tel:/i.test(href)) return;
+
+      event.preventDefault();
+      const phone = decodeURIComponent(href.replace(/^tel:/i, "").split("?")[0]).trim();
+      if (!phone) {
+        window.location.assign(href);
+        return;
+      }
+
+      const previous = lastCallClick.current;
+      const clickedAt = Date.now();
+      if (previous?.phone === phone && clickedAt - previous.at < 2_000) return;
+      lastCallClick.current = { phone, at: clickedAt };
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        let repName: string | null = null;
+        if (user) {
+          const { data: member } = await supabase
+            .from("bd_team_members")
+            .select("display_name")
+            .eq("id", user.id)
+            .maybeSingle();
+          repName = member?.display_name ?? null;
+        }
+
+        const deviceType = /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent)
+          ? "Mobile"
+          : "Desktop";
+        const { error } = await supabase.from("call_logs").insert({
+          phone_number: phone,
+          rep_name: repName,
+          call_type: `Call Initiated · ${deviceType}`,
+          duration_seconds: null,
+          created_at: new Date().toISOString(),
+        });
+        if (error) console.warn("Click-to-call log was not saved", error.message);
+        void logCrmUsageEvent("call_initiated", "Started phone call from CRM", {
+          metadata: { phone_number: phone, device: deviceType.toLowerCase() },
+        });
+      } catch (error) {
+        console.warn("Click-to-call logging failed", error);
+      } finally {
+        window.location.assign(href);
       }
     };
 
