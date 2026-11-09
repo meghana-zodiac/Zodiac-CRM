@@ -212,15 +212,24 @@ function CrmUsagePage() {
       ...memberSessions.map((session) => session.last_seen_at),
     ].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
     const lastActive = latestTimes[0] ?? null;
-    const isOnline = lastActive
-      ? Date.now() - new Date(lastActive).getTime() <= 5 * 60 * 1000
-      : false;
+    const latestSession = [...memberSessions].sort(
+      (a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime(),
+    )[0];
+    const activeSessions = memberSessions.filter(
+      (session) => Date.now() - new Date(session.last_seen_at).getTime() <= 5 * 60 * 1000,
+    );
+    const isOnline = activeSessions.length > 0;
     const devices = Array.from(
       new Set(
-        [...memberEvents.map((event) => event.device_type), ...memberSessions.map((session) => session.device_type)]
-          .filter((device) => device && device !== "unknown"),
+        (isOnline
+          ? activeSessions.map((session) => session.device_type)
+          : latestSession
+            ? [latestSession.device_type]
+            : []
+        ).filter((device) => device && device !== "unknown"),
       ),
     );
+    const deviceState = isOnline ? "Active device" : devices.length ? "Last used" : null;
 
     return {
       member,
@@ -228,6 +237,7 @@ function CrmUsagePage() {
       lastActive,
       isOnline,
       devices,
+      deviceState,
       leadsAdded: memberEvents.filter(
         (event) => event.entity_type === "leads" && event.event_type === "record_created",
       ).length,
@@ -382,7 +392,7 @@ function CrmUsagePage() {
                 <th className="px-4 py-3">Member</th>
                 <th className="px-4 py-3">First login</th>
                 <th className="px-4 py-3">Last active / logout</th>
-                <th className="px-4 py-3">Device</th>
+                <th className="px-4 py-3">Current / last device</th>
                 <th className="px-4 py-3 text-center">Leads added</th>
                 <th className="px-4 py-3 text-center">Leads updated</th>
                 <th className="px-4 py-3 text-center">Follow-ups</th>
@@ -424,6 +434,9 @@ function CrmUsagePage() {
                     <div className="flex flex-wrap gap-1">
                       {row.devices.length ? row.devices.map((device) => <DeviceBadge key={device} device={device} />) : "—"}
                     </div>
+                    {row.deviceState ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">{row.deviceState}</p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.leadsAdded}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.leadsUpdated}</td>
