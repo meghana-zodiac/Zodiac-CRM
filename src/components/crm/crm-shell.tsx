@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -265,6 +266,54 @@ export function CrmShell({
   const contacts = useQuery({ ...contactsQuery(), enabled: quickCreate === "deal" });
   const notifications = useNotifications(true);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => {
+    if (!notifications.userId || !notifications.items.length) return;
+
+    const timer = window.setTimeout(() => {
+      const storageKey = `zodiac-crm.popup-notifications.v1.${notifications.userId}`;
+      let shownIds: string[] = [];
+      try {
+        const stored = window.localStorage.getItem(storageKey);
+        shownIds = stored ? (JSON.parse(stored) as string[]) : [];
+      } catch {
+        shownIds = [];
+      }
+
+      const unread = new Set(notifications.unreadIds);
+      const next = notifications.items.find(
+        (item) => unread.has(item.id) && !shownIds.includes(item.id),
+      );
+      if (!next) return;
+
+      const updated = [...shownIds, next.id].slice(-250);
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch {
+        /* The pop-up can still be displayed when storage is unavailable. */
+      }
+
+      toast(next.title, {
+        description: next.detail,
+        duration: 12_000,
+        action: {
+          label: "Open",
+          onClick: () => window.location.assign(next.href),
+        },
+        cancel: {
+          label: "Dismiss",
+          onClick: () => notifications.dismiss(next.id),
+        },
+      });
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    notifications.dismiss,
+    notifications.items,
+    notifications.unreadIds,
+    notifications.userId,
+  ]);
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem("zodiac-crm-sidebar") === "collapsed");
