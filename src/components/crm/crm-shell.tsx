@@ -472,7 +472,7 @@ export function CrmShell({
           </div>
         </header>
 
-        <GlobalOwnerTabs isAdmin={isAdmin} />
+        {pathname !== "/usage" ? <GlobalOwnerTabs isAdmin={isAdmin} /> : null}
 
         <main key={pathname} className="crm-route-enter min-w-0 flex-1 pb-20 md:pb-0">
           {children}
