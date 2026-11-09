@@ -89,11 +89,30 @@ export function ActivityModule({
         completed_at: status === "Completed" ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast.success("Activity updated");
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["activities"] });
+      const previous = queryClient.getQueryData<Activity[]>(["activities"]);
+      queryClient.setQueryData<Activity[]>(["activities"], (current = []) =>
+        current.map((activity) =>
+          activity.id === id
+            ? {
+                ...activity,
+                status,
+                completed_at: status === "Completed" ? new Date().toISOString() : null,
+              }
+            : activity,
+        ),
+      );
+      return { previous };
     },
-    onError: (error: Error) => toast.error(error.message),
+    onSuccess: () => toast.success("Activity updated"),
+    onError: (error: Error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["activities"], context.previous);
+      }
+      toast.error(error.message);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["activities"] }),
   });
 
   const rows = useMemo(() => {
@@ -248,9 +267,34 @@ export function ActivityModule({
                         >
                           {activity.title}
                         </p>
-                        <StatusPill tone={activityTone(activity.status)}>
-                          {activity.status}
-                        </StatusPill>
+                        <select
+                          value={activity.status}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            toggleComplete.mutate({
+                              id: activity.id,
+                              status: event.target.value,
+                            });
+                          }}
+                          disabled={toggleComplete.isPending}
+                          className={
+                            "cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-primary/30 disabled:cursor-wait disabled:opacity-60 " +
+                            (activity.status === "Completed"
+                              ? "border-success/30 bg-success/10 text-success"
+                              : activity.status === "In Progress"
+                                ? "border-warning/40 bg-warning/10 text-warning-foreground"
+                                : "border-border bg-muted text-muted-foreground")
+                          }
+                          aria-label={`Change status for ${activity.title}`}
+                          title="Click to change status"
+                        >
+                          {ACTIVITY_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
                         {activity.status !== "Completed" ? (
                           <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
                         ) : null}
