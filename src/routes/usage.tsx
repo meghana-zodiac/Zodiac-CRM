@@ -11,7 +11,15 @@ import {
   Smartphone,
   UsersRound,
 } from "lucide-react";
-import { format, formatDistanceToNow, startOfDay, subDays } from "date-fns";
+import {
+  endOfDay,
+  format,
+  formatDistanceToNow,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+} from "date-fns";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -41,15 +49,43 @@ type TeamMember = Pick<
 
 const periods = [
   { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This week" },
   { value: "7", label: "Last 7 days" },
+  { value: "this_month", label: "This month" },
   { value: "30", label: "Last 30 days" },
   { value: "90", label: "Last 90 days" },
+  { value: "custom", label: "Custom dates" },
 ] as const;
 
-function rangeStart(period: string) {
+function usageRange(period: string, customFrom: string, customTo: string) {
   const now = new Date();
-  if (period === "today") return startOfDay(now);
-  return startOfDay(subDays(now, Math.max(0, Number(period) - 1)));
+
+  if (period === "today") {
+    return { start: startOfDay(now), end: endOfDay(now) };
+  }
+  if (period === "yesterday") {
+    const yesterday = subDays(now, 1);
+    return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+  }
+  if (period === "this_week") {
+    return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now) };
+  }
+  if (period === "this_month") {
+    return { start: startOfMonth(now), end: endOfDay(now) };
+  }
+  if (period === "custom" && customFrom && customTo) {
+    const start = new Date(`${customFrom}T00:00:00`);
+    const end = new Date(`${customTo}T23:59:59.999`);
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+      return start <= end ? { start, end } : { start: startOfDay(end), end: endOfDay(start) };
+    }
+  }
+
+  return {
+    start: startOfDay(subDays(now, Math.max(0, Number(period) - 1))),
+    end: endOfDay(now),
+  };
 }
 
 function readableEntity(value: string | null) {
@@ -103,10 +139,20 @@ function DeviceBadge({ device }: { device: string }) {
 }
 
 function CrmUsagePage() {
+  const todayValue = format(new Date(), "yyyy-MM-dd");
   const [period, setPeriod] = useState("7");
+  const [customFrom, setCustomFrom] = useState(format(subDays(new Date(), 6), "yyyy-MM-dd"));
+  const [customTo, setCustomTo] = useState(todayValue);
   const [memberFilter, setMemberFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
-  const since = useMemo(() => rangeStart(period).toISOString(), [period]);
+  const selectedRange = useMemo(
+    () => usageRange(period, customFrom, customTo),
+    [customFrom, customTo, period],
+  );
+  const since = selectedRange.start.toISOString();
+  const until = selectedRange.end.toISOString();
+  const rangeIncludesNow =
+    selectedRange.start.getTime() <= Date.now() && selectedRange.end.getTime() >= Date.now();
 
   const access = useQuery({
     queryKey: ["crm-usage-access"],
@@ -144,13 +190,14 @@ function CrmUsagePage() {
   });
 
   const events = useQuery({
-    queryKey: ["crm-usage-events", since],
+    queryKey: ["crm-usage-events", since, until],
     enabled: isAdmin,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_usage_events")
         .select("*")
         .gte("occurred_at", since)
+        .lte("occurred_at", until)
         .order("occurred_at", { ascending: false })
         .limit(5000);
       if (error) throw error;
@@ -198,11 +245,17 @@ function CrmUsagePage() {
   );
   const activeUsers = new Set(filteredEvents.map((event) => event.user_id)).size;
   const conversions = filteredEvents.filter((event) => event.event_type === "lead_converted").length;
+  const callStatusChanges = filteredEvents.filter(
+    (event) => event.event_type === "call_status_changed",
+  ).length;
 
   const memberRows = visibleMembers.map((member) => {
     const memberEvents = filteredEvents.filter((event) => event.user_id === member.id);
     const memberSessions = (sessions.data ?? []).filter(
-      (session) => session.user_id === member.id && session.last_seen_at >= since,
+      (session) =>
+        session.user_id === member.id &&
+        session.last_seen_at >= since &&
+        session.last_seen_at <= until,
     );
     const firstLogin = memberSessions
       .map((session) => session.first_seen_at)
@@ -218,7 +271,7 @@ function CrmUsagePage() {
     const activeSessions = memberSessions.filter(
       (session) => Date.now() - new Date(session.last_seen_at).getTime() <= 5 * 60 * 1000,
     );
-    const isOnline = activeSessions.length > 0;
+    const isOnline = rangeIncludesNow && activeSessions.length > 0;
     const devices = Array.from(
       new Set(
         (isOnline
@@ -244,7 +297,10 @@ function CrmUsagePage() {
       leadsUpdated: memberEvents.filter(
         (event) =>
           event.entity_type === "leads" &&
-          ["record_updated", "lead_status_changed", "call_status_changed"].includes(event.event_type),
+          ["record_updated", "lead_status_changed"].includes(event.event_type),
+      ).length,
+      callStatusChanges: memberEvents.filter(
+        (event) => event.event_type === "call_status_changed",
       ).length,
       followUps: memberEvents.filter(
         (event) =>
@@ -306,6 +362,33 @@ function CrmUsagePage() {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+          {period === "custom" ? (
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                From
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo || todayValue}
+                  onChange={(event) => setCustomFrom(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                  aria-label="Usage start date"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                To
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom}
+                  max={todayValue}
+                  onChange={(event) => setCustomTo(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                  aria-label="Usage end date"
+                />
+              </label>
+            </>
+          ) : null}
           <select
             value={deviceFilter}
             onChange={(event) => setDeviceFilter(event.target.value)}
@@ -370,11 +453,12 @@ function CrmUsagePage() {
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard label="Active members" value={activeUsers} detail="Used CRM in this period" icon={UsersRound} />
         <StatCard label="Verified CRM actions" value={verifiedActions.length} detail="Database-confirmed changes" icon={CheckCircle2} />
         <StatCard label="Communication starts" value={communicationStarts.length} detail="Call, WhatsApp or Gmail opened" icon={MessageCircle} />
         <StatCard label="Conversions" value={conversions} detail="Leads converted to clients" icon={Activity} />
+        <StatCard label="Call status changes" value={callStatusChanges} detail="Status updates confirmed by CRM" icon={RefreshCw} />
         <StatCard label="Total evidence" value={meaningfulEvents.length} detail="Meaningful tracked actions" icon={Clock3} />
       </div>
 
@@ -386,7 +470,7 @@ function CrmUsagePage() {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1160px] text-left text-sm">
+          <table className="w-full min-w-[1280px] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Member</th>
@@ -395,6 +479,7 @@ function CrmUsagePage() {
                 <th className="px-4 py-3">Current / last device</th>
                 <th className="px-4 py-3 text-center">Leads added</th>
                 <th className="px-4 py-3 text-center">Leads updated</th>
+                <th className="px-4 py-3 text-center">Call statuses</th>
                 <th className="px-4 py-3 text-center">Follow-ups</th>
                 <th className="px-4 py-3 text-center">Completed</th>
                 <th className="px-4 py-3 text-center">Communication</th>
@@ -440,6 +525,7 @@ function CrmUsagePage() {
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.leadsAdded}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.leadsUpdated}</td>
+                  <td className="px-4 py-3 text-center tabular-nums">{row.callStatusChanges}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.followUps}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.completed}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{row.communication}</td>
@@ -447,7 +533,7 @@ function CrmUsagePage() {
                 </tr>
               ))}
               {!memberRows.length && (
-                <tr><td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">No approved members found.</td></tr>
+                <tr><td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">No approved members found.</td></tr>
               )}
             </tbody>
           </table>
