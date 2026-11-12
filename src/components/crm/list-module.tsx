@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ export type Column<T> = {
   render: (row: T) => React.ReactNode;
   className?: string;
   inlineEditable?: boolean;
+  groupedHidden?: boolean;
 };
 
 const ROWS_PER_PAGE = 100;
@@ -50,6 +51,8 @@ export function ListModule<T extends { id: string }>({
   filterPlacement = "sidebar",
   rowClassName,
   showSerialNumbers = false,
+  groupBy,
+  renderGroupHeader,
 }: {
   title: string;
   createLabel: string;
@@ -75,6 +78,8 @@ export function ListModule<T extends { id: string }>({
   filterPlacement?: "sidebar" | "toolbar";
   rowClassName?: (row: T) => string;
   showSerialNumbers?: boolean;
+  groupBy?: (row: T) => string;
+  renderGroupHeader?: (row: T, contactCount: number) => React.ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
@@ -86,7 +91,10 @@ export function ListModule<T extends { id: string }>({
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
-  const compactColumns = mobileColumns ?? columns;
+  const groupedColumns = groupBy ? columns.filter((column) => !column.groupedHidden) : columns;
+  const compactColumns = (mobileColumns ?? columns).filter(
+    (column) => !groupBy || !column.groupedHidden,
+  );
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const syncingScrollRef = useRef(false);
@@ -124,11 +132,37 @@ export function ListModule<T extends { id: string }>({
       ),
     [filterOptions, filterValue, rows],
   );
-  const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  const orderedFiltered = useMemo(() => {
+    if (!groupBy) return filtered;
+    const groups = new Map<string, T[]>();
+    filtered.forEach((row) => {
+      const key = groupBy(row);
+      const group = groups.get(key);
+      if (group) group.push(row);
+      else groups.set(key, [row]);
+    });
+    return Array.from(groups.values()).flat();
+  }, [filtered, groupBy]);
+  const groupContactCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!groupBy) return counts;
+    orderedFiltered.forEach((row) => {
+      const key = groupBy(row);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return counts;
+  }, [orderedFiltered, groupBy]);
+  const pageCount = Math.max(1, Math.ceil(orderedFiltered.length / ROWS_PER_PAGE));
   const visibleRows = useMemo(
-    () => filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE),
-    [filtered, page],
+    () => orderedFiltered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE),
+    [orderedFiltered, page],
   );
+  const isGroupStart = (row: T, index: number) =>
+    Boolean(
+      groupBy &&
+        renderGroupHeader &&
+        (index === 0 || groupBy(visibleRows[index - 1]) !== groupBy(row)),
+    );
 
   useEffect(() => {
     setPage(1);
@@ -279,8 +313,13 @@ export function ListModule<T extends { id: string }>({
             <>
               <div className="space-y-2.5 md:hidden">
                 {visibleRows.map((row, rowIndex) => (
+                  <Fragment key={row.id}>
+                    {isGroupStart(row, rowIndex) ? (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3 shadow-sm">
+                        {renderGroupHeader?.(row, groupContactCounts.get(groupBy?.(row) ?? "") ?? 1)}
+                      </div>
+                    ) : null}
                   <article
-                    key={row.id}
                     className={`cursor-pointer overflow-hidden rounded-xl border border-border bg-surface shadow-panel transition-shadow active:shadow-none ${rowClassName?.(row) ?? ""}`}
                     onClick={() => openDetails(row)}
                   >
@@ -336,6 +375,7 @@ export function ListModule<T extends { id: string }>({
                       </div>
                     ) : null}
                   </article>
+                  </Fragment>
                 ))}
               </div>
               <div className="relative hidden md:block">
@@ -356,7 +396,7 @@ export function ListModule<T extends { id: string }>({
                   <thead>
                     <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {showSerialNumbers ? <th className="w-20 px-3 py-2.5">Sr. No.</th> : null}
-                      {columns.map((column) => (
+                      {groupedColumns.map((column) => (
                         <th key={column.header} className="px-3 py-2.5">
                           {column.header}
                         </th>
@@ -367,8 +407,26 @@ export function ListModule<T extends { id: string }>({
                   </thead>
                   <tbody className="divide-y divide-border">
                     {visibleRows.map((row, rowIndex) => (
+                      <Fragment key={row.id}>
+                        {isGroupStart(row, rowIndex) ? (
+                          <tr className="border-y border-primary/20 bg-primary/5">
+                            <td
+                              colSpan={
+                                groupedColumns.length +
+                                (showSerialNumbers ? 1 : 0) +
+                                (desktopActions ? 1 : 0) +
+                                1
+                              }
+                              className="px-4 py-3"
+                            >
+                              {renderGroupHeader?.(
+                                row,
+                                groupContactCounts.get(groupBy?.(row) ?? "") ?? 1,
+                              )}
+                            </td>
+                          </tr>
+                        ) : null}
                       <tr
-                        key={row.id}
                         className={`cursor-pointer transition-colors hover:bg-muted/40 ${rowClassName?.(row) ?? ""}`}
                         onClick={() => openDetails(row)}
                       >
@@ -377,7 +435,7 @@ export function ListModule<T extends { id: string }>({
                             {(page - 1) * ROWS_PER_PAGE + rowIndex + 1}
                           </td>
                         ) : null}
-                        {columns.map((column) => (
+                        {groupedColumns.map((column) => (
                           <td
                             key={column.header}
                             className={column.className ?? "px-3 py-2.5 text-muted-foreground"}
@@ -406,6 +464,7 @@ export function ListModule<T extends { id: string }>({
                           />
                         </td>
                       </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
