@@ -78,7 +78,7 @@ function usageRange(period: string, customFrom: string, customTo: string) {
     const start = new Date(`${customFrom}T00:00:00`);
     const end = new Date(`${customTo}T23:59:59.999`);
     if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-      return start <= end ? { start, end } : { start: endOfDay(end), end: endOfDay(start) };
+      return start <= end ? { start, end } : { start: startOfDay(end), end: endOfDay(start) };
     }
   }
 
