@@ -98,6 +98,11 @@ function gmailComposeUrl(email: string, subject?: string) {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subjectParameter}`;
 }
 
+function leadCompanyKey(row: Lead) {
+  const company = row.company_name?.trim().toLocaleLowerCase();
+  return company || `lead:${row.id}`;
+}
+
 type InlineLeadField =
   | "contact_name"
   | "company_name"
@@ -498,18 +503,21 @@ function LeadsPage() {
     },
     {
       header: "Current company",
+      groupedHidden: true,
       className: "w-72 max-w-72 truncate px-3 py-2.5 font-medium text-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "company_name", undefined, true),
     },
     {
       header: "Industry",
+      groupedHidden: true,
       className: "w-40 max-w-40 truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "industry"),
     },
     {
       header: "Current location",
+      groupedHidden: true,
       className: "w-48 max-w-48 truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "city"),
@@ -637,14 +645,36 @@ function LeadsPage() {
               { header: "HR / Contact", render: (row) => row.contact_name ?? "—" },
               {
                 header: "Current company",
+                groupedHidden: true,
                 className: "font-medium text-foreground",
                 render: (row) => row.company_name,
               },
               { header: "Designation", render: (row) => row.designation ?? "—" },
-              { header: "Location", render: (row) => row.city ?? "—" },
+              {
+                header: "Location",
+                groupedHidden: true,
+                render: (row) => row.city ?? "—",
+              },
             ]}
             minWidth={3100}
             showSerialNumbers
+            groupBy={leadCompanyKey}
+            renderGroupHeader={(row, contactCount) => (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground sm:text-base">
+                    {row.company_name || "Company not specified"}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {row.industry ? <span>{row.industry}</span> : null}
+                    {row.city ? <span>{row.city}</span> : null}
+                  </div>
+                </div>
+                <span className="w-fit shrink-0 rounded-full border border-primary/20 bg-surface px-2.5 py-1 text-xs font-medium text-primary">
+                  {contactCount} HR {contactCount === 1 ? "contact" : "contacts"}
+                </span>
+              </div>
+            )}
             allowCreate={tab !== "ceipal"}
             filterAllLabel="All leads"
             filterOptions={LEAD_STATUSES}
