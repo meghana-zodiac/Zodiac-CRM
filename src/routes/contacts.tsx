@@ -75,9 +75,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
 import { supabase } from "@/integrations/supabase/client";
 import { gmailComposeUrl } from "@/lib/contact-links";
+import { callLogForEvent, type CallLogAttempt } from "@/lib/call-logging";
 
 type PendingCall = {
   contact: ContactWithAccount;
+  log: CallLogAttempt;
   startedAt: number;
   returnedAt: number | null;
 };
@@ -247,14 +249,17 @@ function ContactsPage() {
     setActivityDialogOpen(true);
   };
 
-  const startTrackedCall = (contact: ContactWithAccount) => {
+  const startTrackedCall = (contact: ContactWithAccount, event: React.MouseEvent) => {
+    const log = callLogForEvent(event.nativeEvent);
+    if (!log) return;
+    if (pendingCallRef.current?.log.id === log.id) return;
     callLeftApp.current = false;
     setCallOutcome("Connected");
     setCallNotes("");
     setNextAction("Call Again");
     setFollowUpAt("");
     setPriority("Medium");
-    const call = { contact, startedAt: Date.now(), returnedAt: null };
+    const call = { contact, log, startedAt: log.startedAt, returnedAt: null };
     pendingCallRef.current = call;
     setPendingCall(call);
   };
@@ -323,16 +328,21 @@ function ContactsPage() {
         service_details: details,
       });
 
-      const { error: callLogError } = await supabase.from("call_logs").insert({
-        phone_number: pendingCall.contact.phone,
-        rep_name: signedInName || null,
-        call_type: "CRM Outgoing",
-        duration_seconds: elapsedSeconds,
-        created_at: details.started_at,
-      });
+      // The entry already exists from the Call tap; enrich that same entry.
+      await pendingCall.log.save();
+      const { error: callLogError } = await supabase
+        .from("call_logs")
+        .update({
+          rep_name: signedInName || null,
+          call_type: `CRM Outgoing · ${pendingCall.log.device} · Estimated elapsed`,
+          duration_seconds: elapsedSeconds,
+        })
+        .eq("id", pendingCall.log.id)
+        .select("id")
+        .single();
       if (callLogError) {
         throw new Error(
-          `The CRM activity was saved, but the Call Log failed: ${callLogError.message}`,
+          `The CRM activity was saved, but the call details could not be updated: ${callLogError.message}`,
         );
       }
 
@@ -522,7 +532,7 @@ function ContactsPage() {
                             href={contact.phone ? `tel:${contact.phone}` : null}
                             label="Call"
                             icon={Phone}
-                            onClick={() => startTrackedCall(contact)}
+                            onClick={(event) => startTrackedCall(contact, event)}
                           />
                           <ContactAction
                             href={
@@ -698,7 +708,7 @@ function ContactsPage() {
                   href={openContact.phone ? `tel:${openContact.phone}` : null}
                   label="Call"
                   icon={Phone}
-                  onClick={() => startTrackedCall(openContact)}
+                  onClick={(event) => startTrackedCall(openContact, event)}
                 />
                 <ContactAction
                   href={openContact.phone ? `sms:${openContact.phone}` : null}
@@ -955,9 +965,9 @@ function ContactsPage() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Log completed call</DialogTitle>
+            <DialogTitle>Add call details (optional)</DialogTitle>
             <DialogDescription>
-              Review the call with{" "}
+              The call log saves automatically when you tap Call. Add details for{" "}
               {pendingCall
                 ? fullName(pendingCall.contact.first_name, pendingCall.contact.last_name)
                 : "this contact"}
@@ -1068,10 +1078,10 @@ function ContactsPage() {
               }}
               disabled={saveTrackedCall.isPending}
             >
-              Discard
+              Skip details
             </Button>
             <Button onClick={() => saveTrackedCall.mutate()} disabled={saveTrackedCall.isPending}>
-              {saveTrackedCall.isPending ? "Saving…" : "Save call"}
+              {saveTrackedCall.isPending ? "Saving…" : "Save details"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1093,7 +1103,7 @@ function ContactAction({
   label: string;
   icon: typeof Phone;
   external?: boolean;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const className = `flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[10px] font-medium ${
     href ? "text-primary" : "pointer-events-none text-muted-foreground/40"
@@ -1111,7 +1121,7 @@ function ContactAction({
           event.preventDefault();
           window.open(desktopHref, "_blank", "noopener,noreferrer");
         }
-        onClick?.();
+        onClick?.(event);
       }}
     >
       <Icon className="size-[18px]" />

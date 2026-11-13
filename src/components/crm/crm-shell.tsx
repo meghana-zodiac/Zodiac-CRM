@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   Building2,
@@ -47,6 +47,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AccessManagement } from "./access-management";
 import { GlobalOwnerTabs } from "./owner-filter";
 import { logCrmUsageEvent, trackCrmSession } from "@/lib/crm-usage";
+import { installCallLogging, type CallLogAttempt } from "@/lib/call-logging";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
@@ -259,7 +260,7 @@ export function CrmShell({
   const [quickCreate, setQuickCreate] = useState<QuickCreate>(null);
   const [accessManagementOpen, setAccessManagementOpen] = useState(false);
   const [accountInitials, setAccountInitials] = useState("—");
-  const lastCallClick = useRef<{ phone: string; at: number } | null>(null);
+  const queryClient = useQueryClient();
   const accounts = useQuery({
     ...accountsQuery(),
     enabled: quickCreate === "contact" || quickCreate === "deal",
@@ -309,12 +310,7 @@ export function CrmShell({
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [
-    notifications.dismiss,
-    notifications.items,
-    notifications.unreadIds,
-    notifications.userId,
-  ]);
+  }, [notifications.dismiss, notifications.items, notifications.unreadIds, notifications.userId]);
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem("zodiac-crm-sidebar") === "collapsed");
@@ -332,15 +328,18 @@ export function CrmShell({
 
   useEffect(() => {
     void trackCrmSession(pathname);
-    const heartbeat = window.setInterval(() => {
-      void trackCrmSession(pathname, false);
-    }, 3 * 60 * 1000);
+    const heartbeat = window.setInterval(
+      () => {
+        void trackCrmSession(pathname, false);
+      },
+      3 * 60 * 1000,
+    );
 
     return () => window.clearInterval(heartbeat);
   }, [pathname]);
 
   useEffect(() => {
-    const trackCommunication = async (event: MouseEvent) => {
+    const trackCommunication = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
@@ -355,58 +354,38 @@ export function CrmShell({
         void logCrmUsageEvent("email_opened", "Opened email from CRM");
         return;
       }
-      if (!/^tel:/i.test(href)) return;
-
-      event.preventDefault();
-      const phone = decodeURIComponent(href.replace(/^tel:/i, "").split("?")[0]).trim();
-      if (!phone) {
-        window.location.assign(href);
-        return;
-      }
-
-      const previous = lastCallClick.current;
-      const clickedAt = Date.now();
-      if (previous?.phone === phone && clickedAt - previous.at < 2_000) return;
-      lastCallClick.current = { phone, at: clickedAt };
-
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        let repName: string | null = null;
-        if (user) {
-          const { data: member } = await supabase
-            .from("bd_team_members")
-            .select("display_name")
-            .eq("id", user.id)
-            .maybeSingle();
-          repName = member?.display_name ?? null;
-        }
-
-        const deviceType = /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent)
-          ? "Mobile"
-          : "Desktop";
-        const { error } = await supabase.from("call_logs").insert({
-          phone_number: phone,
-          rep_name: repName,
-          call_type: `Call Initiated · ${deviceType}`,
-          duration_seconds: null,
-          created_at: new Date().toISOString(),
-        });
-        if (error) console.warn("Click-to-call log was not saved", error.message);
-        void logCrmUsageEvent("call_initiated", "Started phone call from CRM", {
-          metadata: { phone_number: phone, device: deviceType.toLowerCase() },
-        });
-      } catch (error) {
-        console.warn("Click-to-call logging failed", error);
-      } finally {
-        window.location.assign(href);
-      }
     };
 
-    document.addEventListener("click", trackCommunication);
-    return () => document.removeEventListener("click", trackCommunication);
-  }, []);
+    document.addEventListener("click", trackCommunication, true);
+    const onSaved = (attempt: CallLogAttempt) => {
+      void queryClient.invalidateQueries({ queryKey: ["call-logs"] });
+      void logCrmUsageEvent("call_initiated", "Started phone call from CRM", {
+        metadata: { phone_number: attempt.phone, device: attempt.device.toLowerCase() },
+      });
+    };
+    const onError = (attempt: CallLogAttempt) => {
+      toast.error("Call log could not be auto-saved. Tap Retry to save it.", {
+        duration: Infinity,
+        action: {
+          label: "Retry",
+          onClick: () => {
+            void attempt.save().then(
+              () => {
+                onSaved(attempt);
+                toast.success("Call log saved");
+              },
+              () => onError(attempt),
+            );
+          },
+        },
+      });
+    };
+    const stopCallLogging = installCallLogging({ onSaved, onError });
+    return () => {
+      document.removeEventListener("click", trackCommunication, true);
+      stopCallLogging();
+    };
+  }, [queryClient]);
 
   const toggleSidebar = () => {
     setCollapsed((previous) => {
