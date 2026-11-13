@@ -39,6 +39,7 @@ import {
 } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { whatsappNumber } from "@/lib/phone-links";
 import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import {
   leadCountryKey,
@@ -84,15 +85,6 @@ const CALL_STATUSES = [
 
 type CallStatus = (typeof CALL_STATUSES)[number];
 const CLEAR_CALL_STATUS = "__clear_call_status__";
-
-function whatsappNumber(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits.length === 10
-    ? `91${digits}`
-    : digits.length === 11 && digits.startsWith("0")
-      ? `91${digits.slice(1)}`
-      : digits;
-}
 
 function whatsappUrl(value: string) {
   return `https://wa.me/${whatsappNumber(value)}`;
