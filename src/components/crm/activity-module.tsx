@@ -49,6 +49,23 @@ function callDetails(value: unknown) {
   return value as Record<string, unknown>;
 }
 
+function taskContactDetails(value: unknown) {
+  const details = callDetails(value);
+  if (!details) return null;
+  const phones = [
+    details.contact_phone,
+    details.contact_phone_2,
+    details.contact_landline,
+  ].filter((item): item is string => typeof item === "string" && Boolean(item.trim()));
+  const emails = [details.contact_email, details.contact_email_2].filter(
+    (item): item is string => typeof item === "string" && Boolean(item.trim()),
+  );
+  const uniquePhones = [...new Set(phones)];
+  const uniqueEmails = [...new Set(emails)];
+  if (!uniquePhones.length && !uniqueEmails.length) return null;
+  return { phones: uniquePhones, emails: uniqueEmails };
+}
+
 function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -126,7 +143,13 @@ export function ActivityModule({
         }
         if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
         if (!term) return true;
-        return [activity.title, activity.notes, activity.owner_name, activity.related_to_type]
+        return [
+          activity.title,
+          activity.notes,
+          activity.owner_name,
+          activity.related_to_type,
+          JSON.stringify(activity.service_details),
+        ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term));
       });
@@ -237,6 +260,8 @@ export function ActivityModule({
               {rows.map((activity) => {
                 const badge = dueBadge(activity.due_date);
                 const details = type === "Call" ? callDetails(activity.service_details) : null;
+                const taskContact =
+                  type === "Task" ? taskContactDetails(activity.service_details) : null;
                 return (
                   <li
                     key={activity.id}
@@ -320,6 +345,33 @@ export function ActivityModule({
                         <p className="mt-1 truncate text-xs font-medium text-primary">
                           {relatedLabels.get(activity.related_to_id)}
                         </p>
+                      ) : null}
+                      {taskContact ? (
+                        <div
+                          className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {taskContact.phones.map((phone) => (
+                            <a
+                              key={`phone-${phone}`}
+                              href={`tel:${phone}`}
+                              className="font-medium text-primary underline-offset-2 hover:underline"
+                            >
+                              Phone: {phone}
+                            </a>
+                          ))}
+                          {taskContact.emails.map((email) => (
+                            <a
+                              key={`email-${email}`}
+                              href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-primary underline-offset-2 hover:underline"
+                            >
+                              Email: {email}
+                            </a>
+                          ))}
+                        </div>
                       ) : null}
                       {activity.notes ? (
                         <p className="mt-1.5 text-xs text-muted-foreground">{activity.notes}</p>
