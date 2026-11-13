@@ -39,6 +39,15 @@ import {
 } from "@/lib/crm";
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
+import {
+  leadCountryKey,
+  leadCountryName,
+  leadMarket,
+  matchesLeadGeography,
+  UNKNOWN_COUNTRY,
+  type LeadMarket,
+} from "@/lib/lead-geography";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({
@@ -96,7 +105,7 @@ function gmailComposeUrl(email: string, subject?: string) {
 
 function leadCompanyKey(row: Lead) {
   const company = row.company_name?.trim().toLocaleLowerCase();
-  return company || `lead:${row.id}`;
+  return company ? `${leadCountryKey(row.country)}:${company}` : `lead:${row.id}`;
 }
 
 type InlineLeadField =
@@ -104,6 +113,7 @@ type InlineLeadField =
   | "company_name"
   | "industry"
   | "city"
+  | "country"
   | "designation"
   | "phone"
   | "phone_2"
@@ -352,6 +362,13 @@ async function fetchLeadsByOrigin(origin: LeadOrigin) {
 
 function LeadsPage() {
   const queryClient = useQueryClient();
+  const { owner } = useOwnerScope();
+  const [market, setMarket] = useState<LeadMarket>("all");
+  const [country, setCountry] = useState("all");
+  useEffect(() => {
+    setMarket("all");
+    setCountry("all");
+  }, [owner]);
   const runCeipalSync = useServerFn(syncCeipalLeads);
   const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
   const [tab, setTab] = useState<ModuleTab>("records");
@@ -373,6 +390,15 @@ function LeadsPage() {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [hideActivityType, setHideActivityType] = useState(false);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
+  const activeRows = activeLeadsQuery.data ?? [];
+  const visibleRows = activeRows.filter((row) => matchesLeadGeography(row.country, market, country));
+  const countryOptions = [...new Map(
+    activeRows
+      .filter((row) => ownerMatches(owner, row.owner_name))
+      .filter((row) => market === "all" || leadMarket(row.country) === market)
+      .filter((row) => leadCountryKey(row.country))
+      .map((row) => [leadCountryKey(row.country), leadCountryName(row.country)]),
+  ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
       const { error } = await supabase.from("leads").update({ call_status: status }).eq("id", id);
@@ -529,6 +555,12 @@ function LeadsPage() {
       render: (row) => inlineCell(row, "city"),
     },
     {
+      header: "Country",
+      className: "w-48 max-w-48 truncate px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "country", leadCountryName(row.country) || "Not set"),
+    },
+    {
       header: "Designation",
       className: "w-72 max-w-72 truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
@@ -663,7 +695,7 @@ function LeadsPage() {
             recordLabel="Lead"
             table="leads"
             fields={leadFields}
-            rows={tab === "ceipal" ? (ceipalLeads.data ?? []) : (uploadedLeads.data ?? [])}
+            rows={visibleRows}
             isLoading={activeLeadsQuery.isLoading}
             columns={columns}
             mobileColumns={[
@@ -678,7 +710,7 @@ function LeadsPage() {
               {
                 header: "Location",
                 groupedHidden: true,
-                render: (row) => row.city ?? "—",
+                render: (row) => [row.city, leadCountryName(row.country)].filter(Boolean).join(", ") || "—",
               },
             ]}
             minWidth={3100}
@@ -693,6 +725,7 @@ function LeadsPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {row.industry ? <span>{row.industry}</span> : null}
                     {row.city ? <span>{row.city}</span> : null}
+                    {row.country ? <span>{leadCountryName(row.country)}</span> : null}
                   </div>
                 </div>
                 <span className="w-fit shrink-0 rounded-full border border-primary/20 bg-surface px-2.5 py-1 text-xs font-medium text-primary">
@@ -705,6 +738,43 @@ function LeadsPage() {
             filterOptions={LEAD_STATUSES}
             filterValue={(row) => row.status}
             filterPlacement="toolbar"
+            paginationResetKey={`${market}:${country}`}
+            toolbarFilters={
+              <>
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <span className="text-xs font-semibold text-muted-foreground">Market</span>
+                  <Select value={market} onValueChange={(value) => {
+                    setMarket(value as LeadMarket);
+                    setCountry("all");
+                  }}>
+                    <SelectTrigger className="w-full bg-surface sm:w-48" aria-label="Lead market">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All markets</SelectItem>
+                      <SelectItem value="domestic">Domestic (India)</SelectItem>
+                      <SelectItem value="international">International</SelectItem>
+                      <SelectItem value="unknown">Country not set</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <span className="text-xs font-semibold text-muted-foreground">Country</span>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger className="w-full bg-surface sm:w-56" aria-label="Lead country">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All countries</SelectItem>
+                      <SelectItem value={UNKNOWN_COUNTRY}>Country not set</SelectItem>
+                      {countryOptions.map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            }
             ownerOf={(row) => row.owner_name}
             headerAction={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -755,6 +825,7 @@ function LeadsPage() {
               row.age_or_dob,
               row.industry,
               row.city,
+              row.country,
               row.source,
               row.notes,
             ]}
@@ -764,6 +835,7 @@ function LeadsPage() {
                 <p className="text-xs text-muted-foreground">
                   {row.contact_name ?? "—"} · {row.phone ?? row.phone_2 ?? row.landline ?? "—"} ·{" "}
                   {row.city ?? "—"}
+                  {row.country ? ` · ${leadCountryName(row.country)}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
