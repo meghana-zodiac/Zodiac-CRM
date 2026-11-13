@@ -20,6 +20,12 @@ begin
   loop
     select display_name into other_name from public.bd_team_members where active and access_status='approved' and id <> member.id limit 1;
     select count(*) into expected_tasks from public.activities where activity_type='Task' and lower(btrim(owner_name))=lower(btrim(member.display_name));
+    -- Simulate the editable profile metadata used by Auth's update-user API.
+    update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb)
+      || jsonb_build_object('full_name', other_name, 'name', other_name) where id=member.id;
+    if (select display_name from public.bd_team_members where id=member.id) <> member.display_name then
+      raise exception 'Profile metadata changed task ownership';
+    end if;
     perform set_config('request.jwt.claim.sub', member.id::text, true);
     perform set_config('request.jwt.claims', json_build_object('sub',member.id,'role','authenticated')::text,true);
     execute 'set local role authenticated';
