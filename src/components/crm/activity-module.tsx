@@ -109,7 +109,9 @@ export function ActivityModule({
     enabled: dialogOpen || Boolean(viewing),
   });
 
-  const all = (activities.data ?? []).filter((activity) => activity.activity_type === type);
+  const all = (activities.data ?? []).filter(
+    (activity) => activity.activity_type === type && ownerMatches(ownerFilter, activity.owner_name),
+  );
 
   const toggleComplete = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -190,7 +192,6 @@ export function ActivityModule({
             }
           }
         }
-        if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
         if (!term) return true;
         return [
           activity.title,
