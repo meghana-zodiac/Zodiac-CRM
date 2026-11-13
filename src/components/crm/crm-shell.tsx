@@ -49,6 +49,7 @@ import { GlobalOwnerTabs } from "./owner-filter";
 import { logCrmUsageEvent, trackCrmSession } from "@/lib/crm-usage";
 import { installCallLogging, type CallLogAttempt } from "@/lib/call-logging";
 import { CallUpdateDialog } from "./call-update-dialog";
+import { UpdateBanner } from "./update-banner";
 import type { ReviewCall } from "@/lib/call-updates";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
@@ -562,6 +563,8 @@ export function CrmShell({
             </DropdownMenu>
           </div>
         </header>
+
+        <UpdateBanner />
 
         {pathname !== "/usage" && pathname !== "/calls" ? (
           <GlobalOwnerTabs isAdmin={isAdmin} />
