@@ -25,6 +25,15 @@ import {
 } from "@/lib/crm";
 
 type DueFilter = "all" | "open" | "today" | "overdue" | "upcoming" | "completed";
+type DateView = "all" | "today" | "week" | "month" | "custom";
+
+const DATE_VIEWS: Array<{ value: DateView; label: string }> = [
+  { value: "all", label: "All dates" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+  { value: "custom", label: "Custom" },
+];
 
 function startOfToday() {
   const date = new Date();
@@ -86,6 +95,9 @@ export function ActivityModule({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dueFilter, setDueFilter] = useState<DueFilter>(type === "Task" ? "open" : "all");
+  const [dateView, setDateView] = useState<DateView>("all");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
   const { owner: ownerFilter } = useOwnerScope();
   const [activeRep, setActiveRep] = useState<string>("");
   const [editing, setEditing] = useState<Activity | null>(null);
@@ -140,6 +152,43 @@ export function ActivityModule({
           const group = dueGroup(activity);
           if (dueFilter === "open" && group === "completed") return false;
           if (dueFilter !== "all" && dueFilter !== "open" && group !== dueFilter) return false;
+
+          if (dateView !== "all") {
+            if (!activity.due_date) return false;
+            const due = new Date(activity.due_date);
+            const today = startOfToday();
+
+            if (dateView === "today") {
+              const tomorrow = new Date(today);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              if (due < today || due >= tomorrow) return false;
+            }
+
+            if (dateView === "week") {
+              const weekStart = new Date(today);
+              const daysSinceMonday = (weekStart.getDay() + 6) % 7;
+              weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekEnd.getDate() + 7);
+              if (due < weekStart || due >= weekEnd) return false;
+            }
+
+            if (dateView === "month") {
+              const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+              const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+              if (due < monthStart || due >= monthEnd) return false;
+            }
+
+            if (dateView === "custom") {
+              const from = customDateFrom
+                ? new Date(`${customDateFrom}T00:00:00`)
+                : null;
+              const to = customDateTo ? new Date(`${customDateTo}T00:00:00`) : null;
+              if (to) to.setDate(to.getDate() + 1);
+              if (from && due < from) return false;
+              if (to && due >= to) return false;
+            }
+          }
         }
         if (!ownerMatches(ownerFilter, activity.owner_name)) return false;
         if (!term) return true;
@@ -155,7 +204,17 @@ export function ActivityModule({
       });
 
     return type === "Task" ? filtered.sort(compareActivityDates) : filtered;
-  }, [all, search, statusFilter, ownerFilter, type, dueFilter]);
+  }, [
+    all,
+    search,
+    statusFilter,
+    ownerFilter,
+    type,
+    dueFilter,
+    dateView,
+    customDateFrom,
+    customDateTo,
+  ]);
 
   const taskCounts = useMemo(
     () => ({
@@ -228,6 +287,66 @@ export function ActivityModule({
               </span>
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {type === "Task" ? (
+        <div className="border-b border-border bg-surface px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Task date
+            </span>
+            {DATE_VIEWS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setDateView(option.value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  dateView === option.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {dateView === "custom" ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:items-end">
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                From
+                <input
+                  type="date"
+                  value={customDateFrom}
+                  onChange={(event) => setCustomDateFrom(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                To
+                <input
+                  type="date"
+                  value={customDateTo}
+                  min={customDateFrom || undefined}
+                  onChange={(event) => setCustomDateTo(event.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              {(customDateFrom || customDateTo) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCustomDateFrom("");
+                    setCustomDateTo("");
+                  }}
+                >
+                  Clear dates
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
