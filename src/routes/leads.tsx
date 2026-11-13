@@ -89,10 +89,6 @@ function whatsappUrl(value: string) {
   return `https://wa.me/${whatsappNumber(value)}`;
 }
 
-function whatsappWebUrl(value: string) {
-  return `https://web.whatsapp.com/send?phone=${whatsappNumber(value)}`;
-}
-
 function gmailComposeUrl(email: string, subject?: string) {
   const subjectParameter = subject ? `&su=${encodeURIComponent(subject)}` : "";
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}${subjectParameter}`;
@@ -262,13 +258,20 @@ function InlineLeadCell({
   };
 
   if (!editing) {
+    const isPhoneLink = Boolean(actionHref?.startsWith("tel:") && value);
+    const DisplayValue = isPhoneLink ? "a" : "span";
     return (
-      <span
+      <DisplayValue
+        href={isPhoneLink ? actionHref : undefined}
         className={`block min-h-5 ${actionHref && value ? "cursor-pointer text-primary hover:underline" : "cursor-text"}`}
-        title={actionHref && value ? `${actionLabel ?? "Open"} (double-click to edit)` : "Double-click to edit"}
+        title={
+          actionHref && value
+            ? `${actionLabel ?? "Open"} (double-click to edit)`
+            : "Double-click to edit"
+        }
         onClick={(event) => {
           event.stopPropagation();
-          if (!actionHref || !value) return;
+          if (isPhoneLink || !actionHref || !value) return;
           if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
           clickTimerRef.current = setTimeout(() => {
             window.open(actionHref, "_blank", "noopener,noreferrer");
@@ -276,6 +279,7 @@ function InlineLeadCell({
           }, 250);
         }}
         onDoubleClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           if (clickTimerRef.current) {
             clearTimeout(clickTimerRef.current);
@@ -285,7 +289,7 @@ function InlineLeadCell({
         }}
       >
         {displayValue ?? value ?? "—"}
-      </span>
+      </DisplayValue>
     );
   }
 
@@ -401,10 +405,7 @@ function LeadsPage() {
         .eq("activity_type", "Task")
         .neq("status", "Completed");
 
-      const [, { data: pendingTasks, error }] = await Promise.all([
-        statusUpdate,
-        pendingTaskCheck,
-      ]);
+      const [, { data: pendingTasks, error }] = await Promise.all([statusUpdate, pendingTaskCheck]);
 
       if (error) throw new Error(error.message);
 
@@ -532,7 +533,14 @@ function LeadsPage() {
       header: "Phone 1",
       inlineEditable: true,
       render: (row) =>
-        inlineCell(row, "phone", undefined, false, row.phone ? whatsappWebUrl(row.phone) : undefined, "Open WhatsApp Web"),
+        inlineCell(
+          row,
+          "phone",
+          undefined,
+          false,
+          row.phone ? `tel:${row.phone}` : undefined,
+          "Call number",
+        ),
     },
     {
       header: "Phone 2",
@@ -543,8 +551,8 @@ function LeadsPage() {
           "phone_2",
           undefined,
           false,
-          row.phone_2 ? whatsappWebUrl(row.phone_2) : undefined,
-          "Open WhatsApp Web",
+          row.phone_2 ? `tel:${row.phone_2}` : undefined,
+          "Call number",
         ),
     },
     {
@@ -573,7 +581,19 @@ function LeadsPage() {
           "Compose email",
         ),
     },
-    { header: "Landline", inlineEditable: true, render: (row) => inlineCell(row, "landline") },
+    {
+      header: "Landline",
+      inlineEditable: true,
+      render: (row) =>
+        inlineCell(
+          row,
+          "landline",
+          undefined,
+          false,
+          row.landline ? `tel:${row.landline}` : undefined,
+          "Call number",
+        ),
+    },
     {
       header: "Date of birth",
       inlineEditable: true,
@@ -632,7 +652,7 @@ function LeadsPage() {
               </Button>
             </div>
           ) : null}
-                    <ListModule<Lead>
+          <ListModule<Lead>
             title={tab === "ceipal" ? "CEIPAL Leads" : "Uploaded Leads"}
             createLabel="Add Lead"
             recordLabel="Lead"
@@ -773,65 +793,62 @@ function LeadsPage() {
                   />
 
                   <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain">
-                  {numbers.map(({ label, value }) => (
-                    <a
-                      key={label}
-                      href={label === "Landline" ? `tel:${value}` : whatsappUrl(value)}
-                      target={label === "Landline" ? undefined : "_blank"}
-                      rel={label === "Landline" ? undefined : "noreferrer"}
+                    {numbers.map(({ label, value }) => (
+                      <a
+                        key={label}
+                        href={`tel:${value}`}
+                        className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                        aria-label={`Call ${label}: ${value}`}
+                      >
+                        <Phone className="size-3.5" /> {label}: {value}
+                      </a>
+                    ))}
+                    {whatsappNumber ? (
+                      <a
+                        href={whatsappUrl(whatsappNumber)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                      >
+                        <MessageCircle className="size-3.5" /> WhatsApp
+                      </a>
+                    ) : null}
+                    {row.email ? (
+                      <a
+                        href={gmailComposeUrl(row.email)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                      >
+                        <Mail className="size-3.5" /> Email: {row.email}
+                      </a>
+                    ) : null}
+                    {row.email_2 ? (
+                      <a
+                        href={gmailComposeUrl(row.email_2)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                      >
+                        <Mail className="size-3.5" /> Email 2: {row.email_2}
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                      aria-label={label === "Landline" ? `Call ${label}: ${value}` : `Open WhatsApp for ${label}: ${value}`}
+                      onClick={() =>
+                        openActivity("Call", `Call with ${row.contact_name ?? row.company_name}`)
+                      }
                     >
-                      {label === "Landline" ? <Phone className="size-3.5" /> : <MessageCircle className="size-3.5" />}{" "}
-                      {label}: {value}
-                    </a>
-                  ))}
-                  {whatsappNumber ? (
-                    <a
-                      href={whatsappUrl(whatsappNumber)}
-                      target="_blank"
-                      rel="noreferrer"
+                      <NotebookPen className="size-3.5" /> Log call
+                    </button>
+                    <button
+                      type="button"
                       className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+                      onClick={() => openActivity("Task", `Follow up: ${row.company_name}`)}
                     >
-                      <MessageCircle className="size-3.5" /> WhatsApp
-                    </a>
-                  ) : null}
-                  {row.email ? (
-                    <a
-                      href={gmailComposeUrl(row.email)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                    >
-                      <Mail className="size-3.5" /> Email: {row.email}
-                    </a>
-                  ) : null}
-                  {row.email_2 ? (
-                    <a
-                      href={gmailComposeUrl(row.email_2)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                    >
-                      <Mail className="size-3.5" /> Email 2: {row.email_2}
-                    </a>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                    onClick={() =>
-                      openActivity("Call", `Call with ${row.contact_name ?? row.company_name}`)
-                    }
-                  >
-                    <NotebookPen className="size-3.5" /> Log call
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                    onClick={() => openActivity("Task", `Follow up: ${row.company_name}`)}
-                  >
-                    <Clock3 className="size-3.5" /> Follow-up
-                  </button>
+                      <Clock3 className="size-3.5" /> Follow-up
+                    </button>
                   </div>
                 </div>
               );
