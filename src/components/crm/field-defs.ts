@@ -415,5 +415,34 @@ export const activityFields = (
     options: opts(SERVICE_LINES),
   },
   ...serviceDetailFields("service_line"),
+  ...(type === "Task"
+    ? [
+        {
+          name: "service_details.contact_phone",
+          label: "Contact phone 1",
+          type: "tel" as const,
+        },
+        {
+          name: "service_details.contact_phone_2",
+          label: "Contact phone 2",
+          type: "tel" as const,
+        },
+        {
+          name: "service_details.contact_landline",
+          label: "Contact landline",
+          type: "tel" as const,
+        },
+        {
+          name: "service_details.contact_email",
+          label: "Contact email 1",
+          type: "email" as const,
+        },
+        {
+          name: "service_details.contact_email_2",
+          label: "Contact email 2",
+          type: "email" as const,
+        },
+      ]
+    : []),
   { name: "notes", label: "Notes", type: "textarea" },
 ];
