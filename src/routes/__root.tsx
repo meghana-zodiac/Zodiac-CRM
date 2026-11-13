@@ -173,9 +173,16 @@ function RootComponent() {
 
   useEffect(() => {
     let mounted = true;
+    let accountId: string | null | undefined;
 
     const applyUser = async (user: Parameters<typeof isOrganizationGoogleUser>[0]) => {
       if (!mounted) return;
+      const nextAccountId = user?.id ?? null;
+      if (accountId !== nextAccountId) {
+        accountId = nextAccountId;
+        queryClient.clear();
+        setIsLoading(true);
+      }
 
       const isAllowed = isOrganizationGoogleUser(user);
       setIsSignedIn(Boolean(user) && isAllowed);
@@ -252,7 +259,7 @@ function RootComponent() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [checkDevice]);
+  }, [checkDevice, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
