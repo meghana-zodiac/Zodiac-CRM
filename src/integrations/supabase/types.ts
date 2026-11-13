@@ -739,6 +739,7 @@ export type Database = {
           ceipal_id: string | null;
           ceipal_last_synced_at: string | null;
           city: string | null;
+          country: string | null;
           company_name: string;
           comment_1: string | null;
           comment_2: string | null;
@@ -780,6 +781,7 @@ export type Database = {
           ceipal_id?: string | null;
           ceipal_last_synced_at?: string | null;
           city?: string | null;
+          country?: string | null;
           company_name: string;
           comment_1?: string | null;
           comment_2?: string | null;
@@ -822,6 +824,7 @@ export type Database = {
           ceipal_id?: string | null;
           ceipal_last_synced_at?: string | null;
           city?: string | null;
+          country?: string | null;
           company_name?: string;
           comment_1?: string | null;
           comment_2?: string | null;

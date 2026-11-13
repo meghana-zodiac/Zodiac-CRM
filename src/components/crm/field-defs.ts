@@ -170,6 +170,7 @@ export const leadFields: FieldDef[] = [
   },
   { name: "industry", label: "Industry" },
   { name: "city", label: "Current location" },
+  { name: "country", label: "Country (company / property)" },
   { name: "designation", label: "Designation" },
   { name: "phone", label: "Phone 1", type: "tel" },
   { name: "phone_2", label: "Phone 2", type: "tel" },

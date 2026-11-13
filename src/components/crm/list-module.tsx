@@ -53,6 +53,8 @@ export function ListModule<T extends { id: string }>({
   showSerialNumbers = false,
   groupBy,
   renderGroupHeader,
+  toolbarFilters,
+  paginationResetKey,
 }: {
   title: string;
   createLabel: string;
@@ -80,6 +82,8 @@ export function ListModule<T extends { id: string }>({
   showSerialNumbers?: boolean;
   groupBy?: (row: T) => string;
   renderGroupHeader?: (row: T, contactCount: number) => React.ReactNode;
+  toolbarFilters?: React.ReactNode;
+  paginationResetKey?: string;
 }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("list");
@@ -166,7 +170,7 @@ export function ListModule<T extends { id: string }>({
 
   useEffect(() => {
     setPage(1);
-  }, [search, filter, owner, view]);
+  }, [search, filter, owner, view, paginationResetKey]);
 
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
@@ -236,6 +240,12 @@ export function ListModule<T extends { id: string }>({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      ) : null}
+
+      {toolbarFilters ? (
+        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+          {toolbarFilters}
         </div>
       ) : null}
 
