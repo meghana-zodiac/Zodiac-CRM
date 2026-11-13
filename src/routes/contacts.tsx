@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,23 +19,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   EmptyState,
   FilterPanel,
@@ -73,33 +56,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
-import { supabase } from "@/integrations/supabase/client";
 import { gmailComposeUrl } from "@/lib/contact-links";
-import { callLogForEvent, type CallLogAttempt } from "@/lib/call-logging";
-
-type PendingCall = {
-  contact: ContactWithAccount;
-  log: CallLogAttempt;
-  startedAt: number;
-  returnedAt: number | null;
-};
-
-const CALL_OUTCOMES = [
-  "Connected",
-  "Unanswered",
-  "Busy",
-  "Switched Off",
-  "Wrong Number",
-  "Call Back Later",
-] as const;
-
-const NEXT_ACTIONS = [
-  "Call Again",
-  "Send Proposal",
-  "Send Email",
-  "Schedule Meeting",
-  "Close / No Action",
-] as const;
 
 function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -154,15 +111,6 @@ function ContactsPage() {
   const [activityType, setActivityType] = useState<ActivityType>("Task");
   const [activityTitle, setActivityTitle] = useState("Follow up");
   const [note, setNote] = useState("");
-  const [pendingCall, setPendingCall] = useState<PendingCall | null>(null);
-  const [callReviewOpen, setCallReviewOpen] = useState(false);
-  const [callOutcome, setCallOutcome] = useState<(typeof CALL_OUTCOMES)[number]>("Connected");
-  const [callNotes, setCallNotes] = useState("");
-  const [nextAction, setNextAction] = useState<(typeof NEXT_ACTIONS)[number]>("Call Again");
-  const [followUpAt, setFollowUpAt] = useState("");
-  const [priority, setPriority] = useState("Medium");
-  const callLeftApp = useRef(false);
-  const pendingCallRef = useRef<PendingCall | null>(null);
 
   const all = useMemo(() => contacts.data ?? [], [contacts.data]);
 
@@ -248,135 +196,6 @@ function ContactsPage() {
     setActivityTitle(title);
     setActivityDialogOpen(true);
   };
-
-  const startTrackedCall = (contact: ContactWithAccount, event: React.MouseEvent) => {
-    const log = callLogForEvent(event.nativeEvent);
-    if (!log) return;
-    if (pendingCallRef.current?.log.id === log.id) return;
-    callLeftApp.current = false;
-    setCallOutcome("Connected");
-    setCallNotes("");
-    setNextAction("Call Again");
-    setFollowUpAt("");
-    setPriority("Medium");
-    const call = { contact, log, startedAt: log.startedAt, returnedAt: null };
-    pendingCallRef.current = call;
-    setPendingCall(call);
-  };
-
-  useEffect(() => {
-    const showReview = () => {
-      if (!callLeftApp.current || !pendingCallRef.current) return;
-      callLeftApp.current = false;
-      const finishedCall = {
-        ...pendingCallRef.current,
-        returnedAt: pendingCallRef.current.returnedAt ?? Date.now(),
-      };
-      pendingCallRef.current = finishedCall;
-      setPendingCall(finishedCall);
-      setCallReviewOpen(true);
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") callLeftApp.current = true;
-      else showReview();
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("focus", showReview);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("focus", showReview);
-    };
-  }, []);
-
-  const saveTrackedCall = useMutation({
-    mutationFn: async () => {
-      if (!pendingCall) return;
-      const returnedAt = pendingCall.returnedAt ?? Date.now();
-      const elapsedSeconds = Math.max(0, Math.round((returnedAt - pendingCall.startedAt) / 1000));
-      const { data } = await supabase.auth.getUser();
-      const metadata = data.user?.user_metadata;
-      const signedInName =
-        (typeof metadata?.full_name === "string" && metadata.full_name) ||
-        (typeof metadata?.name === "string" && metadata.name) ||
-        pendingCall.contact.owner_name;
-      const details = {
-        source: "CRM Mobile",
-        phone: pendingCall.contact.phone,
-        company: pendingCall.contact.accounts?.name,
-        started_at: new Date(pendingCall.startedAt).toISOString(),
-        elapsed_seconds: elapsedSeconds,
-        duration_type: "estimated_elapsed",
-        outcome: callOutcome,
-        next_action: nextAction,
-        follow_up_at: followUpAt ? new Date(followUpAt).toISOString() : null,
-        priority,
-      };
-
-      await createRecord("activities", {
-        title: `Call with ${fullName(
-          pendingCall.contact.first_name,
-          pendingCall.contact.last_name,
-        )}`,
-        activity_type: "Call",
-        status: "Completed",
-        due_date: new Date(pendingCall.startedAt).toISOString(),
-        notes: callNotes.trim() || null,
-        owner_name: signedInName || null,
-        related_to_type: "Client Contact",
-        related_to_id: pendingCall.contact.id,
-        service_details: details,
-      });
-
-      // The entry already exists from the Call tap; enrich that same entry.
-      await pendingCall.log.save();
-      const { error: callLogError } = await supabase
-        .from("call_logs")
-        .update({
-          rep_name: signedInName || null,
-          call_type: `CRM Outgoing · ${pendingCall.log.device} · Estimated elapsed`,
-          duration_seconds: elapsedSeconds,
-        })
-        .eq("id", pendingCall.log.id)
-        .select("id")
-        .single();
-      if (callLogError) {
-        throw new Error(
-          `The CRM activity was saved, but the call details could not be updated: ${callLogError.message}`,
-        );
-      }
-
-      if (followUpAt) {
-        await createRecord("activities", {
-          title: `${nextAction}: ${fullName(
-            pendingCall.contact.first_name,
-            pendingCall.contact.last_name,
-          )}`,
-          activity_type: "Task",
-          status: "Pending",
-          due_date: new Date(followUpAt).toISOString(),
-          notes: callNotes.trim() || null,
-          owner_name: signedInName || null,
-          related_to_type: "Client Contact",
-          related_to_id: pendingCall.contact.id,
-          service_details: {
-            source: "Call follow-up",
-            priority,
-            originating_call_started_at: details.started_at,
-          },
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
-      queryClient.invalidateQueries({ queryKey: ["call-logs"] });
-      toast.success(followUpAt ? "Call and follow-up saved" : "Call saved");
-      setCallReviewOpen(false);
-      pendingCallRef.current = null;
-      setPendingCall(null);
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -532,7 +351,7 @@ function ContactsPage() {
                             href={contact.phone ? `tel:${contact.phone}` : null}
                             label="Call"
                             icon={Phone}
-                            onClick={(event) => startTrackedCall(contact, event)}
+                            contactId={contact.id}
                           />
                           <ContactAction
                             href={
@@ -708,7 +527,7 @@ function ContactsPage() {
                   href={openContact.phone ? `tel:${openContact.phone}` : null}
                   label="Call"
                   icon={Phone}
-                  onClick={(event) => startTrackedCall(openContact, event)}
+                  contactId={openContact.id}
                 />
                 <ContactAction
                   href={openContact.phone ? `sms:${openContact.phone}` : null}
@@ -953,139 +772,6 @@ function ContactsPage() {
         }
         invalidateKeys={["activities"]}
       />
-      <Dialog
-        open={callReviewOpen}
-        onOpenChange={(open) => {
-          setCallReviewOpen(open);
-          if (!open && !saveTrackedCall.isPending) {
-            pendingCallRef.current = null;
-            setPendingCall(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add call details (optional)</DialogTitle>
-            <DialogDescription>
-              The call log saves automatically when you tap Call. Add details for{" "}
-              {pendingCall
-                ? fullName(pendingCall.contact.first_name, pendingCall.contact.last_name)
-                : "this contact"}
-              . The elapsed time is an estimate from leaving and returning to the CRM.
-            </DialogDescription>
-          </DialogHeader>
-
-          {pendingCall ? (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">{pendingCall.contact.phone}</p>
-              <p className="mt-1">
-                Started {formatDateTime(new Date(pendingCall.startedAt).toISOString())} · Approx.
-                elapsed{" "}
-                {formatElapsed(
-                  Math.max(
-                    0,
-                    Math.round(
-                      ((pendingCall.returnedAt ?? Date.now()) - pendingCall.startedAt) / 1000,
-                    ),
-                  ),
-                )}
-              </p>
-            </div>
-          ) : null}
-
-          <div className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label>Call outcome</Label>
-              <Select
-                value={callOutcome}
-                onValueChange={(value) => setCallOutcome(value as typeof callOutcome)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CALL_OUTCOMES.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="call-notes">Discussion notes</Label>
-              <Textarea
-                id="call-notes"
-                value={callNotes}
-                onChange={(event) => setCallNotes(event.target.value)}
-                rows={3}
-                placeholder="What was discussed?"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label>Next action</Label>
-                <Select
-                  value={nextAction}
-                  onValueChange={(value) => setNextAction(value as typeof nextAction)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NEXT_ACTIONS.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {item}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(["High", "Medium", "Low"] as const).map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {item}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="follow-up-at">Next follow-up (optional)</Label>
-              <Input
-                id="follow-up-at"
-                type="datetime-local"
-                value={followUpAt}
-                onChange={(event) => setFollowUpAt(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCallReviewOpen(false);
-                pendingCallRef.current = null;
-                setPendingCall(null);
-              }}
-              disabled={saveTrackedCall.isPending}
-            >
-              Skip details
-            </Button>
-            <Button onClick={() => saveTrackedCall.mutate()} disabled={saveTrackedCall.isPending}>
-              {saveTrackedCall.isPending ? "Saving…" : "Save details"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -1096,14 +782,14 @@ function ContactAction({
   label,
   icon: Icon,
   external = false,
-  onClick,
+  contactId,
 }: {
   href: string | null;
   desktopHref?: string | null;
   label: string;
   icon: typeof Phone;
   external?: boolean;
-  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  contactId?: string;
 }) {
   const className = `flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[10px] font-medium ${
     href ? "text-primary" : "pointer-events-none text-muted-foreground/40"
@@ -1111,6 +797,8 @@ function ContactAction({
   return href ? (
     <a
       href={href}
+      data-call-record-id={contactId}
+      data-call-record-type={contactId ? "Client Contact" : undefined}
       className={className}
       target={external ? "_blank" : undefined}
       rel={external ? "noreferrer" : undefined}
@@ -1121,7 +809,6 @@ function ContactAction({
           event.preventDefault();
           window.open(desktopHref, "_blank", "noopener,noreferrer");
         }
-        onClick?.(event);
       }}
     >
       <Icon className="size-[18px]" />

@@ -474,6 +474,8 @@ export function ActivityModule({
                             <a
                               key={`phone-${phone}`}
                               href={`tel:${phone}`}
+                              data-call-record-id={activity.related_to_id ?? undefined}
+                              data-call-record-type={activity.related_to_type ?? undefined}
                               className="font-medium text-primary underline-offset-2 hover:underline"
                             >
                               Phone: {phone}

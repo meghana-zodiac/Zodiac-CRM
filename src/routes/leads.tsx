@@ -208,13 +208,15 @@ function InlineLeadCell({
   required = false,
   actionHref,
   actionLabel,
+  recordId,
   onSave,
 }: {
   value: string | null;
-  displayValue?: string;
+  displayValue?: string | undefined;
   required?: boolean;
-  actionHref?: string;
-  actionLabel?: string;
+  actionHref?: string | undefined;
+  actionLabel?: string | undefined;
+  recordId?: string;
   onSave: (value: string | null) => Promise<void>;
 }) {
   const initialValue = value ?? "";
@@ -263,6 +265,8 @@ function InlineLeadCell({
     return (
       <DisplayValue
         href={isPhoneLink ? actionHref : undefined}
+        data-call-record-id={isPhoneLink ? recordId : undefined}
+        data-call-record-type={isPhoneLink ? "Lead" : undefined}
         className={`block min-h-5 ${actionHref && value ? "cursor-pointer text-primary hover:underline" : "cursor-text"}`}
         title={
           actionHref && value
@@ -464,6 +468,7 @@ function LeadsPage() {
       value={row[field] as string | null}
       displayValue={displayValue}
       required={required}
+      recordId={row.id}
       actionHref={actionHref}
       actionLabel={actionLabel}
       onSave={(value) => inlineLeadUpdate.mutateAsync({ id: row.id, field, value })}
@@ -785,7 +790,11 @@ function LeadsPage() {
               };
 
               return (
-                <div className="space-y-2">
+                <div
+                  className="space-y-2"
+                  data-call-record-id={row.id}
+                  data-call-record-type="Lead"
+                >
                   <CallStatusSelect
                     value={row.call_status}
                     disabled={callStatusUpdate.isPending}

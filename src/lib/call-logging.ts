@@ -5,6 +5,8 @@ export type CallLogAttempt = {
   phone: string;
   startedAt: number;
   device: "Mobile" | "Desktop";
+  relatedId?: string;
+  relatedType?: string;
   save: () => Promise<void>;
 };
 
@@ -69,8 +71,23 @@ export function createCallLogAttempt(phone: string, userAgent: string): CallLogA
 export function installCallLogging(callbacks: {
   onSaved: (attempt: CallLogAttempt) => void;
   onError: (attempt: CallLogAttempt, error: unknown) => void;
+  onReturn?: (attempt: CallLogAttempt, returnedAt: number) => void;
 }) {
   let previous: CallLogAttempt | undefined;
+  let pending: { attempt: CallLogAttempt; leftApp: boolean } | undefined;
+  const markAway = () => {
+    if (pending) pending.leftApp = true;
+  };
+  const reviewOnReturn = () => {
+    if (document.visibilityState === "hidden" || !pending?.leftApp) return;
+    const { attempt } = pending;
+    pending = undefined;
+    callbacks.onReturn?.(attempt, Date.now());
+  };
+  const visibilityChanged = () => {
+    if (document.visibilityState === "hidden") markAway();
+    else reviewOnReturn();
+  };
   const track = (event: MouseEvent) => {
     if (event.button !== 0) return;
     const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
@@ -90,6 +107,14 @@ export function installCallLogging(callbacks: {
     attempts.set(event, attempt);
     if (attempt === previous) return;
     previous = attempt;
+    const record = anchor?.closest("[data-call-record-id]");
+    const relatedId = record?.getAttribute("data-call-record-id");
+    const relatedType = record?.getAttribute("data-call-record-type");
+    if (relatedId && relatedType) {
+      attempt.relatedId = relatedId;
+      attempt.relatedType = relatedType;
+    }
+    pending = { attempt, leftApp: false };
     // Keep native tel: navigation synchronous so the mobile dialler can open.
     void attempt.save().then(
       () => callbacks.onSaved(attempt),
@@ -98,5 +123,13 @@ export function installCallLogging(callbacks: {
   };
   // Capture runs before React buttons/containers stop click propagation.
   document.addEventListener("click", track, true);
-  return () => document.removeEventListener("click", track, true);
+  document.addEventListener("visibilitychange", visibilityChanged);
+  window.addEventListener("blur", markAway);
+  window.addEventListener("focus", reviewOnReturn);
+  return () => {
+    document.removeEventListener("click", track, true);
+    document.removeEventListener("visibilitychange", visibilityChanged);
+    window.removeEventListener("blur", markAway);
+    window.removeEventListener("focus", reviewOnReturn);
+  };
 }

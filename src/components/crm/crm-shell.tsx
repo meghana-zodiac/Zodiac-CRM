@@ -48,6 +48,8 @@ import { AccessManagement } from "./access-management";
 import { GlobalOwnerTabs } from "./owner-filter";
 import { logCrmUsageEvent, trackCrmSession } from "@/lib/crm-usage";
 import { installCallLogging, type CallLogAttempt } from "@/lib/call-logging";
+import { CallUpdateDialog } from "./call-update-dialog";
+import type { ReviewCall } from "@/lib/call-updates";
 
 import { accountsQuery, contactsQuery, currency, dealsQuery, fullName } from "@/lib/crm";
 
@@ -261,6 +263,7 @@ export function CrmShell({
   const [accessManagementOpen, setAccessManagementOpen] = useState(false);
   const [accountInitials, setAccountInitials] = useState("—");
   const queryClient = useQueryClient();
+  const [reviewCall, setReviewCall] = useState<ReviewCall | null>(null);
   const accounts = useQuery({
     ...accountsQuery(),
     enabled: quickCreate === "contact" || quickCreate === "deal",
@@ -380,7 +383,18 @@ export function CrmShell({
         },
       });
     };
-    const stopCallLogging = installCallLogging({ onSaved, onError });
+    const stopCallLogging = installCallLogging({
+      onSaved,
+      onError,
+      onReturn: (attempt, returnedAt) =>
+        setReviewCall({
+          id: attempt.id,
+          phone: attempt.phone,
+          startedAt: attempt.startedAt,
+          returnedAt,
+          attempt,
+        }),
+    });
     return () => {
       document.removeEventListener("click", trackCommunication, true);
       stopCallLogging();
@@ -549,7 +563,9 @@ export function CrmShell({
           </div>
         </header>
 
-        {pathname !== "/usage" ? <GlobalOwnerTabs isAdmin={isAdmin} /> : null}
+        {pathname !== "/usage" && pathname !== "/calls" ? (
+          <GlobalOwnerTabs isAdmin={isAdmin} />
+        ) : null}
 
         <main key={pathname} className="crm-route-enter min-w-0 flex-1 pb-20 md:pb-0">
           {children}
@@ -589,6 +605,14 @@ export function CrmShell({
           <span>More</span>
         </button>
       </nav>
+
+      {reviewCall ? (
+        <CallUpdateDialog
+          key={reviewCall.id}
+          call={reviewCall}
+          onClose={() => setReviewCall(null)}
+        />
+      ) : null}
 
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
