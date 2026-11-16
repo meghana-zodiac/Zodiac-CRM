@@ -51,6 +51,7 @@ export function ListModule<T extends { id: string }>({
   filterPlacement = "sidebar",
   rowClassName,
   showSerialNumbers = false,
+  freezeTable = false,
   groupBy,
   renderGroupHeader,
   toolbarFilters,
@@ -80,6 +81,7 @@ export function ListModule<T extends { id: string }>({
   filterPlacement?: "sidebar" | "toolbar";
   rowClassName?: (row: T) => string;
   showSerialNumbers?: boolean;
+  freezeTable?: boolean;
   groupBy?: (row: T) => string;
   renderGroupHeader?: (row: T, contactCount: number) => React.ReactNode;
   toolbarFilters?: React.ReactNode;
@@ -391,7 +393,7 @@ export function ListModule<T extends { id: string }>({
               <div className="relative hidden md:block">
                 <div
                   ref={topScrollRef}
-                  className="sticky top-[3.5rem] z-20 mb-1 h-4 overflow-x-auto overscroll-x-contain rounded border border-border bg-surface/95 shadow-sm backdrop-blur"
+                  className={`${freezeTable ? "" : "sticky top-[3.5rem]"} z-20 mb-1 h-4 overflow-x-auto overscroll-x-contain rounded border border-border bg-surface/95 shadow-sm backdrop-blur`}
                   onScroll={(event) => syncHorizontalScroll(event, tableScrollRef)}
                   aria-label="Horizontal table scroll"
                 >
@@ -399,13 +401,13 @@ export function ListModule<T extends { id: string }>({
                 </div>
                 <div
                   ref={tableScrollRef}
-                  className="crm-table-scroll overflow-x-auto overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className={`crm-table-scroll ${freezeTable ? "max-h-[65vh] overflow-auto" : "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"} overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel`}
                   onScroll={(event) => syncHorizontalScroll(event, topScrollRef)}
                 >
                 <table className="w-full text-sm" style={{ minWidth }}>
-                  <thead>
+                  <thead className={freezeTable ? "sticky top-0 z-20 bg-surface" : undefined}>
                     <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {showSerialNumbers ? <th className="w-20 px-3 py-2.5">Sr. No.</th> : null}
+                      {showSerialNumbers ? <th scope="col" className={`w-20 px-3 py-2.5 ${freezeTable ? "sticky left-0 z-30 bg-surface shadow-[1px_0_0_var(--border)]" : ""}`}>Sr. No.</th> : null}
                       {groupedColumns.map((column) => (
                         <th key={column.header} className="px-3 py-2.5">
                           {column.header}
@@ -441,7 +443,7 @@ export function ListModule<T extends { id: string }>({
                         onClick={() => openDetails(row)}
                       >
                         {showSerialNumbers ? (
-                          <td className="px-3 py-2.5 font-medium tabular-nums text-muted-foreground">
+                          <td className={`px-3 py-2.5 font-medium tabular-nums text-muted-foreground ${freezeTable ? "sticky left-0 z-10 bg-surface shadow-[1px_0_0_var(--border)]" : ""}`}>
                             {(page - 1) * ROWS_PER_PAGE + rowIndex + 1}
                           </td>
                         ) : null}
