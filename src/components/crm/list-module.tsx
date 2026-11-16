@@ -22,6 +22,7 @@ export type Column<T> = {
   className?: string;
   inlineEditable?: boolean;
   groupedHidden?: boolean;
+  width?: number;
 };
 
 const ROWS_PER_PAGE = 100;
@@ -52,6 +53,7 @@ export function ListModule<T extends { id: string }>({
   rowClassName,
   showSerialNumbers = false,
   freezeTable = false,
+  fixedColumnWidths = false,
   groupBy,
   renderGroupHeader,
   toolbarFilters,
@@ -82,6 +84,7 @@ export function ListModule<T extends { id: string }>({
   rowClassName?: (row: T) => string;
   showSerialNumbers?: boolean;
   freezeTable?: boolean;
+  fixedColumnWidths?: boolean;
   groupBy?: (row: T) => string;
   renderGroupHeader?: (row: T, contactCount: number) => React.ReactNode;
   toolbarFilters?: React.ReactNode;
@@ -98,6 +101,12 @@ export function ListModule<T extends { id: string }>({
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
   const groupedColumns = groupBy ? columns.filter((column) => !column.groupedHidden) : columns;
+  const fixedTableWidth = fixedColumnWidths
+    ? groupedColumns.reduce(
+        (sum, column) => sum + (column.width ?? 160),
+        (showSerialNumbers ? 64 : 0) + (desktopActions ? 200 : 0) + 48,
+      )
+    : undefined;
   const compactColumns = (mobileColumns ?? columns).filter(
     (column) => !groupBy || !column.groupedHidden,
   );
@@ -397,14 +406,27 @@ export function ListModule<T extends { id: string }>({
                   onScroll={(event) => syncHorizontalScroll(event, tableScrollRef)}
                   aria-label="Horizontal table scroll"
                 >
-                  <div style={{ width: minWidth, height: 1 }} />
+                  <div style={{ width: fixedTableWidth ?? minWidth, height: 1 }} />
                 </div>
                 <div
                   ref={tableScrollRef}
                   className={`crm-table-scroll ${freezeTable ? "max-h-[65vh] overflow-auto" : "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"} overscroll-x-contain rounded-lg border border-border bg-surface shadow-panel`}
                   onScroll={(event) => syncHorizontalScroll(event, topScrollRef)}
                 >
-                <table className="w-full text-sm" style={{ minWidth }}>
+                <table
+                  className={fixedColumnWidths ? "table-fixed text-sm" : "w-full text-sm"}
+                  style={{ minWidth: fixedTableWidth ?? minWidth, width: fixedTableWidth }}
+                >
+                  {fixedColumnWidths ? (
+                    <colgroup>
+                      {showSerialNumbers ? <col style={{ width: 64 }} /> : null}
+                      {groupedColumns.map((column) => (
+                        <col key={column.header} style={{ width: column.width ?? 160 }} />
+                      ))}
+                      {desktopActions ? <col style={{ width: 200 }} /> : null}
+                      <col style={{ width: 48 }} />
+                    </colgroup>
+                  ) : null}
                   <thead className={freezeTable ? "sticky top-0 z-20 bg-surface" : undefined}>
                     <tr className="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {showSerialNumbers ? <th scope="col" className={`w-20 px-3 py-2.5 ${freezeTable ? "sticky left-0 z-30 bg-surface shadow-[1px_0_0_var(--border)]" : ""}`}>Sr. No.</th> : null}
