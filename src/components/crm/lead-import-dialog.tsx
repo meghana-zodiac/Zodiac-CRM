@@ -587,8 +587,8 @@ export function LeadImportDialog({
               <FileSpreadsheet className="mx-auto size-9 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Upload .xlsx, .xls, or .csv</p>
               <p className="text-xs text-muted-foreground">
-                Current Company is required. Lead Source is optional. Missing Lead Status defaults
-                to New.
+                Current Company is required. Priority is optional: Hot, Warm or Cold.
+                Blank priorities stay unset.
               </p>
             </div>
           ) : (
