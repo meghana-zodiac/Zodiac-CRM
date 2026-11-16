@@ -29,12 +29,12 @@ import { DesktopContactActions } from "@/components/crm/desktop-contact-actions"
 export const Route = createFileRoute("/accounts")({
   head: () => ({
     meta: [
-      { title: "Corporate Clients — Zodiac HR Consultants" },
+      { title: "Active Clients — Zodiac HR Consultants" },
       {
         name: "description",
         content: "Company records with industry, contacts, open pipeline value, and record owner.",
       },
-      { property: "og:title", content: "Corporate Clients — Zodiac HR Consultants" },
+      { property: "og:title", content: "Active Clients — Zodiac HR Consultants" },
       {
         property: "og:description",
         content: "Company records with industry, contacts, open pipeline value, and record owner.",
@@ -113,7 +113,7 @@ function AccountsPage() {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
       <ModuleHeader
-        title="Corporate Clients"
+        title="Active Clients"
         count={rows.length}
         search={search}
         onSearchChange={setSearch}
