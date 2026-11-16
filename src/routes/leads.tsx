@@ -109,7 +109,7 @@ function PrioritySelect({
         disabled={disabled}
       >
         <SelectTrigger
-          className={`h-9 min-w-32 ${style?.pill ?? "bg-surface"}`}
+          className={`h-9 w-full min-w-0 ${style?.pill ?? "bg-surface"}`}
           aria-label="Lead priority"
         >
           <SelectValue />
@@ -225,7 +225,7 @@ function CallStatusSelect({
         disabled={disabled}
       >
         <SelectTrigger
-          className={`h-9 min-w-48 border ${selected ? CALL_STATUS_STYLE[selected].pill : "bg-surface"}`}
+          className={`h-9 w-full min-w-0 border ${selected ? CALL_STATUS_STYLE[selected].pill : "bg-surface"}`}
           aria-label="Call status"
         >
           <SelectValue placeholder="Select status" />
@@ -317,7 +317,7 @@ function InlineLeadCell({
         title={
           actionHref && value
             ? `${actionLabel ?? "Open"} (double-click to edit)`
-            : "Double-click to edit"
+            : `${displayValue ?? value ?? "—"} (double-click to edit)`
         }
         onClick={(event) => {
           event.stopPropagation();
@@ -348,7 +348,7 @@ function InlineLeadCell({
       autoFocus
       value={draft}
       disabled={saving}
-      className="h-8 w-full min-w-32 rounded-md border border-primary bg-surface px-2 text-sm text-foreground outline-none ring-2 ring-primary/20"
+      className="h-8 w-full min-w-0 rounded-md border border-primary bg-surface px-2 text-sm text-foreground outline-none ring-2 ring-primary/20"
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => void save()}
       onClick={(event) => event.stopPropagation()}
@@ -588,45 +588,84 @@ function LeadsPage() {
   const columns: Column<Lead>[] = [
     {
       header: "Name",
-      className: "w-56 max-w-56 truncate px-3 py-2.5 text-muted-foreground",
+      width: 160,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "contact_name"),
     },
     {
+      header: "Designation",
+      width: 160,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "designation"),
+    },
+    {
+      header: "Priority",
+      width: 128,
+      inlineEditable: true,
+      render: (row) => (
+        <PrioritySelect
+          value={row.priority}
+          disabled={priorityUpdate.isPending}
+          onChange={(priority) => priorityUpdate.mutate({ id: row.id, priority })}
+        />
+      ),
+    },
+    {
+      header: "Call status",
+      width: 200,
+      className: "px-3 py-2.5",
+      render: (row) => (
+        <CallStatusSelect
+          value={row.call_status}
+          disabled={callStatusUpdate.isPending}
+          onChange={(status) => void updateCallStatus(row, status)}
+        />
+      ),
+    },
+    {
+      header: "Notes",
+      width: 240,
+      className: "whitespace-normal break-words px-3 py-2.5 text-muted-foreground",
+      inlineEditable: true,
+      render: (row) => inlineCell(row, "notes"),
+    },
+    {
       header: "Current company",
+      width: 200,
       groupedHidden: true,
-      className: "w-72 max-w-72 truncate px-3 py-2.5 font-medium text-foreground",
+      className: "truncate px-3 py-2.5 font-medium text-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "company_name", undefined, true),
     },
     {
       header: "Industry",
+      width: 120,
       groupedHidden: true,
-      className: "w-40 max-w-40 truncate px-3 py-2.5 text-muted-foreground",
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "industry"),
     },
     {
       header: "Current location",
+      width: 140,
       groupedHidden: true,
-      className: "w-48 max-w-48 truncate px-3 py-2.5 text-muted-foreground",
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "city"),
     },
     {
       header: "Country",
-      className: "w-48 max-w-48 truncate px-3 py-2.5 text-muted-foreground",
+      width: 120,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "country", leadCountryName(row.country) || "Not set"),
     },
     {
-      header: "Designation",
-      className: "w-72 max-w-72 truncate px-3 py-2.5 text-muted-foreground",
-      inlineEditable: true,
-      render: (row) => inlineCell(row, "designation"),
-    },
-    {
       header: "Phone 1",
+      width: 140,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) =>
         inlineCell(
@@ -640,6 +679,8 @@ function LeadsPage() {
     },
     {
       header: "Phone 2",
+      width: 140,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) =>
         inlineCell(
@@ -653,6 +694,8 @@ function LeadsPage() {
     },
     {
       header: "Email ID",
+      width: 200,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) =>
         inlineCell(
@@ -666,6 +709,8 @@ function LeadsPage() {
     },
     {
       header: "Landline",
+      width: 140,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) =>
         inlineCell(
@@ -679,35 +724,29 @@ function LeadsPage() {
     },
     {
       header: "Date of birth",
+      width: 120,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
       inlineEditable: true,
       render: (row) => inlineCell(row, "age_or_dob", formatDateOnly(row.age_or_dob)),
     },
-    { header: "Lead source", render: (row) => row.source ?? "—" },
     {
-      header: "Priority",
-      inlineEditable: true,
-      render: (row) => (
-        <PrioritySelect
-          value={row.priority}
-          disabled={priorityUpdate.isPending}
-          onChange={(priority) => priorityUpdate.mutate({ id: row.id, priority })}
-        />
-      ),
+      header: "Lead source",
+      width: 140,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
+      render: (row) => row.source ?? "—",
     },
     {
-      header: "Call status",
-      className: "whitespace-nowrap px-3 py-2.5",
-      render: (row) => (
-        <CallStatusSelect
-          value={row.call_status}
-          disabled={callStatusUpdate.isPending}
-          onChange={(status) => void updateCallStatus(row, status)}
-        />
-      ),
+      header: "Estimated value",
+      width: 120,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
+      render: (row) => currency(row.estimated_value),
     },
-    { header: "Estimated value", render: (row) => currency(row.estimated_value) },
-    { header: "Owner", render: (row) => row.owner_name ?? "—" },
-    { header: "Notes", inlineEditable: true, render: (row) => inlineCell(row, "notes") },
+    {
+      header: "Owner",
+      width: 140,
+      className: "truncate px-3 py-2.5 text-muted-foreground",
+      render: (row) => row.owner_name ?? "—",
+    },
   ];
 
   return (
@@ -767,7 +806,7 @@ function LeadsPage() {
                   [row.city, leadCountryName(row.country)].filter(Boolean).join(", ") || "—",
               },
             ]}
-            minWidth={2900}
+            fixedColumnWidths
             showSerialNumbers
             freezeTable
             groupBy={leadCompanyKey}
@@ -807,7 +846,10 @@ function LeadsPage() {
                       {LEAD_PRIORITIES.map((value) => (
                         <SelectItem key={value} value={value}>
                           <span className="flex items-center gap-2">
-                            <span className={`size-2.5 rounded-full ${LEAD_PRIORITY_STYLES[value].dot}`} aria-hidden="true" />
+                            <span
+                              className={`size-2.5 rounded-full ${LEAD_PRIORITY_STYLES[value].dot}`}
+                              aria-hidden="true"
+                            />
                             {value}
                           </span>
                         </SelectItem>
@@ -917,9 +959,14 @@ function LeadsPage() {
                   {row.country ? ` · ${leadCountryName(row.country)}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <StatusPill className={`border border-border ring-0 ${leadPriorityStyle(row.priority)?.pill ?? ""}`}>
+                  <StatusPill
+                    className={`border border-border ring-0 ${leadPriorityStyle(row.priority)?.pill ?? ""}`}
+                  >
                     {leadPriorityStyle(row.priority) ? (
-                      <span className={`size-2 rounded-full ${leadPriorityStyle(row.priority)?.dot}`} aria-hidden="true" />
+                      <span
+                        className={`size-2 rounded-full ${leadPriorityStyle(row.priority)?.dot}`}
+                        aria-hidden="true"
+                      />
                     ) : null}
                     {row.priority ?? "Priority not set"}
                   </StatusPill>
