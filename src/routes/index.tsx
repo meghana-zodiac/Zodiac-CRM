@@ -127,7 +127,7 @@ function HomePage() {
       to: "/leads",
     },
     {
-      label: "Corporate clients",
+      label: "Active clients",
       value: String(overview.data?.counts.accounts ?? 0),
       sub: "Client companies",
       icon: Building2,
