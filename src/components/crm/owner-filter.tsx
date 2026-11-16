@@ -148,6 +148,7 @@ export function OwnerFilter({
             key={option}
             type="button"
             onClick={() => onChange(option)}
+            aria-pressed={value === option}
             className={cn(
               "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
               value === option

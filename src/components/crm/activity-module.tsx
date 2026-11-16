@@ -12,6 +12,7 @@ import { RowActions } from "@/components/crm/row-actions";
 import { StatusPill, activityTone } from "@/components/crm/status-pill";
 import { activityFields } from "@/components/crm/field-defs";
 import { OwnerFilter, ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
+import { bdTeamMembersQuery, currentUserEmailQuery } from "@/lib/poa";
 import {
   ACTIVITY_STATUSES,
   activityRelatedRecordsQuery,
@@ -94,11 +95,21 @@ export function ActivityModule({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dueFilter, setDueFilter] = useState<DueFilter>(type === "Task" ? "open" : "all");
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all");
   const [dateView, setDateView] = useState<DateView>("all");
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
-  const { owner: ownerFilter } = useOwnerScope();
+  const { owner: ownerFilter, setOwner } = useOwnerScope();
+  const teamMembers = useQuery({ ...bdTeamMembersQuery(), enabled: type === "Task" });
+  const userEmail = useQuery({ ...currentUserEmailQuery(), enabled: type === "Task" });
+  const currentMember = teamMembers.data?.find(
+    (member) => member.email.toLowerCase() === userEmail.data,
+  );
+  const canViewAllTasks = Boolean(
+    currentMember?.active &&
+    currentMember.access_status === "approved" &&
+    currentMember.access_role === "primary_admin",
+  );
   const [activeRep, setActiveRep] = useState<string>("");
   const [editing, setEditing] = useState<Activity | null>(null);
   const [viewing, setViewing] = useState<Activity | null>(null);
@@ -242,14 +253,19 @@ export function ActivityModule({
         onToggleFilters={() => setShowFilters((prev) => !prev)}
         action={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <OwnerFilter
-              label="Logging as"
-              value={activeRep}
-              allowAll={false}
-              onChange={setActiveRep}
-            />
+            {type !== "Task" || currentMember ? (
+              <OwnerFilter
+                label={type === "Task" ? "View tasks for" : "Logging as"}
+                value={type === "Task" ? ownerFilter : activeRep}
+                allowAll={type === "Task" && canViewAllTasks}
+                onChange={type === "Task" ? setOwner : setActiveRep}
+              />
+            ) : (
+              <span className="text-xs text-muted-foreground">Loading task view…</span>
+            )}
             <Button
               size="sm"
+              disabled={type === "Task" && !currentMember}
               onClick={() => {
                 setEditing(null);
                 setDialogOpen(true);
@@ -274,7 +290,11 @@ export function ActivityModule({
             <button
               key={id}
               type="button"
-              onClick={() => setDueFilter(id)}
+              onClick={() => {
+                setDueFilter((current) => (current === id ? "all" : id));
+                setStatusFilter("all");
+                setDateView("all");
+              }}
               className={`flex min-h-16 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                 dueFilter === id
                   ? "border-primary bg-primary/5 text-primary"
@@ -301,7 +321,10 @@ export function ActivityModule({
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setDateView(option.value)}
+                onClick={() => {
+                  setDateView(option.value);
+                  setDueFilter("all");
+                }}
                 className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   dateView === option.value
                     ? "border-primary bg-primary text-primary-foreground"
@@ -355,7 +378,15 @@ export function ActivityModule({
         <FilterPanel
           className={showFilters ? "block w-full lg:w-56" : "hidden lg:block"}
           activeFilter={statusFilter}
-          onFilterChange={setStatusFilter}
+          onFilterChange={(status) => {
+            setStatusFilter(status);
+            setDueFilter("all");
+            if (status === "all") {
+              setDateView("all");
+              setCustomDateFrom("");
+              setCustomDateTo("");
+            }
+          }}
           systemFilters={[
             { id: "all", label: `All ${title.toLowerCase()}`, count: all.length },
             ...ACTIVITY_STATUSES.map((status) => ({
@@ -371,7 +402,22 @@ export function ActivityModule({
             showFilters ? "hidden flex-1 p-4 lg:block sm:p-5" : "min-w-0 flex-1 p-4 sm:p-5"
           }
         >
-          {activities.isLoading ? (
+          {activities.isError ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+            >
+              <p>{title} could not be loaded. Please retry.</p>
+              <Button
+                className="mt-3"
+                size="sm"
+                variant="outline"
+                onClick={() => void activities.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : activities.isLoading ? (
             <EmptyState message="Loading activities…" />
           ) : rows.length === 0 ? (
             <EmptyState message={`No ${title.toLowerCase()} match this view.`} />
@@ -553,7 +599,12 @@ export function ActivityModule({
             activity_type: type,
             status: "Pending",
             priority: "Medium",
-            owner_name: activeRep,
+            owner_name:
+              type === "Task"
+                ? ownerFilter === "all"
+                  ? currentMember?.display_name ?? ""
+                  : ownerFilter
+                : activeRep,
           }
         }
         fixedValues={{ updated_at: new Date().toISOString() }}
