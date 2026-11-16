@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  LEAD_PRIORITIES,
   LEAD_SOURCES,
   LEAD_STATUSES,
   formatDateOnly,
@@ -40,6 +41,7 @@ type LeadField =
   | "city"
   | "source"
   | "status"
+  | "priority"
   | "estimated_value"
   | "owner_name"
   | "notes";
@@ -59,6 +61,7 @@ type ImportRow = {
   city: string | null;
   source: string | null;
   status: string;
+  priority: string | null;
   estimated_value: number | null;
   owner_name: string | null;
   notes: string | null;
@@ -67,6 +70,7 @@ type ImportRow = {
 };
 
 const aliases: Record<LeadField, string[]> = {
+  priority: ["priority", "lead priority"],
   company_name: [
     "company",
     "company name",
@@ -309,6 +313,8 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
   return source.map((row, index) => {
     const companyName = valueFor(row, "company_name");
     const statusRaw = valueFor(row, "status");
+    const priorityRaw = valueFor(row, "priority");
+    const priority = priorityRaw ? enumValue(priorityRaw, LEAD_PRIORITIES) : null;
     const sourceRaw = valueFor(row, "source");
     const valueRaw = valueFor(row, "estimated_value");
     const estimatedValue = numberValue(valueRaw);
@@ -323,6 +329,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
     const sourceValue = normalizeLeadSource(sourceRaw);
     const errors = [
       !companyName ? "Company name is required" : "",
+      priorityRaw && !priority ? `Unknown priority: ${priorityRaw}` : "",
       statusRaw && !status ? `Unknown status: ${statusRaw}` : "",
       sourceRaw && !sourceValue ? `Unknown source: ${sourceRaw}` : "",
       valueRaw && estimatedValue === null ? "Estimated value must be a number" : "",
@@ -348,6 +355,7 @@ function parseWorkbook(buffer: ArrayBuffer, ownerNames: string[]): ImportRow[] {
       city: nullable(valueFor(row, "city")),
       source: sourceValue,
       status: status ?? "New",
+      priority,
       estimated_value: estimatedValue,
       owner_name: owner.value,
       notes: nullable(suppliedNotes),
@@ -451,11 +459,10 @@ export function LeadImportDialog({
         "Phone 1",
         "Phone 2",
         "Email ID",
-        "Email 2",
         "Landline",
         "Date of Birth",
         "Lead Source",
-        "Lead Status",
+        "Priority",
         "Estimated Value",
         "Owner",
         "Notes",
@@ -469,18 +476,17 @@ export function LeadImportDialog({
         "+91 98450 11223",
         "+91 98765 44321",
         "rahul@vertexglobal.in",
-        "rahul.menon@vertexglobal.in",
         "080 4000 0000",
         "15/08/1991",
         "Naukri Resdex",
-        "New",
+        "Warm",
         "1200000",
         "Nuzhat K",
         "Looking for mid-level technology hiring support.",
       ],
     ]);
-    sheet["!cols"] = Array.from({ length: 16 }, (_, index) => ({
-      wch: [0, 1, 15].includes(index) ? 36 : 20,
+    sheet["!cols"] = Array.from({ length: 15 }, (_, index) => ({
+      wch: [0, 1, 14].includes(index) ? 36 : 20,
     }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Corporate Leads");
@@ -516,6 +522,7 @@ export function LeadImportDialog({
           age_or_dob: row.age_or_dob,
           source: row.source,
           status: row.status,
+          priority: row.priority,
           estimated_value: row.estimated_value,
           owner_name: row.owner_name,
           notes: row.notes,
@@ -654,11 +661,10 @@ export function LeadImportDialog({
                         "Phone 1",
                         "Phone 2",
                         "Email ID",
-                        "Email 2",
                         "Landline",
                         "Date of birth",
                         "Lead source",
-                        "Lead status",
+                        "Priority",
                         "Estimated value",
                         "Owner",
                         "Notes",
@@ -697,11 +703,10 @@ export function LeadImportDialog({
                         <td className="px-3 py-2">{row.phone ?? "—"}</td>
                         <td className="px-3 py-2">{row.phone_2 ?? "—"}</td>
                         <td className="px-3 py-2">{row.email ?? "—"}</td>
-                        <td className="px-3 py-2">{row.email_2 ?? "—"}</td>
                         <td className="px-3 py-2">{row.landline ?? "—"}</td>
                         <td className="px-3 py-2">{formatDateOnly(row.age_or_dob)}</td>
                         <td className="px-3 py-2">{row.source ?? "—"}</td>
-                        <td className="px-3 py-2">{row.status}</td>
+                        <td className="px-3 py-2">{row.priority ?? "Not set"}</td>
                         <td className="px-3 py-2">{row.estimated_value ?? "—"}</td>
                         <td className="px-3 py-2">{row.owner_name ?? "—"}</td>
                         <td className="max-w-56 truncate px-3 py-2">{row.notes ?? "—"}</td>
