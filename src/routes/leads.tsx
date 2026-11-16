@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { ListModule, type Column } from "@/components/crm/list-module";
 import { ModuleTabs, type ModuleTab } from "@/components/crm/module-tabs";
 import { ApolloProspector } from "@/components/crm/apollo-prospector";
-import { StatusPill, leadTone } from "@/components/crm/status-pill";
+import { StatusPill } from "@/components/crm/status-pill";
 import { leadFields } from "@/components/crm/field-defs";
 import { LeadImportDialog } from "@/components/crm/lead-import-dialog";
 import { RecordDialog } from "@/components/crm/record-dialog";
@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/select";
 import { activityFields } from "@/components/crm/field-defs";
 import {
-  LEAD_STATUSES,
+  LEAD_PRIORITIES,
+  type LeadPriority,
   currency,
   formatDateOnly,
   updateRecord,
@@ -85,6 +86,41 @@ const CALL_STATUSES = [
 
 type CallStatus = (typeof CALL_STATUSES)[number];
 const CLEAR_CALL_STATUS = "__clear_call_status__";
+const UNASSIGNED_PRIORITY = "__unassigned_priority__";
+
+function PrioritySelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | null;
+  onChange: (priority: LeadPriority | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div onClick={(event) => event.stopPropagation()}>
+      <Select
+        value={value ?? UNASSIGNED_PRIORITY}
+        onValueChange={(priority) =>
+          onChange(priority === UNASSIGNED_PRIORITY ? null : (priority as LeadPriority))
+        }
+        disabled={disabled}
+      >
+        <SelectTrigger className="h-9 min-w-32 bg-surface" aria-label="Lead priority">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={UNASSIGNED_PRIORITY}>Not set</SelectItem>
+          {LEAD_PRIORITIES.map((priority) => (
+            <SelectItem key={priority} value={priority}>
+              {priority}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 function whatsappUrl(value: string) {
   return `https://wa.me/${whatsappNumber(value)}`;
@@ -357,9 +393,11 @@ function LeadsPage() {
   const { owner } = useOwnerScope();
   const [market, setMarket] = useState<LeadMarket>("all");
   const [country, setCountry] = useState("all");
+  const [priority, setPriority] = useState("all");
   useEffect(() => {
     setMarket("all");
     setCountry("all");
+    setPriority("all");
   }, [owner]);
   const runCeipalSync = useServerFn(syncCeipalLeads);
   const runCeipalContactSync = useServerFn(syncCeipalLeadContacts);
@@ -383,14 +421,35 @@ function LeadsPage() {
   const [hideActivityType, setHideActivityType] = useState(false);
   const activeLeadsQuery = tab === "ceipal" ? ceipalLeads : uploadedLeads;
   const activeRows = activeLeadsQuery.data ?? [];
-  const visibleRows = activeRows.filter((row) => matchesLeadGeography(row.country, market, country));
-  const countryOptions = [...new Map(
-    activeRows
-      .filter((row) => ownerMatches(owner, row.owner_name))
-      .filter((row) => market === "all" || leadMarket(row.country) === market)
-      .filter((row) => leadCountryKey(row.country))
-      .map((row) => [leadCountryKey(row.country), leadCountryName(row.country)]),
-  ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const visibleRows = activeRows.filter(
+    (row) =>
+      matchesLeadGeography(row.country, market, country) &&
+      (priority === "all" || (row.priority ?? UNASSIGNED_PRIORITY) === priority),
+  );
+  const priorityUpdate = useMutation({
+    mutationFn: async ({ id, priority }: { id: string; priority: LeadPriority | null }) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ priority })
+        .eq("id", id)
+        .select("id, priority")
+        .single();
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error: Error) => toast.error(`Priority could not be updated: ${error.message}`),
+  });
+  const countryOptions = [
+    ...new Map(
+      activeRows
+        .filter((row) => ownerMatches(owner, row.owner_name))
+        .filter((row) => market === "all" || leadMarket(row.country) === market)
+        .filter((row) => leadCountryKey(row.country))
+        .map((row) => [leadCountryKey(row.country), leadCountryName(row.country)]),
+    ).entries(),
+  ].sort((a, b) => a[1].localeCompare(b[1]));
   const callStatusUpdate = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: CallStatus | null }) => {
       const { error } = await supabase.from("leads").update({ call_status: status }).eq("id", id);
@@ -598,19 +657,6 @@ function LeadsPage() {
         ),
     },
     {
-      header: "Email 2",
-      inlineEditable: true,
-      render: (row) =>
-        inlineCell(
-          row,
-          "email_2",
-          undefined,
-          false,
-          row.email_2 ? gmailComposeUrl(row.email_2) : undefined,
-          "Compose email",
-        ),
-    },
-    {
       header: "Landline",
       inlineEditable: true,
       render: (row) =>
@@ -630,8 +676,15 @@ function LeadsPage() {
     },
     { header: "Lead source", render: (row) => row.source ?? "—" },
     {
-      header: "Lead status",
-      render: (row) => <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>,
+      header: "Priority",
+      inlineEditable: true,
+      render: (row) => (
+        <PrioritySelect
+          value={row.priority}
+          disabled={priorityUpdate.isPending}
+          onChange={(priority) => priorityUpdate.mutate({ id: row.id, priority })}
+        />
+      ),
     },
     {
       header: "Call status",
@@ -702,11 +755,13 @@ function LeadsPage() {
               {
                 header: "Location",
                 groupedHidden: true,
-                render: (row) => [row.city, leadCountryName(row.country)].filter(Boolean).join(", ") || "—",
+                render: (row) =>
+                  [row.city, leadCountryName(row.country)].filter(Boolean).join(", ") || "—",
               },
             ]}
-            minWidth={3100}
+            minWidth={2900}
             showSerialNumbers
+            freezeTable
             groupBy={leadCompanyKey}
             renderGroupHeader={(row, contactCount) => (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -726,19 +781,39 @@ function LeadsPage() {
               </div>
             )}
             allowCreate={tab !== "ceipal"}
-            filterAllLabel="All leads"
-            filterOptions={LEAD_STATUSES}
-            filterValue={(row) => row.status}
             filterPlacement="toolbar"
-            paginationResetKey={`${market}:${country}`}
+            paginationResetKey={`${market}:${country}:${priority}:${tab}`}
             toolbarFilters={
               <>
                 <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <span className="text-xs font-semibold text-muted-foreground">Priority</span>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger
+                      className="w-full bg-surface sm:w-48"
+                      aria-label="Filter by priority"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All priorities</SelectItem>
+                      {LEAD_PRIORITIES.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={UNASSIGNED_PRIORITY}>Not set</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex w-full items-center gap-2 sm:w-auto">
                   <span className="text-xs font-semibold text-muted-foreground">Market</span>
-                  <Select value={market} onValueChange={(value) => {
-                    setMarket(value as LeadMarket);
-                    setCountry("all");
-                  }}>
+                  <Select
+                    value={market}
+                    onValueChange={(value) => {
+                      setMarket(value as LeadMarket);
+                      setCountry("all");
+                    }}
+                  >
                     <SelectTrigger className="w-full bg-surface sm:w-48" aria-label="Lead market">
                       <SelectValue />
                     </SelectTrigger>
@@ -760,7 +835,9 @@ function LeadsPage() {
                       <SelectItem value="all">All countries</SelectItem>
                       <SelectItem value={UNKNOWN_COUNTRY}>Country not set</SelectItem>
                       {countryOptions.map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -809,7 +886,6 @@ function LeadsPage() {
               row.company_name,
               row.contact_name,
               row.email,
-              row.email_2,
               row.phone,
               row.phone_2,
               row.landline,
@@ -830,7 +906,7 @@ function LeadsPage() {
                   {row.country ? ` · ${leadCountryName(row.country)}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <StatusPill tone={leadTone(row.status)}>{row.status}</StatusPill>
+                  <StatusPill>{row.priority ?? "Priority not set"}</StatusPill>
                   {row.industry ? <StatusPill tone="info">{row.industry}</StatusPill> : null}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -859,6 +935,11 @@ function LeadsPage() {
                   data-call-record-id={row.id}
                   data-call-record-type="Lead"
                 >
+                  <PrioritySelect
+                    value={row.priority}
+                    disabled={priorityUpdate.isPending}
+                    onChange={(priority) => priorityUpdate.mutate({ id: row.id, priority })}
+                  />
                   <CallStatusSelect
                     value={row.call_status}
                     disabled={callStatusUpdate.isPending}
@@ -894,16 +975,6 @@ function LeadsPage() {
                         className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
                       >
                         <Mail className="size-3.5" /> Email: {row.email}
-                      </a>
-                    ) : null}
-                    {row.email_2 ? (
-                      <a
-                        href={gmailComposeUrl(row.email_2)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-w-fit items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-primary hover:bg-primary/10"
-                      >
-                        <Mail className="size-3.5" /> Email 2: {row.email_2}
                       </a>
                     ) : null}
                     <button

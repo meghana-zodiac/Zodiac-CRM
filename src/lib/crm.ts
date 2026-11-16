@@ -94,6 +94,9 @@ export const LEAD_STATUSES = [
   "Not Interested",
 ] as const;
 
+export const LEAD_PRIORITIES = ["Hot", "Warm", "Cold"] as const;
+export type LeadPriority = (typeof LEAD_PRIORITIES)[number];
+
 export const LEAD_SOURCES = [
   "Inbound Website",
   "Referral",

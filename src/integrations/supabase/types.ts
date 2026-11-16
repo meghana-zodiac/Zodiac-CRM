@@ -772,6 +772,7 @@ export type Database = {
           service_interest: string | null;
           source: string | null;
           status: string;
+          priority: string | null;
           ug_course: string | null;
           updated_at: string;
           work_experience: string | null;
@@ -815,6 +816,7 @@ export type Database = {
           service_interest?: string | null;
           source?: string | null;
           status?: string;
+          priority?: string | null;
           ug_course?: string | null;
           updated_at?: string;
           work_experience?: string | null;
@@ -856,6 +858,7 @@ export type Database = {
           service_interest?: string | null;
           source?: string | null;
           status?: string;
+          priority?: string | null;
           ug_course?: string | null;
           updated_at?: string;
           work_experience?: string | null;
