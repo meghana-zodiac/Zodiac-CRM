@@ -41,6 +41,7 @@ import {
 import { syncCeipalLeadContacts, syncCeipalLeads } from "@/lib/ceipal.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { whatsappNumber } from "@/lib/phone-links";
+import { leadPriorityStyle, LEAD_PRIORITY_STYLES } from "@/lib/lead-priority";
 import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import {
   leadCountryKey,
@@ -97,6 +98,7 @@ function PrioritySelect({
   onChange: (priority: LeadPriority | null) => void;
   disabled?: boolean;
 }) {
+  const style = leadPriorityStyle(value);
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <Select
@@ -106,14 +108,20 @@ function PrioritySelect({
         }
         disabled={disabled}
       >
-        <SelectTrigger className="h-9 min-w-32 bg-surface" aria-label="Lead priority">
+        <SelectTrigger
+          className={`h-9 min-w-32 ${style?.pill ?? "bg-surface"}`}
+          aria-label="Lead priority"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={UNASSIGNED_PRIORITY}>Not set</SelectItem>
           {LEAD_PRIORITIES.map((priority) => (
             <SelectItem key={priority} value={priority}>
-              {priority}
+              <span className="flex items-center gap-2">
+                <span className={`size-2.5 rounded-full ${LEAD_PRIORITY_STYLES[priority].dot}`} aria-hidden="true" />
+                {priority}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -789,7 +797,7 @@ function LeadsPage() {
                   <span className="text-xs font-semibold text-muted-foreground">Priority</span>
                   <Select value={priority} onValueChange={setPriority}>
                     <SelectTrigger
-                      className="w-full bg-surface sm:w-48"
+                      className={`w-full sm:w-48 ${leadPriorityStyle(priority)?.pill ?? "bg-surface"}`}
                       aria-label="Filter by priority"
                     >
                       <SelectValue />
@@ -798,7 +806,10 @@ function LeadsPage() {
                       <SelectItem value="all">All priorities</SelectItem>
                       {LEAD_PRIORITIES.map((value) => (
                         <SelectItem key={value} value={value}>
-                          {value}
+                          <span className="flex items-center gap-2">
+                            <span className={`size-2.5 rounded-full ${LEAD_PRIORITY_STYLES[value].dot}`} aria-hidden="true" />
+                            {value}
+                          </span>
                         </SelectItem>
                       ))}
                       <SelectItem value={UNASSIGNED_PRIORITY}>Not set</SelectItem>
@@ -906,7 +917,12 @@ function LeadsPage() {
                   {row.country ? ` · ${leadCountryName(row.country)}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  <StatusPill>{row.priority ?? "Priority not set"}</StatusPill>
+                  <StatusPill className={`border border-border ring-0 ${leadPriorityStyle(row.priority)?.pill ?? ""}`}>
+                    {leadPriorityStyle(row.priority) ? (
+                      <span className={`size-2 rounded-full ${leadPriorityStyle(row.priority)?.dot}`} aria-hidden="true" />
+                    ) : null}
+                    {row.priority ?? "Priority not set"}
+                  </StatusPill>
                   {row.industry ? <StatusPill tone="info">{row.industry}</StatusPill> : null}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
