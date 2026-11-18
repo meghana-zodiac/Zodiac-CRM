@@ -278,7 +278,7 @@ function AccountsPage() {
               })}
             </div>
             {viewing && !isMobile ? (
-              <div className="min-w-0 self-start">
+              <div className="sticky top-4 max-h-[80vh] min-w-0 self-start overflow-y-auto">
                 <ClientDetails
                   key={viewing.id}
                   account={viewing}
