@@ -48,7 +48,7 @@ export const navGroups: NavGroup[] = [
     label: "Business Development",
     items: [
       { label: "Corporate Leads", to: "/leads", icon: Sparkles },
-      { label: "Active Clients", to: "/accounts", icon: Building2 },
+      { label: "Clients", to: "/accounts", icon: Building2 },
       { label: "BD Proposals & SLAs", to: "/deals", icon: FileSignature },
       { label: "Daily POA & KRA", to: "/poa", icon: ClipboardList },
       { label: "My Daily EOD", to: "/eod", icon: ClipboardCheck },

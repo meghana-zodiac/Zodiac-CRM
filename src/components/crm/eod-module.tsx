@@ -123,7 +123,7 @@ export function EodModule() {
     {
       label: "Clients added",
       value: metrics.clientsAdded,
-      detail: "From Active Clients",
+      detail: "From Clients",
       icon: Building2,
     },
   ];

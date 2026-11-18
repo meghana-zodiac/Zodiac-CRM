@@ -219,7 +219,7 @@ export function AccountImportDialog({
       wch: index === 0 || index === 3 || index === 11 ? 28 : 20,
     }));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Active Clients");
+    XLSX.utils.book_append_sheet(workbook, sheet, "Clients");
     XLSX.writeFile(workbook, "zodiac-crm-client-import-template.xlsx");
   };
 
@@ -361,7 +361,7 @@ export function AccountImportDialog({
     >
       <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import Active Clients</DialogTitle>
+          <DialogTitle>Import Clients</DialogTitle>
           <DialogDescription>
             Upload an Excel or CSV file. Client details are imported here; any contact columns
             automatically create linked Client Contacts.
