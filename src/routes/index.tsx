@@ -26,7 +26,9 @@ import {
   trainingRequestsQuery,
 } from "@/lib/crm";
 import { StatusPill, activityTone, bdTone } from "@/components/crm/status-pill";
-import { BD_OWNERS } from "@/components/crm/nav-data";
+import { useCrmIdentity } from "@/components/crm/use-crm-identity";
+import { bdTeamMembersQuery } from "@/lib/poa";
+import { buildBdTeamPerformance } from "@/lib/bd-team-performance";
 import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 
 export const Route = createFileRoute("/")({
@@ -56,6 +58,8 @@ const openTrainingStages = TRAINING_STATUSES.filter((status) => status !== "Comp
 
 function HomePage() {
   const { owner } = useOwnerScope();
+  const identity = useCrmIdentity();
+  const teamMembers = useQuery(bdTeamMembersQuery());
   const leadCounts = useQuery(leadDashboardCountsQuery());
   const overview = useQuery(dashboardOverviewQuery());
   const deals = useQuery(dealsQuery());
@@ -76,29 +80,27 @@ function HomePage() {
   const meetingsToday = activityList.filter(
     (activity) => activity.activity_type === "Meeting" && isToday(activity.due_date),
   );
-  const ownerSummary = BD_OWNERS.map((owner) => {
-    const isOwner = (value: string | null | undefined) =>
-      (value ?? "").trim().toLowerCase() === owner.toLowerCase();
-    const openDeals = dealList.filter(
-      (deal) => deal.stage !== "SLA Signed" && isOwner(deal.owner_name),
-    );
-    const meetings = activityList.filter(
-      (activity) =>
-        activity.activity_type === "Meeting" &&
-        activity.status !== "Completed" &&
-        isOwner(activity.owner_name),
-    );
-    return {
-      owner,
-      openDeals: openDeals.length,
-      pipelineValue: openDeals.reduce((sum, deal) => sum + (deal.amount ?? 0), 0),
-      meetings: meetings.length,
-      meetingsToday: meetings.filter((activity) => isToday(activity.due_date)).length,
-      trainingRequests: requestList.filter(
-        (request) => request.status !== "Completed & Invoiced" && isOwner(request.owner_name),
-      ).length,
-    };
+  const ownerSummary = buildBdTeamPerformance({
+    members: teamMembers.data ?? [],
+    viewer: identity.member,
+    ownerFilter: owner,
+    deals: deals.data ?? [],
+    activities: activities.data ?? [],
+    trainingRequests: trainingRequests.data ?? [],
+    isToday,
   });
+  const performanceLoading =
+    identity.isLoading ||
+    teamMembers.isPending ||
+    deals.isPending ||
+    activities.isPending ||
+    trainingRequests.isPending;
+  const performanceError =
+    teamMembers.isError ||
+    deals.isError ||
+    activities.isError ||
+    trainingRequests.isError ||
+    (!identity.isLoading && !identity.member);
   const maxBdCount = Math.max(
     1,
     ...openBdStages.map((stage) => dealList.filter((deal) => deal.stage === stage).length),
@@ -288,53 +290,72 @@ function HomePage() {
 
       <section className="rounded-lg border border-border bg-surface p-4 shadow-panel">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">
-            BD team split — Nuzhat vs Edward
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">BD Team Performance</h2>
           <Link to="/deals" className="text-xs font-medium text-primary hover:underline">
             Open pipeline
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {ownerSummary.map((entry) => (
-            <div key={entry.owner} className="rounded-lg border border-border bg-background p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-foreground">{entry.owner}</p>
-                <StatusPill tone="info">{entry.openDeals} active deals</StatusPill>
+        {performanceLoading ? (
+          <p role="status" className="py-5 text-sm text-muted-foreground">
+            Loading team performance…
+          </p>
+        ) : performanceError ? (
+          <div role="alert" className="py-5 text-sm text-muted-foreground">
+            <p>Team performance could not be loaded.</p>
+            <button
+              type="button"
+              className="mt-2 text-primary underline"
+              onClick={() => window.location.reload()}
+            >
+              Reload dashboard
+            </button>
+          </div>
+        ) : ownerSummary.length === 0 ? (
+          <p className="py-5 text-sm text-muted-foreground">
+            No approved team members match this view.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ownerSummary.map((entry) => (
+              <div key={entry.id} className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">{entry.owner}</p>
+                  <StatusPill tone="info">{entry.openDeals} active deals</StatusPill>
+                </div>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                  {currency(entry.pipelineValue)}
+                </p>
+                <p className="text-xs text-muted-foreground">Open pipeline value</p>
+                <dl className="mt-3 grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
+                  <div className="rounded-md bg-muted/60 py-2">
+                    <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Meetings
+                    </dt>
+                    <dd className="text-sm font-semibold tabular-nums text-foreground">
+                      {entry.meetings}
+                    </dd>
+                  </div>
+                  <div className="rounded-md bg-muted/60 py-2">
+                    <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Today
+                    </dt>
+                    <dd className="text-sm font-semibold tabular-nums text-foreground">
+                      {entry.meetingsToday}
+                    </dd>
+                  </div>
+                  <div className="rounded-md bg-muted/60 py-2">
+                    <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Training
+                    </dt>
+                    <dd className="text-sm font-semibold tabular-nums text-foreground">
+                      {entry.trainingRequests}
+                    </dd>
+                  </div>
+                </dl>
               </div>
-              <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
-                {currency(entry.pipelineValue)}
-              </p>
-              <p className="text-xs text-muted-foreground">Open pipeline value</p>
-              <dl className="mt-3 grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
-                <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Meetings
-                  </dt>
-                  <dd className="text-sm font-semibold tabular-nums text-foreground">
-                    {entry.meetings}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Today
-                  </dt>
-                  <dd className="text-sm font-semibold tabular-nums text-foreground">
-                    {entry.meetingsToday}
-                  </dd>
-                </div>
-                <div className="rounded-md bg-muted/60 py-2">
-                  <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    Training
-                  </dt>
-                  <dd className="text-sm font-semibold tabular-nums text-foreground">
-                    {entry.trainingRequests}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
