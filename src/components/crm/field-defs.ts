@@ -266,6 +266,7 @@ export const trainerFields: FieldDef[] = [
   { name: "rating", label: "Rating (/5)", type: "number" },
   { name: "day_rate", label: "Day rate (₹)", type: "number" },
   { name: "bio", label: "Profile summary", type: "textarea" },
+  ownerField,
 ];
 
 export const trainingRequestFields = (accounts: Account[], trainers: Trainer[]): FieldDef[] => [
@@ -351,6 +352,7 @@ export const trainingBatchFields = (
     defaultValue: "Scheduled",
     options: opts(BATCH_STATUSES),
   },
+  ownerField,
   { name: "notes", label: "Notes", type: "textarea" },
 ];
 

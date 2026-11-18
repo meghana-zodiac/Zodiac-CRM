@@ -263,6 +263,8 @@ function leadFrom(lead: JsonObject) {
 export const syncCeipalClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalSyncResult> => {
+    const { requirePrimaryAdmin } = await import("./crm-admin.server");
+    await requirePrimaryAdmin(context.userId);
     const token = await authenticate();
     const clients = await fetchClients(token);
     const accounts = clients
@@ -283,6 +285,8 @@ export const syncCeipalClients = createServerFn({ method: "POST" })
 export const syncCeipalLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalSyncResult> => {
+    const { requirePrimaryAdmin } = await import("./crm-admin.server");
+    await requirePrimaryAdmin(context.userId);
     const syncKey = "leads";
     const { data: savedState, error: stateError } = await context.supabase
       .from("ceipal_sync_state")
@@ -367,6 +371,8 @@ export const syncCeipalLeads = createServerFn({ method: "POST" })
 export const syncCeipalLeadContacts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CeipalLeadContactSyncResult> => {
+    const { requirePrimaryAdmin } = await import("./crm-admin.server");
+    await requirePrimaryAdmin(context.userId);
     const { data: candidates, error: candidatesError } = await context.supabase
       .from("leads")
       .select("id, ceipal_id, contact_name, phone, email")

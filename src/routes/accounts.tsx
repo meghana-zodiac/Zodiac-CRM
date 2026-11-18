@@ -1,3 +1,4 @@
+import { useCrmIdentity } from "@/components/crm/use-crm-identity";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +18,7 @@ import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { ClientDetails, ClientActivityStatus } from "@/components/crm/client-details";
 import { accountFields } from "@/components/crm/field-defs";
-import { useOwnerScope } from "@/components/crm/owner-filter";
+import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import { accountsQuery, contactsQuery, dealsQuery, type Account } from "@/lib/crm";
 import {
   clientContractsQuery,
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/accounts")({
 
 function AccountsPage() {
   const queryClient = useQueryClient();
+  const { isAdmin } = useCrmIdentity();
   const runCeipalSync = useServerFn(syncCeipalClients);
   const accounts = useQuery(accountsQuery());
   const contacts = useQuery(contactsQuery());
@@ -73,8 +75,8 @@ function AccountsPage() {
   );
   const scoped = useMemo(
     () =>
-      (accounts.data ?? []).filter(
-        (a) => owner === "all" || (contractMap.get(a.id)?.owner_name ?? a.owner_name) === owner,
+      (accounts.data ?? []).filter((a) =>
+        ownerMatches(owner, contractMap.get(a.id)?.owner_name ?? a.owner_name),
       ),
     [accounts.data, owner, contractMap],
   );
@@ -133,15 +135,17 @@ function AccountsPage() {
               <FileSpreadsheet className="size-4" />
               Import Excel
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={ceipalSync.isPending}
-              onClick={() => ceipalSync.mutate()}
-            >
-              <RefreshCw className={`size-4 ${ceipalSync.isPending ? "animate-spin" : ""}`} />
-              {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
-            </Button>
+            {isAdmin ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={ceipalSync.isPending}
+                onClick={() => ceipalSync.mutate()}
+              >
+                <RefreshCw className={`size-4 ${ceipalSync.isPending ? "animate-spin" : ""}`} />
+                {ceipalSync.isPending ? "Syncing…" : "Sync from CEIPAL"}
+              </Button>
+            ) : null}
             <Button
               size="sm"
               onClick={() => {

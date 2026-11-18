@@ -171,9 +171,14 @@ export function RecordDialog({
     const ownerOptions = (teamMembers.data ?? [])
       .filter((member) => member.active && member.access_status === "approved")
       .map((member) => ({ value: member.display_name, label: member.display_name }));
-    if (!ownerOptions.length) return fields;
     return fields.map((field) =>
-      field.name === "owner_name" ? { ...field, options: ownerOptions } : field,
+      field.name === "owner_name"
+        ? {
+            ...field,
+            options: ownerOptions,
+            ...(ownerOptions.length === 1 ? { defaultValue: ownerOptions[0]!.value } : {}),
+          }
+        : field,
     );
   }, [fields, teamMembers.data]);
   const [values, setValues] = useState<Values>({});

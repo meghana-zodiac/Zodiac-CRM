@@ -1114,6 +1114,7 @@ export type Database = {
       };
       trainers: {
         Row: {
+          owner_name: string | null;
           bio: string | null;
           created_at: string;
           day_rate: number | null;
@@ -1127,6 +1128,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          owner_name?: string | null;
           bio?: string | null;
           created_at?: string;
           day_rate?: number | null;
@@ -1140,6 +1142,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          owner_name?: string | null;
           bio?: string | null;
           created_at?: string;
           day_rate?: number | null;
@@ -1156,6 +1159,7 @@ export type Database = {
       };
       training_batches: {
         Row: {
+          owner_name: string | null;
           batch_code: string;
           course_topic: string | null;
           created_at: string;
@@ -1172,6 +1176,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          owner_name?: string | null;
           batch_code: string;
           course_topic?: string | null;
           created_at?: string;
@@ -1188,6 +1193,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          owner_name?: string | null;
           batch_code?: string;
           course_topic?: string | null;
           created_at?: string;

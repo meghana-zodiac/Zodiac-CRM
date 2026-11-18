@@ -1,3 +1,4 @@
+import { matchesCrmOwner } from "@/lib/crm-owner";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -108,8 +109,7 @@ export function GlobalOwnerTabs({ isAdmin }: { isAdmin: boolean }) {
 }
 
 export function ownerMatches(filter: OwnerFilterValue, owner: string | null | undefined) {
-  if (filter === "all") return true;
-  return (owner ?? "").trim().toLowerCase() === filter.toLowerCase();
+  return matchesCrmOwner(filter, owner);
 }
 
 export function OwnerFilter({

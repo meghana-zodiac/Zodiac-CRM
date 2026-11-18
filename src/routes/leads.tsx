@@ -1,3 +1,4 @@
+import { useCrmIdentity } from "@/components/crm/use-crm-identity";
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -397,6 +398,7 @@ async function fetchLeadsByOrigin(origin: LeadOrigin) {
 }
 
 function LeadsPage() {
+  const { isAdmin } = useCrmIdentity();
   const queryClient = useQueryClient();
   const { owner } = useOwnerScope();
   const [market, setMarket] = useState<LeadMarket>("all");
@@ -905,7 +907,7 @@ function LeadsPage() {
                     <FileSpreadsheet className="size-4" /> Import Excel
                   </Button>
                 ) : null}
-                {tab === "ceipal" ? (
+                {tab === "ceipal" && isAdmin ? (
                   <>
                     <Button
                       size="sm"
