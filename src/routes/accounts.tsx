@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, RefreshCw, FileSpreadsheet, Handshake } from "lucide-react";
+import { Plus, RefreshCw, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { ClientDetails, ClientActivityStatus } from "@/components/crm/client-details";
-import { accountFields, dealFields } from "@/components/crm/field-defs";
+import { accountFields } from "@/components/crm/field-defs";
 import { useOwnerScope } from "@/components/crm/owner-filter";
 import { accountsQuery, contactsQuery, dealsQuery, type Account } from "@/lib/crm";
 import {
@@ -58,7 +58,6 @@ function AccountsPage() {
   const [editing, setEditing] = useState<Account | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [opportunityAccount, setOpportunityAccount] = useState<Account | null>(null);
   const isMobile = useIsMobile();
   const ceipalSync = useMutation({
     mutationFn: () => runCeipalSync(),
@@ -117,16 +116,6 @@ function AccountsPage() {
     setEditing(a);
     setDialogOpen(true);
   };
-  const opportunityPrefill = opportunityAccount
-    ? {
-        deal_name: `${opportunityAccount.name} — New Opportunity`,
-        stage: "New Lead",
-        account_id: opportunityAccount.id,
-        contact_id: contacts.data?.find((c) => c.account_id === opportunityAccount.id)?.id ?? null,
-        owner_name:
-          contractMap.get(opportunityAccount.id)?.owner_name ?? opportunityAccount.owner_name,
-      }
-    : null;
   const failed = accounts.isError || contracts.isError;
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -261,18 +250,6 @@ function AccountsPage() {
                         />
                       </div>
                     </div>
-                    {viewing?.id === a.id ? (
-                      <div className="border-t border-border p-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setOpportunityAccount(a)}
-                        >
-                          <Handshake className="size-4" />
-                          Create Opportunity
-                        </Button>
-                      </div>
-                    ) : null}
                   </article>
                 );
               })}
@@ -285,7 +262,6 @@ function AccountsPage() {
                   contract={contractMap.get(viewing.id)}
                   contacts={contacts.data ?? []}
                   onEditAccount={() => editAccount(viewing)}
-                  onCreateOpportunity={() => setOpportunityAccount(viewing)}
                 />
               </div>
             ) : null}
@@ -311,7 +287,6 @@ function AccountsPage() {
                 contract={contractMap.get(viewing.id)}
                 contacts={contacts.data ?? []}
                 onEditAccount={() => editAccount(viewing)}
-                onCreateOpportunity={() => setOpportunityAccount(viewing)}
               />
             ) : null}
           </SheetContent>
@@ -330,18 +305,6 @@ function AccountsPage() {
         open={importOpen}
         onOpenChange={setImportOpen}
         accounts={accounts.data ?? []}
-      />
-      <RecordDialog
-        open={Boolean(opportunityAccount)}
-        onOpenChange={(open) => {
-          if (!open) setOpportunityAccount(null);
-        }}
-        table="deals"
-        title="Create Opportunity"
-        description="The client, primary contact and BD owner are prefilled."
-        fields={dealFields(accounts.data ?? [], contacts.data ?? [])}
-        record={opportunityPrefill}
-        invalidateKeys={["deals"]}
       />
     </div>
   );
