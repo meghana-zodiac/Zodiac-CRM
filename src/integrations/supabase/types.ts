@@ -8,6 +8,115 @@ export type Database = {
   };
   public: {
     Tables: {
+      client_contracts: {
+        Row: {
+          id: string;
+          account_id: string;
+          owner_name: string;
+          activity_status: string;
+          recruiter: string | null;
+          approach_date: string | null;
+          visit_date: string | null;
+          mandate_received_date: string | null;
+          terms: string | null;
+          notes: string | null;
+          source_organisation: string | null;
+          source_sector: string | null;
+          source_place: string | null;
+          contact_names: string | null;
+          contact_designations: string | null;
+          mobile_numbers: string | null;
+          landline_numbers: string | null;
+          email_addresses: string | null;
+          source_key: string | null;
+          revision: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          account_id: string;
+          owner_name: string;
+          activity_status: string;
+          recruiter?: string | null;
+          approach_date?: string | null;
+          visit_date?: string | null;
+          mandate_received_date?: string | null;
+          terms?: string | null;
+          notes?: string | null;
+          source_organisation?: string | null;
+          source_sector?: string | null;
+          source_place?: string | null;
+          contact_names?: string | null;
+          contact_designations?: string | null;
+          mobile_numbers?: string | null;
+          landline_numbers?: string | null;
+          email_addresses?: string | null;
+          source_key?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          account_id?: string;
+          owner_name?: string;
+          activity_status?: string;
+          recruiter?: string | null;
+          approach_date?: string | null;
+          visit_date?: string | null;
+          mandate_received_date?: string | null;
+          terms?: string | null;
+          notes?: string | null;
+          source_organisation?: string | null;
+          source_sector?: string | null;
+          source_place?: string | null;
+          contact_names?: string | null;
+          contact_designations?: string | null;
+          mobile_numbers?: string | null;
+          landline_numbers?: string | null;
+          email_addresses?: string | null;
+          source_key?: string | null;
+          revision?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      client_contract_history: {
+        Row: {
+          id: string;
+          contract_id: string;
+          revision: number;
+          changed_at: string;
+          changed_by: string | null;
+          actor_name: string;
+          previous_values: Json | null;
+          new_values: Json;
+        };
+        Insert: {
+          id?: string;
+          contract_id: string;
+          revision: number;
+          changed_at?: string;
+          changed_by?: string | null;
+          actor_name: string;
+          previous_values?: Json | null;
+          new_values: Json;
+        };
+        Update: {
+          id?: string;
+          contract_id?: string;
+          revision?: number;
+          changed_at?: string;
+          changed_by?: string | null;
+          actor_name?: string;
+          previous_values?: Json | null;
+          new_values?: Json;
+        };
+        Relationships: [];
+      };
+
       bd_team_members: {
         Row: {
           access_role: string;

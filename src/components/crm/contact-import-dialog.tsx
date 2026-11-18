@@ -326,7 +326,7 @@ export function ContactImportDialog({
           <DialogTitle>Import Client Contacts</DialogTitle>
           <DialogDescription>
             Headers are detected automatically. Extra columns are saved with the contact. Company
-            names must already exist under Active Clients.
+            names must already exist under Clients.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
