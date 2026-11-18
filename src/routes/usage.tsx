@@ -11,21 +11,14 @@ import {
   Smartphone,
   UsersRound,
 } from "lucide-react";
-import {
-  endOfDay,
-  format,
-  formatDistanceToNow,
-  startOfDay,
-  startOfMonth,
-  startOfWeek,
-  subDays,
-} from "date-fns";
-import { useMemo, useState } from "react";
+import { format, formatDistanceToNow } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { indiaUsageDay, usageRange } from "@/lib/usage-period";
 
 export const Route = createFileRoute("/usage")({
   head: () => ({
@@ -57,36 +50,6 @@ const periods = [
   { value: "90", label: "Last 90 days" },
   { value: "custom", label: "Custom dates" },
 ] as const;
-
-function usageRange(period: string, customFrom: string, customTo: string) {
-  const now = new Date();
-
-  if (period === "today") {
-    return { start: startOfDay(now), end: endOfDay(now) };
-  }
-  if (period === "yesterday") {
-    const yesterday = subDays(now, 1);
-    return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-  }
-  if (period === "this_week") {
-    return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now) };
-  }
-  if (period === "this_month") {
-    return { start: startOfMonth(now), end: endOfDay(now) };
-  }
-  if (period === "custom" && customFrom && customTo) {
-    const start = new Date(`${customFrom}T00:00:00`);
-    const end = new Date(`${customTo}T23:59:59.999`);
-    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-      return start <= end ? { start, end } : { start: startOfDay(end), end: endOfDay(start) };
-    }
-  }
-
-  return {
-    start: startOfDay(subDays(now, Math.max(0, Number(period) - 1))),
-    end: endOfDay(now),
-  };
-}
 
 function readableEntity(value: string | null) {
   if (!value) return "CRM";
@@ -139,15 +102,24 @@ function DeviceBadge({ device }: { device: string }) {
 }
 
 function CrmUsagePage() {
-  const todayValue = format(new Date(), "yyyy-MM-dd");
-  const [period, setPeriod] = useState("7");
-  const [customFrom, setCustomFrom] = useState(format(subDays(new Date(), 6), "yyyy-MM-dd"));
+  const [todayValue, setTodayValue] = useState(() => indiaUsageDay());
+  const [period, setPeriod] = useState("today");
+  const [customFrom, setCustomFrom] = useState(todayValue);
   const [customTo, setCustomTo] = useState(todayValue);
+  useEffect(() => {
+    const checkDay = () => setTodayValue(indiaUsageDay());
+    const timer = window.setInterval(checkDay, 30_000);
+    window.addEventListener("focus", checkDay);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkDay);
+    };
+  }, []);
   const [memberFilter, setMemberFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
   const selectedRange = useMemo(
-    () => usageRange(period, customFrom, customTo),
-    [customFrom, customTo, period],
+    () => usageRange(period, customFrom, customTo, new Date(`${todayValue}T12:00:00+05:30`)),
+    [customFrom, customTo, period, todayValue],
   );
   const since = selectedRange.start.toISOString();
   const until = selectedRange.end.toISOString();
