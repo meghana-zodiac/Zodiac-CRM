@@ -80,6 +80,7 @@ function TrainingBatchesPage() {
       rows={batches.data ?? []}
       isLoading={batches.isLoading}
       columns={columns}
+      ownerOf={(row) => row.owner_name}
       minWidth={1300}
       filterAllLabel="All batches"
       filterOptions={BATCH_STATUSES}

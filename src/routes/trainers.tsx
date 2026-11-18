@@ -66,6 +66,7 @@ function TrainersPage() {
         rows={trainers.data ?? []}
         isLoading={trainers.isLoading}
         columns={columns}
+        ownerOf={(row) => row.owner_name}
         minWidth={1000}
         filterAllLabel="All trainers"
         filterOptions={TRAINING_TYPES}

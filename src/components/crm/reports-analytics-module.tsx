@@ -1,3 +1,4 @@
+import { matchesCrmOwner } from "@/lib/crm-owner";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -108,7 +109,7 @@ function targetMonthDate(value: string) {
 }
 
 function ownerMatches(value: string | null | undefined, owner: string) {
-  return owner === "all" || (value ?? "").trim().toLowerCase() === owner.toLowerCase();
+  return matchesCrmOwner(owner, value);
 }
 
 function funnelStage(status: string | null | undefined) {
