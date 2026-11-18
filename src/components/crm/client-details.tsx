@@ -182,13 +182,11 @@ export function ClientDetails({
   contract,
   contacts,
   onEditAccount,
-  onCreateOpportunity,
 }: {
   account: Account;
   contract?: ClientContract | undefined;
   contacts: Contact[];
   onEditAccount: () => void;
-  onCreateOpportunity: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const history = useQuery(contractHistoryQuery(contract?.id));
@@ -237,9 +235,6 @@ export function ClientDetails({
           </dl>
           <div className="mt-5 flex flex-wrap gap-2">
             <DesktopContactActions phone={account.phone ?? account.phone_2} />
-            <Button variant="outline" onClick={onCreateOpportunity}>
-              Create Opportunity
-            </Button>
           </div>
           <Button className="mt-5" variant="outline" onClick={onEditAccount}>
             Edit client
