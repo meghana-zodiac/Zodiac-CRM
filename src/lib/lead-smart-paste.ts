@@ -1,6 +1,17 @@
 import type { CrmTable } from "@/lib/crm";
+import { isContractPasteLine, parseContractPaste } from "./contract-smart-paste";
 
 type PasteValues = Record<string, string>;
+export function matchSmartPasteOption(
+  value: string,
+  options: readonly { value: string; label: string }[],
+) {
+  const normalized = value.trim().toLowerCase();
+  return options.find(
+    (option) =>
+      option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized,
+  );
+}
 export type PasteConfidence = "high" | "review";
 export type SmartPasteResult = {
   values: PasteValues;
@@ -537,10 +548,26 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
     const otherNumbers = [phone2, landline]
       .filter(Boolean)
       .map((value) => value!.replace(/\D/g, ""));
+    const phoneSource = raw
+      .split(/\r?\n/)
+      .filter((line, index, lines) => {
+        const previous = lines[index - 1]?.trim() ?? "";
+        return (
+          !/^.{2,45}?\s*[:：\t]/.test(line) &&
+          !isContractPasteLine(line) &&
+          !isContractPasteLine(previous) &&
+          !KNOWN_LABELS.has(previous.toLowerCase())
+        );
+      })
+      .join("\n");
     const fallbackPhone = Array.from(
-      raw.matchAll(new RegExp(PHONE.source, "g")),
+      phoneSource.matchAll(new RegExp(PHONE.source, "g")),
       (match) => match[0],
-    ).find((value) => !otherNumbers.includes(value.replace(/\D/g, "")));
+    ).find(
+      (value) =>
+        !/^\d{1,4}[.-]\d{1,2}[.-]\s*\d{1,4}$/.test(value.trim()) &&
+        !otherNumbers.includes(value.replace(/\D/g, "")),
+    );
     put(
       result,
       "phone",
@@ -921,6 +948,18 @@ export function parseSmartPasteForFields(
 ): SmartPasteResult {
   const parsed = parseSmartPasteDetailed(table, raw);
   const allowed = new Set(fields.map((field) => field.name));
+  if (table === "accounts" && allowed.has("contract.activity_status")) {
+    const contract = parseContractPaste(raw);
+    for (const [field, value] of Object.entries(contract.values)) {
+      parsed.values[`contract.${field}`] = value;
+      parsed.confidence[`contract.${field}`] = "high";
+    }
+    parsed.unclassified = [
+      ...parsed.unclassified.filter((line) => !isContractPasteLine(line)),
+      ...contract.warnings,
+      ...contract.unclassified.filter((line) => isContractPasteLine(line)),
+    ];
+  }
   const result = createResult();
   result.unclassified = [...parsed.unclassified];
   for (const [name, value] of Object.entries(parsed.values)) {
