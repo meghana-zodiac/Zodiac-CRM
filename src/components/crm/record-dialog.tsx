@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecord, toDateInputValue, updateRecord, type CrmTable } from "@/lib/crm";
-import { parseSmartPasteDetailed, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
+import { parseSmartPasteForFields, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
 import { bdTeamMembersQuery } from "@/lib/poa";
 
 export type FieldType =
@@ -207,7 +207,7 @@ export function RecordDialog({
   }, [open, record, effectiveFields]);
 
   const sortPastedDetails = () => {
-    const parsedResult = parseSmartPasteDetailed(table, pasteText);
+    const parsedResult = parseSmartPasteForFields(table, pasteText, effectiveFields);
     const parsed = { ...parsedResult.values };
     const needsReview: PasteReport["review"] = [];
     for (const field of effectiveFields) {
@@ -288,19 +288,20 @@ export function RecordDialog({
     setValues((current) => {
       const next = { ...current };
       if (table === "leads") {
-        if (organization) next.company_name = organization;
-        if (fullName) next.contact_name = fullName;
+        if (organization) next["company_name"] = organization;
+        if (fullName) next["contact_name"] = fullName;
       }
       if (table === "contacts" && fullName) {
         const nameParts = fullName.split(/\s+/).filter(Boolean);
-        next.last_name = nameParts.pop() ?? "";
-        next.first_name = nameParts.join(" ");
+        next["last_name"] = nameParts.pop() ?? "";
+        next["first_name"] = nameParts.join(" ");
       }
       if (table === "accounts" && (organization || fullName)) {
-        next.name = organization || fullName;
+        next["name"] = organization || fullName;
       }
-      if (email) next.email = email.toLowerCase();
-      if (phone) next.phone = phone;
+      if (email && effectiveFields.some((field) => field.name === "email"))
+        next["email"] = email.toLowerCase();
+      if (phone) next["phone"] = phone;
       return next;
     });
 
@@ -493,6 +494,13 @@ export function RecordDialog({
               value={pasteText}
               onChange={(event) => setPasteText(event.target.value)}
             />
+            {table === "accounts" ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Paste the client name, industry, engagement type, city, website, Phone 1, Phone 2,
+                landline and owner. Add people, email addresses and designations under the client’s
+                Contacts tab after saving.
+              </p>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -531,7 +539,7 @@ export function RecordDialog({
                 ) : null}
                 {pasteReport.unclassified.length ? (
                   <div className="rounded-md border border-border bg-background p-2.5 text-muted-foreground">
-                    <p className="font-semibold text-foreground">Could not classify</p>
+                    <p className="font-semibold text-foreground">Details needing manual entry</p>
                     <ul className="mt-1.5 list-disc space-y-1 pl-4">
                       {pasteReport.unclassified.map((item, index) => (
                         <li key={`${item}-${index}`}>{item}</li>

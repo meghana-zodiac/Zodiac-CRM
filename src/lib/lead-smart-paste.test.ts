@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSmartPasteDetailed, SMART_PASTE_TABLES } from "./lead-smart-paste";
+import { accountFields } from "@/components/crm/field-defs";
+import {
+  parseSmartPasteDetailed,
+  parseSmartPasteForFields,
+  SMART_PASTE_TABLES,
+} from "./lead-smart-paste";
 
 describe("Smart Paste", () => {
   it("supports every CRM record type advertised by the UI", () => {
@@ -58,5 +63,125 @@ describe("Smart Paste", () => {
     expect(result.values["course_topic"]).toBe("POSH Awareness");
     expect(result.values["participants"]).toBe("30");
     expect(result.values["notes"]).toContain("Please call after lunch");
+  });
+
+  it("maps client paste labels to the actual client form", () => {
+    const result = parseSmartPasteDetailed(
+      "accounts",
+      [
+        "Client name: Aurora Group",
+        "Industry: Hospitality",
+        "Engagement type: Recruitment",
+        "City: Mumbai",
+        "Website: https://aurora.example",
+        "Phone 1: +91 90000 10001",
+        "Phone 2: +91 90000 10002",
+        "Landline: 022-40001234",
+        "Owner: Edward D",
+      ].join("\n"),
+    );
+
+    expect(result.values).toEqual({
+      name: "Aurora Group",
+      industry: "Hospitality",
+      client_type: "Recruitment",
+      city: "Mumbai",
+      website: "https://aurora.example",
+      phone: "+91 90000 10001",
+      phone_2: "+91 90000 10002",
+      landline: "022-40001234",
+      owner_name: "Edward D",
+    });
+    const fieldNames = accountFields.map((field) => field.name);
+    expect(Object.keys(result.values).every((name) => fieldNames.includes(name))).toBe(true);
+    expect(result.unclassified).toEqual([]);
+  });
+
+  it.each(["Name", "Client", "Company name"])("recognises the client-name label %s", (label) => {
+    const result = parseSmartPasteDetailed("accounts", `${label}: Aurora`);
+    expect(result.values["name"]).toBe("Aurora");
+    expect(result.unclassified).toEqual([]);
+  });
+
+  it("retains extra emails and notes for review instead of silently dropping them", () => {
+    const result = parseSmartPasteDetailed(
+      "accounts",
+      [
+        "Client: Aurora Group",
+        "Email: priya@example.com; careers@example.com",
+        "Notes: Please call tomorrow",
+        "Owner name: Edward D",
+      ].join("\n"),
+    );
+    expect(result.values["owner_name"]).toBe("Edward D");
+    expect(result.unclassified.join("\n")).toContain("priya@example.com");
+    expect(result.unclassified.join("\n")).toContain("careers@example.com");
+    expect(result.unclassified.join("\n")).toContain("Please call tomorrow");
+  });
+
+  it("does not claim a contact's email or designation was filled into the client form", () => {
+    const result = parseSmartPasteForFields(
+      "accounts",
+      [
+        "Client: Aurora Group",
+        "Contact person: Priya Shah",
+        "Email: priya@example.com",
+        "Designation: HR Manager",
+        "Department: Human Resources",
+      ].join("\n"),
+      accountFields,
+    );
+
+    expect(result.values).toEqual({ name: "Aurora Group" });
+    expect(result.unclassified.join("\n")).toContain("priya@example.com");
+    expect(result.unclassified.join("\n")).toContain("Priya Shah");
+    expect(result.unclassified.join("\n")).toContain("HR Manager");
+    expect(result.unclassified.join("\n")).toContain("Contacts tab");
+  });
+
+  it("does not copy a labelled secondary phone or landline into Phone 1", () => {
+    const result = parseSmartPasteDetailed(
+      "accounts",
+      ["Client: Aurora Group", "Phone 2: 9000010002", "Landline: 022-40001234"].join("\n"),
+    );
+    expect(result.values["phone"]).toBeUndefined();
+    expect(result.values["phone_2"]).toBe("9000010002");
+    expect(result.values["landline"]).toBe("022-40001234");
+  });
+
+  it("accepts alternate client phone labels and preserves international numbers", () => {
+    const result = parseSmartPasteDetailed(
+      "accounts",
+      [
+        "Company: Aurora Group",
+        "Mobile: +44 20 7946 0958",
+        "Alternate phone: +1 (212) 555-0199",
+        "Office landline: 020-40001234",
+      ].join("\n"),
+    );
+    expect(result.values["phone"]).toBe("+44 20 7946 0958");
+    expect(result.values["phone_2"]).toBe("+1 (212) 555-0199");
+    expect(result.values["landline"]).toBe("020-40001234");
+  });
+
+  it("recognises copied column names with underscores", () => {
+    const result = parseSmartPasteDetailed(
+      "accounts",
+      "Client: Aurora\nPhone_1: 9000010001\nPhone_2: 9000010002",
+    );
+    expect(result.values["phone"]).toBe("9000010001");
+    expect(result.values["phone_2"]).toBe("9000010002");
+  });
+
+  it("keeps unsupported parsed fields out of form values and conflict detection", () => {
+    const result = parseSmartPasteForFields(
+      "contacts",
+      "Name: Priya Shah\nEmail: priya@example.com",
+      [{ name: "last_name", label: "Last name" }],
+    );
+    expect(result.values).toEqual({ last_name: "Shah" });
+    expect(Object.keys(result.confidence)).toEqual(["last_name"]);
+    expect(result.unclassified.join("\n")).toContain("Email: priya@example.com");
+    expect(result.unclassified.join("\n")).toContain("no matching field");
   });
 });
