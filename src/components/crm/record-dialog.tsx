@@ -33,6 +33,7 @@ import { createClientGroup } from "@/lib/create-client";
 import {
   extractEmails,
   parseClientGroups,
+  mergeGroupedContract,
   type ClientContactDraft,
   type ClientGroupDraft,
 } from "@/lib/client-group-paste";
@@ -244,6 +245,13 @@ export function RecordDialog({
 
   const applyCompanyGroup = (group: ClientGroupDraft) => {
     setCompanyChosen(true);
+    const switching = Boolean(
+      values["name"] && values["name"].toLowerCase() !== group.name.toLowerCase(),
+    );
+    const draft = switching
+      ? Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith("contract.")))
+      : values;
+    const contract = mergeGroupedContract(draft, group.contract);
     setValues((current) => ({
       ...current,
       ...(current["name"] && current["name"].toLowerCase() !== group.name.toLowerCase()
@@ -266,11 +274,17 @@ export function RecordDialog({
       landline: group.landline,
       email_addresses: group.emails,
       notes: group.notes,
+      ...contract.values,
     }));
     setClientContacts(group.contacts);
-    setPasteConflicts([]);
+    setPasteConflicts(contract.conflicts);
     setPasteReport({
-      filled: ["Client name", "Company details", `${group.contacts.length} contact row(s)`],
+      filled: [
+        "Client name",
+        "Company details",
+        `${group.contacts.length} contact row(s)`,
+        ...contract.filled,
+      ],
       review: group.warnings.map((value) => ({
         label: "Review",
         value,

@@ -54,6 +54,10 @@ export function isContractPasteLine(line: string) {
   return labelMap.has(normalize(label));
 }
 
+export function contractPasteField(label: string) {
+  return labelMap.get(normalize(label));
+}
+
 /** Day-first dates from Indian trackers; never rely on US Date.parse interpretation. */
 function dateOnly(value: string): string | undefined {
   let year: number, month: number, day: number;
