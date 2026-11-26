@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+export { commercialTerms } from "./contract-terms";
 
 export type ClientContract = Tables<"client_contracts">;
 export type ClientContractHistory = Tables<"client_contract_history">;
@@ -40,14 +41,6 @@ export function contractMatchesStatus(
   filter: ClientStatusFilter,
 ) {
   return filter === "all" || contract?.activity_status === filter;
-}
-
-export function commercialTerms(terms: string | null) {
-  return {
-    fee: terms?.split(/\s+[I|]\s*Pay\b/i)[0] || "Not recorded",
-    payment: terms?.match(/\bPay\s+(\d+)\s*Days?/i)?.[1],
-    replacement: terms?.match(/\bReplace\s+(\d+)\s*Days?/i)?.[1],
-  };
 }
 
 export type ContractInput = Pick<
