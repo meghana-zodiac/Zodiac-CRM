@@ -1,6 +1,82 @@
 import { describe, it, expect } from "vitest";
-import { parseClientGroups } from "./client-group-paste";
+import { parseClientGroups, mergeGroupedContract } from "./client-group-paste";
 describe("company-grouped client paste", () => {
+  it("fills every Contract Status field from headed Excel contract columns", () => {
+    const group = parseClientGroups(
+      "SECTOR\tAPPROACH DATE\tVISIT DATE\tMANDATE RECEIVED DATE\tACTIVE / NON-ACTIVE\tTERMS\tRECRUITER\tORGANISATION\tPLACE\tCONTACT PERSON\tDESIGNATION\tMOBILE NOS\tTEL NOS\tE-MAIL IDS\tREMARKS\nPharma\t18.10.2025\t20.10.2025\t08.05.2026\tNON-ACTIVE\t8.33% I Pay 30 Days I Replace 90 Days\tPrerna\tAurora Group\tNew Delhi\tSandeep Agarwal\tHR Dept\t9897100900\t9910669939\tsandeep@aurora.com\tAgreement signed digitally",
+    )[0]!;
+    expect(group.contract).toEqual({
+      activity_status: "Non-active",
+      recruiter: "Prerna",
+      approach_date: "18.10.2025",
+      visit_date: "2025-10-20",
+      mandate_received_date: "2026-05-08",
+      terms: "8.33% I Pay 30 Days I Replace 90 Days",
+      notes: "Agreement signed digitally",
+    });
+    expect(group.contacts[0]!.name).toBe("Sandeep Agarwal");
+    expect(mergeGroupedContract({}, group.contract).values["contract.activity_status"]).toBe(
+      "Non-active",
+    );
+  });
+  it("parses a copied Contract Status sheet row without headers", () => {
+    const group = parseClientGroups(
+      "Pharma\t18.10.2025\t\t08.05.2026\tNON-ACTIVE\t8.33% I Pay 30 Days\tPrerna\tAurora Group\tNew Delhi\tSandeep Agarwal\tHR Dept\t9897100900\t9910669939\tsandeep@aurora.com",
+    )[0]!;
+    expect(group.name).toBe("Aurora Group");
+    expect(group.contract).toMatchObject({
+      activity_status: "Non-active",
+      recruiter: "Prerna",
+      mandate_received_date: "2026-05-08",
+    });
+  });
+  it("combines company/contact rows with labelled contract details in the same paste", () => {
+    const group = parseClientGroups(
+      "Aurora Group\tDelhi\tSandeep Agarwal\tHR Dept\t9897100900\t9910669939\tsandeep@aurora.com\tProposal shared\nClient activity status: Active\nAssigned recruiter: Prerna\nFee / pricing: 8.33%\nPayment period: 30 days\nReplacement period: 90 days\nMandate received date: 26.11.2026",
+    )[0]!;
+    expect(group.contract).toMatchObject({
+      activity_status: "Active",
+      recruiter: "Prerna",
+      mandate_received_date: "2026-11-26",
+      terms: "8.33% I Pay 30 Days I Replace 90 Days",
+    });
+    expect(group.contacts).toHaveLength(1);
+  });
+  it("keeps separate companies' contract details separate", () => {
+    const groups = parseClientGroups(
+      "Organisation\tContact person\tClient activity status\tAssigned recruiter\tCommercial terms\nAurora Group\tPriya Shah\tActive\tPrerna\t8.33%\nNova Group\tRiya Jain\tNon-active\tShivani\t10%",
+    );
+    expect(groups[0]!.contract).toMatchObject({
+      activity_status: "Active",
+      recruiter: "Prerna",
+      terms: "8.33%",
+    });
+    expect(groups[1]!.contract).toMatchObject({
+      activity_status: "Non-active",
+      recruiter: "Shivani",
+      terms: "10%",
+    });
+  });
+  it("flags invalid dates and preserves existing contract values for explicit review", () => {
+    const group = parseClientGroups(
+      "Organisation\tContact person\tClient activity status\tVisit date\nAurora Group\tPriya Shah\tNon-active\t31.02.2026",
+    )[0]!;
+    expect(group.contract.visit_date).toBeUndefined();
+    expect(group.warnings.join(" ")).toContain("31.02.2026");
+    const merged = mergeGroupedContract({ "contract.activity_status": "Active" }, group.contract);
+    expect(merged.values["contract.activity_status"]).toBe("Active");
+    expect(merged.conflicts[0]).toMatchObject({
+      field: "contract.activity_status",
+      incoming: "Non-active",
+    });
+  });
+  it("does not invent a contract from a proposal-sent remark", () => {
+    const group = parseClientGroups(
+      "Greenzo Energy India Limited\tNew Delhi\tSandeep Agarwal\tHR Dept\t9897100900\t9910669939\tgreenzoenergy@gmail.com\tProposal sent as on 09.11.2026",
+    )[0]!;
+    expect(group.contract).toEqual({});
+    expect(group.notes).toContain("09.11.2026");
+  });
   it("reads quoted Excel cells containing line breaks without splitting a contact", () => {
     const group = parseClientGroups(
       '"Aurora\nGroup"\tPune\tPriya Shah\tHR\t9000010001\t020-12345678\t"priya@aurora.com\npriya.two@aurora.com"\tProposal shared',

@@ -15,6 +15,7 @@ export type ClientGroupDraft = {
   notes: string;
   contacts: ClientContactDraft[];
   warnings: string[];
+  contract: ReturnType<typeof parseContractPaste>["values"];
 };
 export const extractEmails = (text: string) => [
   ...new Set(text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? []),
@@ -88,15 +89,22 @@ export function parseClientGroups(raw: string): ClientGroupDraft[] {
   ).filter((cells) => !cells.every((c) => !c || /^:?-+:?$/.test(c)));
   if (!rows.length) return [];
   let mapping: Record<string, number> = {};
+  const contractHeaders: Record<string, string> = {};
   const header = rows.findIndex(
     (r) =>
       r.some((c) => aliases["name"]!.some((a) => key(a) === key(c))) &&
-      r.some((c) => aliases["contact"]!.some((a) => key(a) === key(c))),
+      (r.some((c) => aliases["contact"]!.some((a) => key(a) === key(c))) ||
+        r.some((c) => Boolean(contractPasteField(c)))),
   );
   if (header >= 0) {
     rows[header]!.forEach((c, i) => {
       for (const [f, ls] of Object.entries(aliases))
         if (ls.some((a) => key(a) === key(c))) mapping[f] = i;
+      const contractField = contractPasteField(c);
+      if (contractField && contractField !== "notes") {
+        mapping[`contract.${contractField}`] = i;
+        contractHeaders[`contract.${contractField}`] = c;
+      }
     });
     rows.splice(0, header + 1);
   } else {
@@ -113,11 +121,45 @@ export function parseClientGroups(raw: string): ClientGroupDraft[] {
       notes: offset + 7,
     };
     if (offset) mapping["priority"] = 0;
+    if (
+      (rows[0]?.length ?? 0) >= 14 &&
+      /^(active|non[- ]?active|inactive)$/i.test(rows[0]?.[4] ?? "")
+    ) {
+      mapping = { name: 7, city: 8, contact: 9, title: 10, phone: 11, landline: 12, email: 13 };
+      for (const [field, index, label] of [
+        ["approach_date", 1, "Approach date"],
+        ["visit_date", 2, "Visit date"],
+        ["mandate_received_date", 3, "Mandate received date"],
+        ["activity_status", 4, "Client activity status"],
+        ["terms", 5, "Commercial terms"],
+        ["recruiter", 6, "Assigned recruiter"],
+      ] as const) {
+        mapping[`contract.${field}`] = index;
+        contractHeaders[`contract.${field}`] = label;
+      }
+    } else if ((rows[0]?.length ?? 0) >= 13 && /^(hot|warm|cold)$/i.test(rows[0]?.[4] ?? "")) {
+      mapping = {
+        priority: 4,
+        name: 5,
+        city: 6,
+        contact: 7,
+        title: 8,
+        phone: 9,
+        landline: 10,
+        email: 11,
+        notes: 12,
+      };
+      mapping["contract.visit_date"] = 2;
+      contractHeaders["contract.visit_date"] = "Visit date";
+    }
   }
   const groups: ClientGroupDraft[] = [];
   let current: ClientGroupDraft | undefined;
   let inheritedTitle = "";
+  const contractLines = new Map<ClientGroupDraft, string[]>();
   for (const cells of rows) {
+    if (isContractPasteLine(cells[0] ?? "")) continue;
+    if (cells.length < Math.max(mapping["name"] ?? 0, mapping["contact"] ?? 0) + 1) continue;
     const get = (f: string) => cells[mapping[f] ?? -1] ?? "";
     const company = get("name");
     if (company) {
@@ -132,12 +174,19 @@ export function parseClientGroups(raw: string): ClientGroupDraft[] {
           notes: "",
           contacts: [],
           warnings: [],
+          contract: {},
         };
         groups.push(current);
       }
       inheritedTitle = "";
     }
     if (!current) continue;
+    const details = contractLines.get(current) ?? [];
+    for (const [field, label] of Object.entries(contractHeaders)) {
+      const value = get(field);
+      if (value && !/^[-—–]$/.test(value)) details.push(`${label}: ${value}`);
+    }
+    contractLines.set(current, details);
     current.city ||= get("city");
     current.landline ||= phone(get("landline"));
     const priority = get("priority").toLowerCase();
@@ -192,6 +241,30 @@ export function parseClientGroups(raw: string): ClientGroupDraft[] {
       }
     }
   }
+  const rawLines = raw.split(/\r?\n/);
+  const labelledContract: string[] = [];
+  rawLines.forEach((line, index) => {
+    if (!line.includes("\t") && isContractPasteLine(line)) {
+      labelledContract.push(line);
+      if (!/[:：]/.test(line) && rawLines[index + 1] && !rawLines[index + 1]!.includes("\t"))
+        labelledContract.push(rawLines[index + 1]!);
+    }
+  });
+  for (const group of groups) {
+    const lines = contractLines.get(group) ?? [];
+    if (lines.length && group.notes) lines.push(`Remarks: ${group.notes}`);
+    if (groups.length === 1) lines.push(...labelledContract);
+    const parsed = parseContractPaste([...new Set(lines)].join("\n"));
+    group.contract = parsed.values;
+    group.warnings.push(
+      ...parsed.warnings,
+      ...parsed.unclassified.map((value) => `Contract detail needs review: ${value}`),
+    );
+    if (groups.length > 1 && labelledContract.length)
+      group.warnings.push(
+        "Labelled contract details outside the table were not assigned. Include them in each company's columns or paste one company at a time.",
+      );
+  }
   for (const g of groups) {
     const domains = extractEmails(g.emails)
       .map((e) => e.split("@")[1])
@@ -202,4 +275,34 @@ export function parseClientGroups(raw: string): ClientGroupDraft[] {
           g.warnings.push(`Verify ${e} for ${c.name}: its domain differs from the company email.`);
   }
   return groups;
+}
+import {
+  contractPasteField,
+  isContractPasteLine,
+  parseContractPaste,
+  mergeContractPaste,
+  CONTRACT_FIELD_LABELS,
+} from "./contract-smart-paste";
+import type { ContractInput } from "./client-contracts";
+
+export function mergeGroupedContract(
+  current: Record<string, string>,
+  incoming: ClientGroupDraft["contract"],
+) {
+  const draft = Object.fromEntries(
+    Object.keys(CONTRACT_FIELD_LABELS).map((key) => [key, current[`contract.${key}`] ?? ""]),
+  ) as ContractInput;
+  const result = mergeContractPaste(draft, incoming);
+  return {
+    values: Object.fromEntries(
+      Object.entries(result.draft).map(([key, value]) => [`contract.${key}`, value ?? ""]),
+    ),
+    filled: result.filled,
+    conflicts: result.conflicts.map((c) => ({
+      field: `contract.${c.field}`,
+      label: CONTRACT_FIELD_LABELS[c.field],
+      current: c.current,
+      incoming: c.incoming,
+    })),
+  };
 }
