@@ -295,7 +295,7 @@ export function RecordDialog({
   };
   const sortPastedDetails = () => {
     if (includesContract) {
-      const groups = parseClientGroups(pasteText);
+      const groups = parseClientGroups(pasteText, values["name"]);
       setCompanyChoices(groups);
       setCompanyChosen(false);
       if (groups.length) {
