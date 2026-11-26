@@ -23,6 +23,13 @@ import {
   type ClientContract,
   type ContractInput,
 } from "@/lib/client-contracts";
+import {
+  CONTRACT_FIELD_LABELS,
+  mergeContractPaste,
+  parseContractPaste,
+  type ContractPasteConflict,
+  type ContractPasteResult,
+} from "@/lib/contract-smart-paste";
 
 export function ClientActivityStatus({ status }: { status?: string | undefined }) {
   return (
@@ -51,15 +58,7 @@ function Detail({
   );
 }
 
-const editLabels = {
-  activity_status: "Client activity status",
-  recruiter: "Assigned recruiter",
-  approach_date: "Approach date(s)",
-  visit_date: "Visit date",
-  mandate_received_date: "Mandate received date",
-  terms: "Commercial terms",
-  notes: "Remarks",
-} as const;
+const editLabels = CONTRACT_FIELD_LABELS;
 
 function ContractEditor({
   account,
@@ -74,7 +73,7 @@ function ContractEditor({
 }) {
   const client = useQueryClient();
   const [draft, setDraft] = useState<ContractInput>({
-    activity_status: contract?.activity_status ?? "Active",
+    activity_status: contract?.activity_status ?? "",
     recruiter: contract?.recruiter ?? "",
     approach_date: contract?.approach_date ?? "",
     visit_date: contract?.visit_date ?? "",
@@ -82,6 +81,19 @@ function ContractEditor({
     terms: contract?.terms ?? "",
     notes: contract?.notes ?? "",
   });
+  const [pasteText, setPasteText] = useState("");
+  const [pasteResult, setPasteResult] = useState<ContractPasteResult | null>(null);
+  const [pasteConflicts, setPasteConflicts] = useState<ContractPasteConflict[]>([]);
+  const [filledFields, setFilledFields] = useState<string[]>([]);
+  const preview = commercialTerms(draft.terms);
+  const sortPaste = () => {
+    const result = parseContractPaste(pasteText);
+    const merged = mergeContractPaste(draft, result.values);
+    setDraft(merged.draft);
+    setPasteResult(result);
+    setPasteConflicts(merged.conflicts);
+    setFilledFields(merged.filled);
+  };
   const save = useMutation({
     mutationFn: () =>
       saveClientContract(
@@ -111,7 +123,7 @@ function ContractEditor({
     >
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Edit Contract Details</DialogTitle>
+          <DialogTitle>{contract ? "Edit Contract Details" : "Add Contract Details"}</DialogTitle>
           <DialogDescription>
             {account.name} · BD owner: {owner}
           </DialogDescription>
@@ -123,15 +135,114 @@ function ContractEditor({
           }}
           className="space-y-4"
         >
+          <section className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <Label htmlFor="contract-smart-paste" className="text-sm font-semibold">
+              Paste contract details
+            </Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Paste labelled details: client activity status, assigned recruiter, approach date(s),
+              visit date, mandate received date, fee / pricing, payment period, replacement period
+              and remarks. Use DD.MM.YYYY for dates. Review the fields before saving.
+            </p>
+            <Textarea
+              id="contract-smart-paste"
+              className="mt-2"
+              rows={5}
+              placeholder={
+                "Client activity status: Non-active\nAssigned recruiter: Prerna\nMandate received date: 08.05.2026\nFee / pricing: 8.33%\nPayment period: 30 days\nReplacement period: 90 days\nRemarks: Agreement signed digitally"
+              }
+              value={pasteText}
+              disabled={save.isPending}
+              onChange={(event) => setPasteText(event.target.value)}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              disabled={save.isPending || !pasteText.trim()}
+              onClick={sortPaste}
+            >
+              Sort into fields
+            </Button>
+            {pasteResult ? (
+              <div className="mt-3 space-y-3 border-t border-primary/15 pt-3 text-xs">
+                <p>
+                  {filledFields.length} {filledFields.length === 1 ? "field" : "fields"} filled
+                  {filledFields.length
+                    ? `: ${filledFields.join(", ")}`
+                    : ". No empty fields were filled."}{" "}
+                  Changes are saved only when you choose Save changes.
+                </p>
+                {pasteResult.warnings.length ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-amber-950">
+                    <p className="font-semibold">Please review</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                      {pasteResult.warnings.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {pasteResult.unclassified.length ? (
+                  <div className="rounded-md border border-border bg-background p-2.5">
+                    <p className="font-semibold">Details needing manual entry</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4">
+                      {pasteResult.unclassified.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {pasteConflicts.map((conflict) => (
+                  <div
+                    key={conflict.field}
+                    className="rounded-md border border-border bg-background p-2.5"
+                  >
+                    <p className="font-semibold">{editLabels[conflict.field]}</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words">
+                      Current: {draft[conflict.field] || "Not set"}
+                    </p>
+                    <p className="whitespace-pre-wrap break-words">Pasted: {conflict.incoming}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      disabled={save.isPending}
+                      onClick={() => {
+                        setDraft((current) => ({
+                          ...current,
+                          [conflict.field]: conflict.incoming,
+                        }));
+                        setPasteConflicts((current) =>
+                          current.filter((item) => item.field !== conflict.field),
+                        );
+                        setFilledFields((current) => [
+                          ...new Set([...current, editLabels[conflict.field]]),
+                        ]);
+                      }}
+                    >
+                      Use pasted value
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
           <fieldset disabled={save.isPending} className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="contract-status">Client activity status</Label>
               <select
                 id="contract-status"
+                required
                 className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={draft.activity_status}
                 onChange={(e) => setDraft({ ...draft, activity_status: e.target.value })}
               >
+                <option value="" disabled>
+                  Select status
+                </option>
                 <option>Active</option>
                 <option>Non-active</option>
               </select>
@@ -160,6 +271,26 @@ function ContractEditor({
                   value={draft[key] ?? ""}
                   onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
                 />
+                {key === "terms" ? (
+                  <dl
+                    className="mt-3 grid gap-3 rounded-md bg-muted/50 p-3 sm:grid-cols-3"
+                    aria-label="Commercial terms preview"
+                  >
+                    <Detail label="Fee / pricing">{preview.fee}</Detail>
+                    <Detail label="Payment period">
+                      {preview.payment ? `${preview.payment} days` : "Not recorded"}
+                    </Detail>
+                    <Detail label="Replacement period">
+                      {preview.replacement ? `${preview.replacement} days` : "Not recorded"}
+                    </Detail>
+                  </dl>
+                ) : null}
+                {key === "terms" ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    The preview comes from Commercial terms above. Edit that field to change these
+                    values.
+                  </p>
+                ) : null}
               </div>
             ))}
           </fieldset>
@@ -167,7 +298,7 @@ function ContractEditor({
             <Button type="button" variant="outline" disabled={save.isPending} onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={save.isPending}>
+            <Button type="submit" disabled={save.isPending || !draft.activity_status}>
               {save.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
