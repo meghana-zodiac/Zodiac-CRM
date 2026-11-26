@@ -29,7 +29,14 @@ import {
   SMART_PASTE_TABLES,
 } from "@/lib/lead-smart-paste";
 import { bdTeamMembersQuery } from "@/lib/poa";
-import { createClientWithContract } from "@/lib/create-client";
+import { createClientGroup } from "@/lib/create-client";
+import {
+  extractEmails,
+  parseClientGroups,
+  type ClientContactDraft,
+  type ClientGroupDraft,
+} from "@/lib/client-group-paste";
+import { ClientContactRows } from "./client-contact-rows";
 import { commercialTerms } from "@/lib/contract-terms";
 
 export type FieldType =
@@ -189,6 +196,9 @@ export function RecordDialog({
   }, [fields, teamMembers.data]);
   const [values, setValues] = useState<Values>({});
   const [clientCreationId, setClientCreationId] = useState(() => crypto.randomUUID());
+  const [clientContacts, setClientContacts] = useState<ClientContactDraft[]>([]);
+  const [companyChoices, setCompanyChoices] = useState<ClientGroupDraft[]>([]);
+  const [companyChosen, setCompanyChosen] = useState(false);
   const includesContract =
     table === "accounts" &&
     !record?.["id"] &&
@@ -208,6 +218,10 @@ export function RecordDialog({
 
   useEffect(() => {
     if (open) setClientCreationId(crypto.randomUUID());
+    if (open) {
+      setClientContacts([]);
+      setCompanyChoices([]);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -228,7 +242,61 @@ export function RecordDialog({
     setSupportsContactPicker(Boolean((navigator as ContactPickerNavigator).contacts?.select));
   }, [open, record, effectiveFields]);
 
+  const applyCompanyGroup = (group: ClientGroupDraft) => {
+    setCompanyChosen(true);
+    setValues((current) => ({
+      ...current,
+      ...(current["name"] && current["name"].toLowerCase() !== group.name.toLowerCase()
+        ? {
+            industry: "",
+            client_type: "",
+            website: "",
+            phone: "",
+            phone_2: "",
+            ...Object.fromEntries(
+              Object.keys(current)
+                .filter((key) => key.startsWith("contract."))
+                .map((key) => [key, ""]),
+            ),
+          }
+        : {}),
+      name: group.name,
+      city: group.city,
+      priority: group.priority,
+      landline: group.landline,
+      email_addresses: group.emails,
+      notes: group.notes,
+    }));
+    setClientContacts(group.contacts);
+    setPasteConflicts([]);
+    setPasteReport({
+      filled: ["Client name", "Company details", `${group.contacts.length} contact row(s)`],
+      review: group.warnings.map((value) => ({
+        label: "Review",
+        value,
+        reason: "Check before creating the client.",
+      })),
+      unclassified: [],
+    });
+  };
   const sortPastedDetails = () => {
+    if (includesContract) {
+      const groups = parseClientGroups(pasteText);
+      setCompanyChoices(groups);
+      setCompanyChosen(false);
+      if (groups.length) {
+        if (groups.length === 1) applyCompanyGroup(groups[0]!);
+        else
+          setPasteReport({
+            filled: [],
+            review: [],
+            unclassified: [
+              "Several companies were found. Choose one company below to review and create; no company has been selected automatically.",
+            ],
+          });
+        return;
+      }
+    }
     const parsedResult = parseSmartPasteForFields(table, pasteText, effectiveFields);
     const parsed = { ...parsedResult.values };
     const needsReview: PasteReport["review"] = [];
@@ -397,12 +465,18 @@ export function RecordDialog({
       for (const field of visibleFields) {
         const raw = values[field.name]?.trim() ?? "";
         if (raw === "") {
+          if (field.name === "email_addresses" && (table === "accounts" || table === "contacts")) {
+            writePath(payload, field.name, []);
+            continue;
+          }
           // Omit blank values on create so database defaults can be applied.
           // Existing records still receive null so optional fields can be cleared.
           if (record?.["id"]) writePath(payload, field.name, null);
           continue;
         }
-        if (field.type === "number") writePath(payload, field.name, Number(raw));
+        if (table === "accounts" && field.name === "email_addresses")
+          writePath(payload, field.name, extractEmails(raw));
+        else if (field.type === "number") writePath(payload, field.name, Number(raw));
         else if (field.type === "datetime")
           writePath(payload, field.name, new Date(raw).toISOString());
         else if (field.type === "select" && field.options?.length) {
@@ -421,7 +495,7 @@ export function RecordDialog({
       if (record?.["id"]) {
         await updateRecord(table, String(record["id"]), payload);
       } else if (includesContract) {
-        await createClientWithContract(clientCreationId, payload);
+        await createClientGroup(clientCreationId, payload, clientContacts);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await createRecord(table as any, payload as any);
@@ -515,10 +589,11 @@ export function RecordDialog({
             {table === "accounts" ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 {includesContract
-                  ? "Paste client and contract details together. Include the client name, owner, activity status, recruiter, dates, fee / pricing, payment and replacement periods, and remarks. Review both sections below before creating the client."
+                  ? "Paste copied Excel rows or a table, including organisation, place, priority, contact people, designation, mobile, telephone, emails and remarks. Each HR contact appears in a separate row below. Contract details can also be entered."
                   : "Paste the client name, industry, engagement type, city, website, Phone 1, Phone 2, landline and owner."}{" "}
-                Add people, email addresses and designations under the client’s Contacts tab after
-                saving.
+                {includesContract
+                  ? "Review company and contact details below before creating."
+                  : "Add people under the client’s Contacts tab."}
               </p>
             ) : null}
             <Button
@@ -568,6 +643,28 @@ export function RecordDialog({
                   </div>
                 ) : null}
               </div>
+            ) : null}
+            {companyChoices.length > 1 ? (
+              <label className="mt-3 block text-xs">
+                Choose company to review
+                <select
+                  className="mt-1 h-10 w-full rounded-md border bg-background px-2"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const group = companyChoices[Number(e.target.value)];
+                    if (group) applyCompanyGroup(group);
+                  }}
+                >
+                  <option value="" disabled>
+                    Select company
+                  </option>
+                  {companyChoices.map((g, i) => (
+                    <option key={i} value={i}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             {pasteConflicts.length ? (
               <div className="mt-3 space-y-2 border-t border-primary/15 pt-3">
@@ -698,13 +795,25 @@ export function RecordDialog({
             );
           })}
         </div>
+        {includesContract ? (
+          <ClientContactRows
+            rows={clientContacts}
+            onChange={setClientContacts}
+            disabled={mutation.isPending}
+          />
+        ) : null}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={missingRequired || missingContractSelection || mutation.isPending}
+            disabled={
+              missingRequired ||
+              missingContractSelection ||
+              (companyChoices.length > 1 && !companyChosen) ||
+              mutation.isPending
+            }
           >
             {mutation.isPending ? "Saving…" : record?.["id"] ? "Save changes" : "Create"}
           </Button>

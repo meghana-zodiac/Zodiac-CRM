@@ -341,6 +341,9 @@ export type Database = {
       };
       accounts: {
         Row: {
+          email_addresses: string[];
+          priority: string | null;
+          notes: string | null;
           city: string | null;
           ceipal_client_number: string | null;
           ceipal_id: string | null;
@@ -357,6 +360,9 @@ export type Database = {
           website: string | null;
         };
         Insert: {
+          email_addresses?: string[];
+          priority?: string | null;
+          notes?: string | null;
           city?: string | null;
           ceipal_client_number?: string | null;
           ceipal_id?: string | null;
@@ -373,6 +379,9 @@ export type Database = {
           website?: string | null;
         };
         Update: {
+          email_addresses?: string[];
+          priority?: string | null;
+          notes?: string | null;
           city?: string | null;
           ceipal_client_number?: string | null;
           ceipal_id?: string | null;
@@ -623,6 +632,7 @@ export type Database = {
       };
       contacts: {
         Row: {
+          email_addresses: string[];
           account_id: string | null;
           additional_fields: Json;
           created_at: string;
@@ -639,6 +649,7 @@ export type Database = {
           title: string | null;
         };
         Insert: {
+          email_addresses?: string[];
           account_id?: string | null;
           additional_fields?: Json;
           created_at?: string;
@@ -655,6 +666,7 @@ export type Database = {
           title?: string | null;
         };
         Update: {
+          email_addresses?: string[];
           account_id?: string | null;
           additional_fields?: Json;
           created_at?: string;
@@ -1300,6 +1312,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      create_client_group: {
+        Args: { p_client: Json; p_contract: Json; p_contacts: Json };
+        Returns: string;
+      };
       create_client_with_contract: {
         Args: { p_client: Json; p_contract: Json };
         Returns: string;

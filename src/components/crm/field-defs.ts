@@ -151,6 +151,7 @@ export const serviceDetailFields = (dependsOn: string): FieldDef[] => [
 
 export const accountFields: FieldDef[] = [
   { name: "name", label: "Client name", required: true },
+  { name: "priority", label: "Priority", type: "select", options: opts(LEAD_PRIORITIES) },
   { name: "industry", label: "Industry" },
   { name: "client_type", label: "Engagement type", type: "select", options: opts(CLIENT_TYPES) },
   { name: "city", label: "City" },
@@ -158,6 +159,8 @@ export const accountFields: FieldDef[] = [
   { name: "phone", label: "Phone 1", type: "tel" },
   { name: "phone_2", label: "Phone 2", type: "tel" },
   { name: "landline", label: "Landline", type: "tel" },
+  { name: "email_addresses", label: "Company / shared emails", type: "textarea", span: 2 },
+  { name: "notes", label: "Company remarks / proposal history", type: "textarea", span: 2 },
   ownerField,
 ];
 
