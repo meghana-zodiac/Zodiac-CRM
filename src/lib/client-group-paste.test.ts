@@ -1,6 +1,68 @@
 import { describe, it, expect } from "vitest";
 import { parseClientGroups, mergeGroupedContract } from "./client-group-paste";
 describe("company-grouped client paste", () => {
+  it("recovers all three contacts from the user's exact shifted Panchshil clipboard text", () => {
+    const groups = parseClientGroups(
+      "Panchshil Realty\tPune\tMs. Jesmin Pappachan\tHR Dept\t\tBoard: 020-66473200\tjesmin.pappachan@panchshil.com\tProposal sent as on 09.11.2026\n\t\t\t\t\t\tMs. Zarina Darji\t\t\tBoard:020-66473201\trecruitments@panchshil.com\t\n\t\t\t\t\t\tMr. Dattatrya Jagdale\t\t\tBoard: 8970007700\tcareers@panchshil.com",
+    );
+    expect(groups).toHaveLength(1);
+    expect(
+      groups[0]!.contacts.map((c) => ({
+        name: c.name,
+        title: c.title,
+        landline: c.landline,
+        emails: c.emails,
+      })),
+    ).toEqual([
+      {
+        name: "Jesmin Pappachan",
+        title: "HR Dept",
+        landline: "020-66473200",
+        emails: "jesmin.pappachan@panchshil.com",
+      },
+      {
+        name: "Zarina Darji",
+        title: "HR Dept",
+        landline: "020-66473201",
+        emails: "recruitments@panchshil.com",
+      },
+      {
+        name: "Dattatrya Jagdale",
+        title: "HR Dept",
+        landline: "8970007700",
+        emails: "careers@panchshil.com",
+      },
+    ]);
+    expect(groups[0]!.warnings.some((w) => w.includes("not assigned"))).toBe(false);
+  });
+  it("recovers shortened continuation rows without making each contact a company", () => {
+    const groups = parseClientGroups(
+      "Panchshil Realty\tPune\tMs. Jesmin Pappachan\tHR Dept\t\tBoard: 020-66473200\tjesmin.pappachan@panchshil.com\tProposal sent\nMs. Zarina Darji\tBoard:020-66473201\trecruitments@panchshil.com\nDattatrya Jagdale\tBoard:8970007700\tcareers@panchshil.com",
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.contacts.map((c) => c.name)).toEqual([
+      "Jesmin Pappachan",
+      "Zarina Darji",
+      "Dattatrya Jagdale",
+    ]);
+  });
+  it("uses an entered company name when only Place through Remarks were copied", () => {
+    const groups = parseClientGroups(
+      "Pune\tMs. Jesmin Pappachan\tHR Dept\t\tBoard:020-66473200\tjesmin.pappachan@panchshil.com\tProposal sent\n\tMs. Zarina Darji\t\t\tBoard:020-66473201\trecruitments@panchshil.com\t",
+      "Panchshil Realty",
+    );
+    expect(groups[0]!.name).toBe("Panchshil Realty");
+    expect(groups[0]!.contacts).toHaveLength(2);
+    expect(groups[0]!.city).toBe("Pune");
+  });
+  it("skips cropped headers instead of creating a contact named CONTACT PERSON", () => {
+    const group = parseClientGroups(
+      "PLACE\tCONTACT PERSON\tDESIGNATION\tMOBILE NOS\tTEL NOS\tE-MAIL IDS\tREMARKS\nPune\tMs. Jesmin Pappachan\tHR Dept\t\tBoard:020-66473200\tjesmin.pappachan@panchshil.com\tPlease call Mr. Rahul Shah",
+      "Panchshil Realty",
+    )[0]!;
+    expect(group.contacts.map((c) => c.name)).toEqual(["Jesmin Pappachan"]);
+    expect(group.warnings.some((w) => w.includes("Rahul"))).toBe(false);
+  });
   it("fills every Contract Status field from headed Excel contract columns", () => {
     const group = parseClientGroups(
       "SECTOR\tAPPROACH DATE\tVISIT DATE\tMANDATE RECEIVED DATE\tACTIVE / NON-ACTIVE\tTERMS\tRECRUITER\tORGANISATION\tPLACE\tCONTACT PERSON\tDESIGNATION\tMOBILE NOS\tTEL NOS\tE-MAIL IDS\tREMARKS\nPharma\t18.10.2025\t20.10.2025\t08.05.2026\tNON-ACTIVE\t8.33% I Pay 30 Days I Replace 90 Days\tPrerna\tAurora Group\tNew Delhi\tSandeep Agarwal\tHR Dept\t9897100900\t9910669939\tsandeep@aurora.com\tAgreement signed digitally",
