@@ -3,9 +3,51 @@ const mock = vi.hoisted(() => ({
   rpc: vi.fn().mockResolvedValue({ data: "client-id", error: null }),
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: mock }));
-import { createClientWithContract, prepareClientCreation } from "./create-client";
+import {
+  createClientGroup,
+  createClientWithContract,
+  prepareClientCreation,
+} from "./create-client";
 
 describe("combined client creation", () => {
+  it("sends named HR rows and every email in the grouped save", async () => {
+    await createClientGroup(
+      "company-id",
+      {
+        name: "Greenzo",
+        owner_name: "Edward D",
+        email_addresses: "info@greenzo.com",
+        notes: "Proposal sent",
+      },
+      [
+        {
+          id: "contact-id",
+          name: "Sandeep Agarwal",
+          title: "HR Dept",
+          phone: "9897100900",
+          landline: "9910669939",
+          emails: "sandeep@example.com\nsandeep.two@example.com",
+        },
+      ],
+    );
+    expect(mock.rpc).toHaveBeenLastCalledWith(
+      "create_client_group",
+      expect.objectContaining({
+        p_client: expect.objectContaining({
+          name: "Greenzo",
+          email_addresses: ["info@greenzo.com"],
+        }),
+        p_contacts: [
+          expect.objectContaining({
+            id: "contact-id",
+            first_name: "Sandeep",
+            last_name: "Agarwal",
+            email_addresses: ["sandeep@example.com", "sandeep.two@example.com"],
+          }),
+        ],
+      }),
+    );
+  });
   it("keeps the contract optional", () => {
     expect(
       prepareClientCreation("stable-id", {

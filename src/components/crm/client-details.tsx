@@ -342,7 +342,19 @@ export function ClientDetails({
       <div className="mt-2">
         <ClientActivityStatus status={contract?.activity_status} />
       </div>
-      <Tabs defaultValue="contract" className="mt-4">
+      <p className="mt-2 text-sm text-muted-foreground">
+        {[
+          account.city,
+          account.priority ? `${account.priority} priority` : null,
+          account.landline ? `Board: ${account.landline}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
+      {account.email_addresses?.length ? (
+        <p className="mt-1 break-all text-sm">{account.email_addresses.join(" · ")}</p>
+      ) : null}
+      <Tabs defaultValue={linkedContacts.length ? "contacts" : "contract"} className="mt-4">
         <TabsList className="flex h-auto flex-wrap justify-start">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="contract">Contract Status</TabsTrigger>
@@ -351,6 +363,13 @@ export function ClientDetails({
         <TabsContent value="overview">
           <dl className="mt-5 grid gap-5 sm:grid-cols-2">
             <Detail label="BD owner">{owner}</Detail>
+            <Detail label="Priority">{account.priority}</Detail>
+            <Detail label="Company / shared emails" full>
+              {account.email_addresses?.join("\n")}
+            </Detail>
+            <Detail label="Company remarks / proposal history" full>
+              {account.notes}
+            </Detail>
             <Detail label="Industry">{contract?.source_sector ?? account.industry}</Detail>
             <Detail label="Location" full>
               {contract?.source_place ?? account.city}
@@ -461,16 +480,40 @@ export function ClientDetails({
         </TabsContent>
         <TabsContent value="contacts">
           <div className="mt-5 space-y-5">
-            {linkedContacts.map((c) => (
-              <div key={c.id} className="border-b border-border pb-3 text-sm">
-                <p className="font-medium">
-                  {[c.first_name, c.last_name].filter(Boolean).join(" ")}
-                </p>
-                <p className="text-muted-foreground">{c.title}</p>
-                <p className="break-all">{c.email}</p>
-                <p>{c.phone}</p>
+            {linkedContacts.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr>
+                      {["HR / contact name", "Designation", "Mobile", "Telephone", "Email(s)"].map(
+                        (label) => (
+                          <th key={label} className="border-b p-2">
+                            {label}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedContacts.map((c) => (
+                      <tr key={c.id}>
+                        <td className="border-b p-2">
+                          {[c.first_name, c.last_name].filter(Boolean).join(" ")}
+                        </td>
+                        <td className="border-b p-2">{c.title || "—"}</td>
+                        <td className="border-b p-2">{c.phone || "—"}</td>
+                        <td className="border-b p-2">{c.landline || "—"}</td>
+                        <td className="whitespace-pre-wrap break-all border-b p-2">
+                          {c.email_addresses?.length
+                            ? c.email_addresses.join("\n")
+                            : c.email || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
+            ) : null}
             {contract?.contact_names ? (
               <dl className="grid gap-5">
                 <Detail label="Contact people from tracker">{contract.contact_names}</Detail>
