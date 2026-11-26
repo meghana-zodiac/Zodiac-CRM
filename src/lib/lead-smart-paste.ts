@@ -36,6 +36,22 @@ const KNOWN_LABELS = new Set([
   "secondary email",
   "alternate email",
   "phone",
+  "phone 1",
+  "phone 2",
+  "phone number",
+  "secondary phone",
+  "alternate phone",
+  "mobile 1",
+  "mobile 2",
+  "landline",
+  "telephone",
+  "company phone",
+  "company phone 1",
+  "company phone 2",
+  "company landline",
+  "office landline",
+  "owner name",
+  "email address",
   "mobile",
   "contact number",
   "designation",
@@ -165,7 +181,7 @@ function labelledValues(raw: string) {
     .filter(Boolean)) {
     const match = line.match(/^([^:–—-]{2,40})\s*[:–—-]\s*(.+)$/);
     if (!match) continue;
-    const label = match[1]!.trim().toLowerCase();
+    const label = match[1]!.trim().toLowerCase().replace(/_+/g, " ").replace(/\s+/g, " ");
     values[label] = match[2]!.trim();
     if (!KNOWN_LABELS.has(label)) unknown.push(line);
   }
@@ -386,7 +402,7 @@ function addCommon(result: SmartPasteResult, raw: string, labels: Record<string,
   put(
     result,
     "owner_name",
-    firstLabel(labels, ["owner", "account owner", "contact owner", "deal owner"]),
+    firstLabel(labels, ["owner", "owner name", "account owner", "contact owner", "deal owner"]),
   );
 }
 
@@ -483,6 +499,64 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
 
   if (table === "accounts") {
     const lead = parseLeadPasteDetailed(raw);
+    // A client is an organisation. Personal details belong to its linked contacts,
+    // and must never be reported as filled into an absent client field.
+    delete result.values["email"];
+    delete result.confidence["email"];
+    delete result.values["phone"];
+    delete result.confidence["phone"];
+    for (const [label, value] of [
+      [
+        "Contact person",
+        firstLabel(labels, ["contact", "contact name", "contact person"]) ?? personName(raw),
+      ],
+      ["Designation", firstLabel(labels, ["designation", "job title", "title", "position"])],
+      ["Department", firstLabel(labels, ["department", "function", "team"])],
+    ]) {
+      if (value)
+        result.unclassified.push(`${label}: ${value} — add under the client's Contacts tab.`);
+    }
+    for (const email of new Set(
+      Array.from(raw.matchAll(new RegExp(EMAIL.source, "gi")), (match) => match[0]),
+    )) {
+      result.unclassified.push(`Contact email: ${email} — add under the client's Contacts tab.`);
+    }
+    const phone2 = firstLabel(labels, [
+      "phone 2",
+      "company phone 2",
+      "secondary phone",
+      "alternate phone",
+      "mobile 2",
+    ]);
+    const landline = firstLabel(labels, [
+      "landline",
+      "company landline",
+      "office landline",
+      "telephone",
+    ]);
+    const otherNumbers = [phone2, landline]
+      .filter(Boolean)
+      .map((value) => value!.replace(/\D/g, ""));
+    const fallbackPhone = Array.from(
+      raw.matchAll(new RegExp(PHONE.source, "g")),
+      (match) => match[0],
+    ).find((value) => !otherNumbers.includes(value.replace(/\D/g, "")));
+    put(
+      result,
+      "phone",
+      firstLabel(labels, [
+        "phone 1",
+        "company phone 1",
+        "company phone",
+        "phone number",
+        "phone",
+        "mobile 1",
+        "mobile",
+        "contact number",
+      ]) ?? fallbackPhone,
+    );
+    put(result, "phone_2", phone2);
+    put(result, "landline", landline);
     put(
       result,
       "name",
@@ -492,13 +566,15 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
         "company",
         "organisation",
         "organization",
-      ]) ?? lead.values.company_name,
+        "client",
+        "name",
+      ]) ?? lead.values["company_name"],
     );
     put(
       result,
       "industry",
-      firstLabel(labels, ["industry", "sector"]) ?? lead.values.industry,
-      lead.confidence.industry,
+      firstLabel(labels, ["industry", "sector"]) ?? lead.values["industry"],
+      lead.confidence["industry"],
     );
     const inferredType = /\bmultiple|multi[- ]service\b/i.test(raw)
       ? "Multi-service"
@@ -508,14 +584,74 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
       "client_type",
       firstLabel(labels, ["engagement type", "client type"]) ?? inferredType,
     );
-    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values.city);
+    put(result, "city", firstLabel(labels, ["city", "location"]) ?? lead.values["city"]);
     put(
       result,
       "website",
       firstLabel(labels, ["website", "web", "url"]) ??
         raw.match(WEBSITE)?.[0]?.replace(/[.,;]+$/, ""),
     );
+    const handledLabels = new Set([
+      "client name",
+      "company name",
+      "company",
+      "organisation",
+      "organization",
+      "client",
+      "name",
+      "industry",
+      "sector",
+      "engagement type",
+      "client type",
+      "city",
+      "location",
+      "website",
+      "web",
+      "url",
+      "phone 1",
+      "company phone 1",
+      "company phone",
+      "phone number",
+      "phone",
+      "mobile 1",
+      "mobile",
+      "contact number",
+      "phone 2",
+      "company phone 2",
+      "secondary phone",
+      "alternate phone",
+      "mobile 2",
+      "landline",
+      "company landline",
+      "office landline",
+      "telephone",
+      "owner",
+      "owner name",
+      "account owner",
+      "contact owner",
+      "deal owner",
+      "contact",
+      "contact name",
+      "contact person",
+      "email",
+      "email id",
+      "email address",
+      "contact email",
+      "designation",
+      "job title",
+      "title",
+      "position",
+      "department",
+      "function",
+      "team",
+    ]);
+    for (const [label, value] of Object.entries(labels)) {
+      if (!handledLabels.has(label) && KNOWN_LABELS.has(label)) {
+        result.unclassified.push(`${label}: ${value} — no matching field in the client form.`);
+      }
+    }
     result.unclassified.push(...lead.unclassified);
+    result.unclassified = [...new Set(result.unclassified)];
     return result;
   }
 
@@ -775,4 +911,27 @@ export function parseSmartPasteDetailed(table: CrmTable, raw: string): SmartPast
 
 export function parseSmartPaste(table: CrmTable, raw: string): PasteValues {
   return parseSmartPasteDetailed(table, raw).values;
+}
+
+/** Apply the form's field contract before any values or conflicts reach the UI. */
+export function parseSmartPasteForFields(
+  table: CrmTable,
+  raw: string,
+  fields: readonly { name: string; label: string }[],
+): SmartPasteResult {
+  const parsed = parseSmartPasteDetailed(table, raw);
+  const allowed = new Set(fields.map((field) => field.name));
+  const result = createResult();
+  result.unclassified = [...parsed.unclassified];
+  for (const [name, value] of Object.entries(parsed.values)) {
+    if (allowed.has(name)) {
+      result.values[name] = value;
+      if (parsed.confidence[name]) result.confidence[name] = parsed.confidence[name];
+    } else {
+      const label = name.replaceAll("_", " ").replace(/^./, (char) => char.toUpperCase());
+      result.unclassified.push(`${label}: ${value} — no matching field in this form.`);
+    }
+  }
+  result.unclassified = [...new Set(result.unclassified)];
+  return result;
 }
