@@ -1300,7 +1300,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_client_with_contract: {
+        Args: { p_client: Json; p_contract: Json };
+        Returns: string;
+      };
     };
     Enums: {
       activity_status: "Pending" | "In Progress" | "Completed";

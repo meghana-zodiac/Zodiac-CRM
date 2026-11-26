@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ContactRound } from "lucide-react";
 import { toast } from "sonner";
@@ -23,8 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRecord, toDateInputValue, updateRecord, type CrmTable } from "@/lib/crm";
-import { parseSmartPasteForFields, SMART_PASTE_TABLES } from "@/lib/lead-smart-paste";
+import {
+  matchSmartPasteOption,
+  parseSmartPasteForFields,
+  SMART_PASTE_TABLES,
+} from "@/lib/lead-smart-paste";
 import { bdTeamMembersQuery } from "@/lib/poa";
+import { createClientWithContract } from "@/lib/create-client";
+import { commercialTerms } from "@/lib/contract-terms";
 
 export type FieldType =
   "text" | "email" | "tel" | "number" | "date" | "datetime" | "select" | "textarea";
@@ -182,11 +188,27 @@ export function RecordDialog({
     );
   }, [fields, teamMembers.data]);
   const [values, setValues] = useState<Values>({});
+  const [clientCreationId, setClientCreationId] = useState(() => crypto.randomUUID());
+  const includesContract =
+    table === "accounts" &&
+    !record?.["id"] &&
+    effectiveFields.some((field) => field.name === "contract.activity_status");
+  const hasContractDetails =
+    includesContract &&
+    Object.entries(values).some(([key, value]) => key.startsWith("contract.") && value.trim());
+  const missingContractSelection =
+    hasContractDetails &&
+    (!values["contract.activity_status"]?.trim() || !values["owner_name"]?.trim());
+  const contractPreview = commercialTerms(values["contract.terms"] ?? null);
   const [pasteText, setPasteText] = useState("");
   const [pasteConflicts, setPasteConflicts] = useState<PasteConflict[]>([]);
   const [pasteReport, setPasteReport] = useState<PasteReport | null>(null);
   const [supportsContactPicker, setSupportsContactPicker] = useState(false);
   const addressBookFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) setClientCreationId(crypto.randomUUID());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -213,13 +235,7 @@ export function RecordDialog({
     for (const field of effectiveFields) {
       const parsedValue = parsed[field.name];
       if (!parsedValue || !field.options?.length) continue;
-      const normalized = parsedValue.toLowerCase();
-      const match = field.options.find(
-        (option) =>
-          option.value.toLowerCase() === normalized ||
-          option.label.toLowerCase() === normalized ||
-          normalized.includes(option.label.toLowerCase()),
-      );
+      const match = matchSmartPasteOption(parsedValue, field.options);
       if (match) parsed[field.name] = match.value;
       else {
         needsReview.push({
@@ -404,6 +420,8 @@ export function RecordDialog({
       }
       if (record?.["id"]) {
         await updateRecord(table, String(record["id"]), payload);
+      } else if (includesContract) {
+        await createClientWithContract(clientCreationId, payload);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await createRecord(table as any, payload as any);
@@ -496,9 +514,11 @@ export function RecordDialog({
             />
             {table === "accounts" ? (
               <p className="mt-2 text-xs text-muted-foreground">
-                Paste the client name, industry, engagement type, city, website, Phone 1, Phone 2,
-                landline and owner. Add people, email addresses and designations under the client’s
-                Contacts tab after saving.
+                {includesContract
+                  ? "Paste client and contract details together. Include the client name, owner, activity status, recruiter, dates, fee / pricing, payment and replacement periods, and remarks. Review both sections below before creating the client."
+                  : "Paste the client name, industry, engagement type, city, website, Phone 1, Phone 2, landline and owner."}{" "}
+                Add people, email addresses and designations under the client’s Contacts tab after
+                saving.
               </p>
             ) : null}
             <Button
@@ -583,63 +603,98 @@ export function RecordDialog({
           {visibleFields.map((field) => {
             const type = field.type ?? "text";
             return (
-              <div
-                key={field.name}
-                className={field.span === 2 || type === "textarea" ? "sm:col-span-2" : undefined}
-              >
-                <Label
-                  htmlFor={field.name}
-                  className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              <Fragment key={field.name}>
+                {field.name === "contract.activity_status" ? (
+                  <div className="border-t border-border pt-4 sm:col-span-2">
+                    <h3 className="text-sm font-semibold">Contract Status (optional)</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add these details now to save the client and contract together. Leave this
+                      section empty to add them later.
+                    </p>
+                    {missingContractSelection ? (
+                      <p className="mt-2 text-xs text-destructive">
+                        Choose a BD owner and client activity status to save the contract details.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div
+                  className={field.span === 2 || type === "textarea" ? "sm:col-span-2" : undefined}
                 >
-                  {field.label}
-                  {field.required ? <span className="text-destructive"> *</span> : null}
-                </Label>
-                {type === "select" ? (
-                  <Select
-                    value={values[field.name] || undefined}
-                    onValueChange={(value) =>
-                      setValues((prev) => ({ ...prev, [field.name]: value }))
-                    }
+                  <Label
+                    htmlFor={field.name}
+                    className="mb-1.5 block text-xs font-medium text-muted-foreground"
                   >
-                    <SelectTrigger id={field.name}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(field.options ?? []).map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : type === "textarea" ? (
-                  <Textarea
-                    id={field.name}
-                    rows={3}
-                    value={values[field.name] ?? ""}
-                    onChange={(event) =>
-                      setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
-                    }
-                  />
-                ) : (
-                  <Input
-                    id={field.name}
-                    type={
-                      type === "datetime"
-                        ? "datetime-local"
-                        : type === "number"
-                          ? "number"
-                          : type === "date"
-                            ? "date"
-                            : type
-                    }
-                    value={values[field.name] ?? ""}
-                    onChange={(event) =>
-                      setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
-                    }
-                  />
-                )}
-              </div>
+                    {field.label}
+                    {field.required ? <span className="text-destructive"> *</span> : null}
+                  </Label>
+                  {type === "select" ? (
+                    <Select
+                      value={values[field.name] || undefined}
+                      onValueChange={(value) =>
+                        setValues((prev) => ({ ...prev, [field.name]: value }))
+                      }
+                    >
+                      <SelectTrigger id={field.name}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(field.options ?? []).map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : type === "textarea" ? (
+                    <Textarea
+                      id={field.name}
+                      rows={3}
+                      value={values[field.name] ?? ""}
+                      onChange={(event) =>
+                        setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
+                      }
+                    />
+                  ) : (
+                    <Input
+                      id={field.name}
+                      type={
+                        type === "datetime"
+                          ? "datetime-local"
+                          : type === "number"
+                            ? "number"
+                            : type === "date"
+                              ? "date"
+                              : type
+                      }
+                      value={values[field.name] ?? ""}
+                      onChange={(event) =>
+                        setValues((prev) => ({ ...prev, [field.name]: event.target.value }))
+                      }
+                    />
+                  )}
+                  {field.name === "contract.terms" ? (
+                    <div className="mt-2 rounded-md bg-muted/50 p-3 text-xs">
+                      <p className="font-medium">Fee / pricing: {contractPreview.fee}</p>
+                      <p className="mt-1">
+                        Payment period:{" "}
+                        {contractPreview.payment
+                          ? `${contractPreview.payment} days`
+                          : "Not recorded"}
+                      </p>
+                      <p className="mt-1">
+                        Replacement period:{" "}
+                        {contractPreview.replacement
+                          ? `${contractPreview.replacement} days`
+                          : "Not recorded"}
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Edit Commercial terms to change these values.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </Fragment>
             );
           })}
         </div>
@@ -649,7 +704,7 @@ export function RecordDialog({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={missingRequired || mutation.isPending}
+            disabled={missingRequired || missingContractSelection || mutation.isPending}
           >
             {mutation.isPending ? "Saving…" : record?.["id"] ? "Save changes" : "Create"}
           </Button>

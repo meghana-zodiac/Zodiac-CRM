@@ -17,7 +17,7 @@ import { EmptyState, ModuleHeader, type ViewMode } from "@/components/crm/module
 import { RecordDialog } from "@/components/crm/record-dialog";
 import { RowActions } from "@/components/crm/row-actions";
 import { ClientDetails, ClientActivityStatus } from "@/components/crm/client-details";
-import { accountFields } from "@/components/crm/field-defs";
+import { accountFields, clientCreationFields } from "@/components/crm/field-defs";
 import { ownerMatches, useOwnerScope } from "@/components/crm/owner-filter";
 import { accountsQuery, contactsQuery, dealsQuery, type Account } from "@/lib/crm";
 import {
@@ -301,9 +301,15 @@ function AccountsPage() {
         onOpenChange={setDialogOpen}
         table="accounts"
         title={editing ? "Edit Client" : "Create Client"}
-        fields={accountFields}
+        fields={editing ? accountFields : clientCreationFields}
         record={editing}
-        invalidateKeys={["accounts", "contacts", "deals"]}
+        invalidateKeys={[
+          "accounts",
+          "contacts",
+          "deals",
+          "client-contracts",
+          "client-contract-history",
+        ]}
       />
       <AccountImportDialog
         open={importOpen}

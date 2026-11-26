@@ -161,6 +161,22 @@ export const accountFields: FieldDef[] = [
   ownerField,
 ];
 
+export const clientCreationFields: FieldDef[] = [
+  ...accountFields,
+  {
+    name: "contract.activity_status",
+    label: "Client activity status",
+    type: "select",
+    options: opts(["Active", "Non-active"]),
+  },
+  { name: "contract.recruiter", label: "Assigned recruiter" },
+  { name: "contract.approach_date", label: "Approach date(s)" },
+  { name: "contract.visit_date", label: "Visit date", type: "date" },
+  { name: "contract.mandate_received_date", label: "Mandate received date", type: "date" },
+  { name: "contract.terms", label: "Commercial terms", type: "textarea", span: 2 },
+  { name: "contract.notes", label: "Remarks", type: "textarea", span: 2 },
+];
+
 export const leadFields: FieldDef[] = [
   { name: "contact_name", label: "Name" },
   {

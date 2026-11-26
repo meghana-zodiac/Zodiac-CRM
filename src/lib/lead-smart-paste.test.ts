@@ -1,13 +1,40 @@
 import { describe, expect, it } from "vitest";
 
-import { accountFields } from "@/components/crm/field-defs";
+import { accountFields, clientCreationFields } from "@/components/crm/field-defs";
 import {
+  matchSmartPasteOption,
   parseSmartPasteDetailed,
   parseSmartPasteForFields,
   SMART_PASTE_TABLES,
 } from "./lead-smart-paste";
 
 describe("Smart Paste", () => {
+  it("matches Non-active exactly instead of selecting Active as a substring", () => {
+    const options = [
+      { value: "Active", label: "Active" },
+      { value: "Non-active", label: "Non-active" },
+    ];
+    expect(matchSmartPasteOption("Non-active", options)?.value).toBe("Non-active");
+    expect(matchSmartPasteOption("was active before", options)).toBeUndefined();
+  });
+  it("fills both sections of Create Client from the same pasted details", () => {
+    const result = parseSmartPasteForFields(
+      "accounts",
+      "Client: Aurora Group\nOwner: Edward D\nActivity status: Non-active\nAssigned recruiter: Prerna\nMandate date: 08.05.2026\nFee / pricing: 8.33%\nPayment period: 30 days\nReplacement period: 90 days\nRemarks: Agreement signed",
+      clientCreationFields,
+    );
+    expect(result.values).toMatchObject({
+      name: "Aurora Group",
+      owner_name: "Edward D",
+      "contract.activity_status": "Non-active",
+      "contract.recruiter": "Prerna",
+      "contract.mandate_received_date": "2026-05-08",
+      "contract.terms": "8.33% I Pay 30 Days I Replace 90 Days",
+      "contract.notes": "Agreement signed",
+    });
+    expect(result.unclassified).toEqual([]);
+    expect(result.values["phone"]).toBeUndefined();
+  });
   it("supports every CRM record type advertised by the UI", () => {
     expect(SMART_PASTE_TABLES).toEqual([
       "leads",

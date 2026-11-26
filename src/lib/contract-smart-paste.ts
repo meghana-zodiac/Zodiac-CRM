@@ -49,6 +49,11 @@ const labelMap = new Map(
   ),
 );
 
+export function isContractPasteLine(line: string) {
+  const label = line.match(/^(.{2,45}?)\s*[:：\t]/)?.[1] ?? line;
+  return labelMap.has(normalize(label));
+}
+
 /** Day-first dates from Indian trackers; never rely on US Date.parse interpretation. */
 function dateOnly(value: string): string | undefined {
   let year: number, month: number, day: number;
